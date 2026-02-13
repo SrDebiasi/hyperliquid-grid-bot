@@ -1,2 +1,618 @@
-# hyperliquid-grid-bot
-A configurable grid trading engine for Hyperliquid featuring dynamic exposure tracking, weighted entry-based PnL calculations, and Telegram reporting.
+# Grid Trading Bot
+
+## Overview
+
+This Grid Trading Bot is designed to generate passive income from market volatility while operating strictly within a defined price range.
+
+Instead of predicting direction, the bot:
+
+- Works inside a configurable price range
+- Buys low and sells high repeatedly
+- Accumulates more BTC (or base asset) over time
+- Generates realized profit per completed cycle
+- Avoids leverage (no liquidation risk)
+- Can operate continuously in ranging markets
+
+The idea is simple but powerful: **volatility becomes income**.
+
+------------------------------------------------------------------------
+
+## Why This Strategy Is Strong
+
+### 1. No Stop-Loss Required
+
+The bot operates inside a predefined range. It does not rely on stop-loss mechanisms to function.
+
+### 2. No Liquidation Risk
+
+The strategy is spot-based (or non-liquidated environment). There is no leverage exposure.
+
+### 3. Profits From Volatility
+
+Sideways markets are ideal. Every oscillation between grid levels produces income.
+
+### 4. BTC Accumulation
+
+When configured with rebuy logic, realized profits can be reinvested automatically, increasing long-term BTC exposure.
+
+### 5. Passive Structure
+
+After setup, the bot runs automatically: - Places limit orders - Detects fills - Reverses side - Tracks profits - Manages capital allocation
+
+------------------------------------------------------------------------
+
+## How The Bot Works (Concept Explained)
+
+The bot creates multiple micro price ranges inside a larger defined range.
+
+Each micro range generates a fixed profit target.
+
+Instead of predicting direction, the bot waits for price oscillation.
+
+Every time price moves up and down inside the grid, it earns a fixed percentage.
+
+--------------------------------------------------
+
+Step-by-Step Logic
+
+1) You define a price range:
+
+- entry_price (bottom)
+- exit_price (top)
+
+2) The bot divides this range into multiple grid levels.
+
+3) For each level:
+
+- It places a BUY order at a lower price.
+- It places a SELL order above it (target_percent higher).
+
+4) When BUY is filled:
+   → It immediately places the SELL above.
+
+5) When SELL is filled:
+   → Profit is realized. → A new BUY is placed below. → The cycle continues.
+
+(It may also operate as SELL → BUY if you start while already holding the asset and the price is in the middle of the range.)
+
+The important point is that profit is only realized and accounted for when a full cycle is completed:
+
+BUY → SELL  
+or  
+SELL → BUY
+
+A partial movement does not count as profit. Only when the cycle closes is the gain officially recorded.
+
+--------------------------------------------------
+
+Example (Simple BTC Scenario)
+
+Imagine:
+
+- BTC price = 60,000
+- target_percent = 1.8%
+- usd_transaction = 100 USDC
+
+Bot places:
+
+BUY at 60,000 SELL at 61,080  (1.8% profit)
+
+If price moves:
+
+60,000 → 61,080
+
+The SELL fills.
+
+Profit ≈ 1.8 USDC (minus fees).
+
+Then the bot places:
+
+New BUY at 60,000 (or next grid level)
+
+If price oscillates:
+
+60,000 ↔ 61,080 ↔ 60,000 ↔ 61,080
+
+The bot earns 1.8% repeatedly.
+
+--------------------------------------------------
+
+Why This Works
+
+Markets often move sideways.
+
+Instead of waiting for a huge breakout, the bot monetizes small movements.
+
+Volatility becomes income.
+
+--------------------------------------------------
+
+What Happens in a Downtrend?
+
+If price drops:
+
+The bot keeps buying lower grid levels.
+
+No liquidation risk (spot-based). You accumulate BTC.
+
+When price eventually rebounds, the SELL levels above start filling again.
+
+--------------------------------------------------
+
+What Happens in a Strong Uptrend?
+
+If price moves above your exit_price:
+
+The bot stops creating new grid levels. You hold accumulated BTC.
+
+You can then:
+
+- Adjust the range upward.
+- Or restart the grid higher.
+
+--------------------------------------------------
+
+Core Idea
+
+This bot does NOT try to predict direction.
+
+It harvests volatility.
+
+Every oscillation inside your range generates income.
+
+The more healthy sideways movement, the more consistent the returns.
+
+------------------------------------------------------------------------
+
+## Core Execution Loop
+
+Each market runs independently.
+
+### runCoins()
+
+This is the engine loop for each trading pair.
+
+It:
+
+1. Loads config
+2. Updates prices
+3. Filters active grid levels near current price
+4. Places missing orders
+5. Detects filled orders
+6. Places opposite order
+7. Calculates profit
+8. Optionally performs rebuy
+9. Updates execution range
+10. Schedules next iteration
+
+------------------------------------------------------------------------
+
+## Order Flow
+
+For each grid row:
+
+If last side was BUY → place SELL\
+If last side was SELL → place BUY\
+If no side → determine based on current price
+
+When an order is filled:
+
+- Opposite order is created
+- last_side toggles
+- last_operation toggles
+- Profit may be recorded
+- Telegram notification is sent
+
+------------------------------------------------------------------------
+
+## Profit Calculation
+
+Two levels:
+
+### Gross Profit
+
+Sell price - Buy price
+
+### Net Profit
+
+Gross - (Buy Fee + Sell Fee)
+
+Fees are configurable per side.
+
+------------------------------------------------------------------------
+
+## Capital Protection
+
+### Order Block System
+
+The bot can place a reserve BUY limit to "block" free USDC and prevent over-allocation.
+
+### Cleanup Logic
+
+Old grid levels far from price are periodically cleaned to:
+
+- Reduce open orders
+- Improve efficiency
+- Prevent unnecessary capital exposure
+
+------------------------------------------------------------------------
+
+## Rebuy Logic
+
+When enabled:
+
+- Profit accumulates in a rebuy wallet
+- Once threshold is reached
+- A MARKET BUY is executed
+- BTC accumulation increases
+- Stats are persisted
+
+This compounds volatility into long-term asset growth.
+
+------------------------------------------------------------------------
+
+## Exchange Adapter
+
+The bot is exchange-agnostic.
+
+Current supported:
+
+- Hyperliquid
+
+Adapter responsibilities:
+
+- placeOrder()
+- cancelOrder()
+- getOrder()
+- getOpenOrders()
+- getPrices()
+- subscribeAggTrades()
+- getAccountInfo()
+
+The engine does not depend on exchange-specific logic.
+
+------------------------------------------------------------------------
+
+## Websocket Logic
+
+subscribeAggTrades()
+
+- Updates price cache
+- Monitors min/max active range
+- Triggers fast execution when price exits boundary
+
+This allows reactive execution without constant polling.
+
+------------------------------------------------------------------------
+
+## State Management
+
+state.js manages:
+
+- price cache
+- last operation
+- instance id
+- execution flags
+
+Prevents duplicate executions and controls loop timing.
+
+------------------------------------------------------------------------
+
+## Telegram Integration
+
+The bot sends:
+
+- Profit notifications
+- Order fills
+- Error messages
+- Startup confirmation
+
+### How to Create Telegram Bot
+
+1. Open Telegram
+2. Search for **@BotFather**
+3. Send `/start`
+4. Send `/newbot`
+5. Follow instructions
+6. Copy the generated BOT TOKEN
+
+Add to `.env`:
+
+    TELEGRAM_BOT_TOKEN=your_token_here
+    TELEGRAM_CHAT_ID=your_chat_id_here
+
+To get your chat ID:
+
+1. Start your bot in Telegram
+2. Send any message to it
+3. Open this URL in browser:
+
+   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+
+4. Look for `"chat":{"id": ...}`
+   Perfect — add this section right after the Telegram setup instructions in your README:
+
+To get your Chat ID:
+
+1. Open Telegram.
+2. Search for your bot username.
+3. Press Start.
+4. Send any message to the bot (for example: "hi").
+5. Open this URL in your browser:
+
+   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+
+6. Look for:
+
+   "chat": {
+   "id": 123456789 }
+
+That number is your Chat ID.
+
+--------------------------------------------------
+
+If getUpdates Returns Empty Result
+
+If you call:
+
+https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+
+And receive:
+
+{
+"ok": true,
+"result": []
+}
+
+This means Telegram has no new updates to return.
+
+Common reasons:
+
+- You have not sent a message to the bot yet.
+
+How to Fix
+
+Option 1 — Basic Method
+
+1. Open Telegram.
+2. Search your bot username.
+3. Press Start.
+4. Send any message (for example: "hi").
+5. Call getUpdates again.
+
+Security Notice
+
+If you ever expose your Bot Token publicly:
+
+1. Open @BotFather
+2. Use /revoke
+3. Generate a new token
+4. Update your .env file immediately
+
+Never share your Bot Token publicly.
+
+
+------------------------------------------------------------------------
+
+## Environment Variables
+
+Required:
+
+    API_ENV=local
+    API_URL_LOCAL=http://127.0.0.1/api/
+    EXCHANGE=hyperliquid
+    BOT_TZ=America/Vancouver
+
+    HYPERLIQUID_PRIVATE_KEY=...
+    HYPERLIQUID_USER_ADDRESS=...
+
+    TELEGRAM_BOT_TOKEN=...
+    TELEGRAM_CHAT_ID=...
+
+------------------------------------------------------------------------
+
+## CLI Commands
+
+Start bot:
+
+    npm run start -- <instanceId>
+
+Create grid:
+
+    npm run create -- <pair> <instanceId> true
+
+List open orders:
+
+    npm run openOrders -- <instanceId> <pair>
+
+Cancel open orders:
+
+    npm run cancelOrders -- <pair> <instanceId>
+
+------------------------------------------------------------------------
+
+## Hyperliquid Setup (API Wallet + Keys)
+
+This bot uses Hyperliquid "API Wallet" credentials (agent wallet).
+
+Important:
+
+- `wallet_address` must be your MAIN / linked account address on Hyperliquid (the one that actually holds funds).
+- `private_key` must be the API Wallet PRIVATE KEY generated on Hyperliquid (agent wallet private key).
+- Do NOT use the API wallet address as `wallet_address`.
+
+### Generate Hyperliquid API Wallet Private Key
+
+1) Log in to Hyperliquid.
+2) Open the API page:
+   https://app.hyperliquid.xyz/API
+3) Create a new API Wallet:
+
+- Enter a name
+- Click Generate
+- Click "Authorize API Wallet" (do not skip authorization)
+
+4) Copy the Private Key shown (this is what you store as `private_key` in the bot).
+5) Copy your MAIN account address (top-right account dropdown / wallet shown in UI). That is what you store as `wallet_address` in the bot.
+
+Notes:
+
+- Some setups require you to deposit funds before you can authorize an API wallet.
+- Treat the API wallet private key like a password.
+- NEVER SHARE IT WITH ANYONE.
+- If someone gets access to your API wallet private key:
+  • They cannot withdraw your funds. • BUT they can place trades. • They can intentionally execute bad trades and destroy your balance.
+
+If you believe your private key has been exposed:
+
+1. Go to the Hyperliquid API page.
+2. Revoke the compromised API wallet.
+3. Generate a new API wallet.
+4. Update your database immediately.
+
+------------------------------------------------------------------------
+
+### Deployment Recommendation (Security)
+
+We strongly recommend running this bot locally (your own PC / private server you fully control).
+
+Reason:
+
+- This bot uses sensitive credentials (exchange private key + Telegram token).
+- The safest setup is keeping everything on a machine you control.
+
+If you decide to run it in the cloud (AWS, etc.):
+
+- DO NOT store private keys or tokens inside .env files committed to disk.
+- Use a secrets manager (example: AWS Secrets Manager / Parameter Store).
+- Load secrets at runtime from the secrets manager.
+- Lock down access:
+    - restrict IAM permissions to minimum required
+    - restrict server/network access (firewalls, allowed IPs, etc.)
+- Never log secrets to console or to files.
+
+------------------------------------------------------------------------
+
+## Database Setup (PostgreSQL)
+
+This project requires PostgreSQL.
+
+1) Create a database (example: `gridbot`).
+2) Run the SQL file to create database:
+   ./db/db.sql
+
+Or manually create the required tables below.
+
+### trade_instance
+
+Meaning:
+
+- wallet_address = Hyperliquid MAIN account address (linked account on Hyperliquid, not the API wallet).
+- private_key = Hyperliquid API wallet private key (generated on the API page).
+
+### trade_config (fields explained)
+
+Each row in `trade_config` represents ONE market configuration (one pair) for a given `trade_instance_id`. This table defines the grid behavior (
+range, spacing, profit target, order sizing, precision, and optional features).
+
+Core fields:
+
+- id Primary key.
+
+- trade_instance_id Links this config to your `trade_instance` (credentials + notifications).
+
+- pair Market symbol. Example: BTC/USDC
+
+- name Friendly name used in logs/Telegram. Example: BTC
+
+Range + grid behavior:
+
+- entry_price Bottom of the operating range (where grid starts). The bot will create buy/sell levels starting from this price.
+
+- exit_price Top of the operating range (where grid stops generating levels).
+
+- margin_percent Distance between grid levels (spacing). Example: 1.8 means each next BUY level is +1.8% above the previous BUY.
+
+- target_percent Profit target for each cycle. Each SELL is placed at BUY + target_percent.
+
+Sizing + precision:
+
+- usd_transaction Quote currency amount per grid order (how much USDC to use per BUY). Quantity is calculated as: usd_transaction / buy_price
+
+- decimal_price Price precision required by the exchange (how many decimals in price).
+
+- decimal_quantity Quantity precision required by the exchange (how many decimals in quantity).
+
+Optional features:
+
+- rebuy_profit If true, the bot accumulates profits into a rebuy wallet and can rebuy the asset (compound).
+
+- rebuy_percent Optional: percent of profit to allocate into rebuy logic (if your backend uses it).
+
+- rebuy_value Stored rebuy wallet amount (quote currency) accumulated from profits.
+
+- rebought_value Total quote currency spent on rebuys.
+
+- rebought_coin Total base asset acquired via rebuys.
+
+Order block (capital reserve):
+
+- order_block_price Price used to place a reserve BUY LIMIT to “block” free quote balance (USDC). This prevents allocating all free USDC into grid
+  orders.
+
+- order_block_id Stores the current reserve order id (managed by the bot).
+
+Execution boundaries (optional safety):
+
+- execution_price_min If set, the bot will not place BUY orders below this price.
+
+- execution_price_max If set, the bot will not place SELL orders above this price.
+
+Recommended Settings (Very Important)
+
+We strongly recommend starting with:
+
+- target_percent = 1.8
+
+Why:
+
+- It gives a decent profit per cycle while avoiding too many trades.
+- It reduces fee impact compared to very small targets (fees become a big part of the profit).
+- It behaves well in real volatility and avoids over-trading.
+
+Notes:
+
+- margin_percent controls the spacing between grid levels (how dense the grid is).
+- target_percent controls the profit target for each completed BUY->SELL (or SELL->BUY) cycle.
+- A common approach is margin_percent <= target_percent (so orders are not too dense compared to the profit target).
+
+After you insert:
+
+- one row in `trade_instance`
+- one or more rows in `trade_config` for that `trade_instance_id`
+
+You can generate the grid orders using the CLI create command:
+
+npm run create -- <pair> <instanceId> true
+
+This will create the grid rows (trade orders) for the configured range.
+
+------------------------------------------------------------------------
+
+## Final Notes
+
+This bot:
+
+- Does not predict direction
+- Monetizes volatility
+- Avoids leverage risk
+- Accumulates BTC over time
+- Produces steady grid-based income in ranging markets
+
+It performs best in sideways or oscillating conditions.
+
+Long-term trending markets require appropriate range adjustments.
+
+------------------------------------------------------------------------
+
+Built for disciplined volatility harvesting.
