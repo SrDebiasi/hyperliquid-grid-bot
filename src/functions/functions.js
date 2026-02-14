@@ -21,8 +21,8 @@ const getExchange = () => exchange;
 const retrieveInstance = (data) => new Promise((resolve, reject) => {
   axios.get(apiUrl + 'trade-instance', { params: { id: data.id } }, headers)
     .then(async (result) => {
-      const userAddress = result.data.wallet_address ?? '';
-      const privateKey = result.data.private_key ?? '';
+      const userAddress = process.env.WALLET_ADDRESS ?? result.data.wallet_address ??  '';
+      const privateKey = process.env.PRIVATE_KEY ?? result.data.private_key ??  '';
       consoleLog('Private Key loaded.');
 
       if (!privateKey) throw new Error('Missing HYPERLIQUID PRIVATE KEY');

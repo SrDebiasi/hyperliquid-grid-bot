@@ -1,13 +1,13 @@
 import { runBacktest } from '../src/backtest/runBacktest.js';
-import { FEE_RATE_MAKER_PER_SIDE } from '../src/functions/init.js';
+import {FEE_RATE_MAKER_PER_SIDE} from "../src/functions/fees.js";
 
 const { result, grid } = await runBacktest({
   symbol: 'BTCUSDT',
   interval: '1m', // Needs to be 1 minute, always otherwise you might miss profits.
-  startDate: '01/12/2025',
+  startDate: '01/11/2025',
   endDate: '01/02/2026',
-  entry_price: 62000,
-  exit_price: 102000,
+  entry_price: 65000,
+  exit_price: 120000,
   margin_percent: 0.1,
   target_percent: 1.8,
   simulationConfig: {

@@ -16,6 +16,7 @@ import {
 
 import { setPrices, setPrice, getInstanceId, setInstanceId, setLastOperation } from './state.js';
 import { notifyTelegram, createTelegramBot } from './services/telegramService.js';
+import {FEE_RATE_MAKER_PER_SIDE} from "./fees.js";
 
 let wallet = null;
 let enable = true;
@@ -29,13 +30,6 @@ let rangePrices = [];
 const ORDER_STATUS_NOT_OPEN = 'NOT_OPEN_NO_FILL';
 const ORDER_STATUS_FILLED = 'FILLED';
 const ORDER_STATUS_OPEN = 'OPEN';
-
-/**
- * Fee rates are per side (buy + sell).
- * Values are decimals (e.g., 0.0384% => 0.000384).
- */
-export const FEE_RATE_MAKER_PER_SIDE = 0.000384;
-export const FEE_RATE_TAKER_PER_SIDE = 0.000672;
 
 const QUOTE_ASSET = process.env.QUOTE_ASSET || 'USDC';
 const BLOCK_USD_BUFFER = Number(process.env.BLOCK_USD_BUFFER ?? 50);
@@ -1158,23 +1152,23 @@ function parseSaveFlag(save) {
  * Backward compatibility:
  * - `save` can be boolean (true/false) or string ("YES"/"NO").
  *
- * @param {string} coin - Trading pair to generate grid for (e.g., 'BTCUSDT').
- * @param {number|string} i - Trade instance id.
+ * @param {number|string} instance - Trade instance id.
+ * @param {string} pair - Trading pair to generate grid for (e.g., 'BTCUSDT').
  * @param {boolean|string} save - Whether to persist generated rows (true/"YES" to save).
  * @returns {Promise<void>}
  */
-const create = async function(coin, i, save) {
-  setInstanceId(i);
+const create = async function(instance, pair, save) {
+  setInstanceId(instance);
 
   const shouldSave = parseSaveFlag(save);
-  const cfgRows = await loadConfig(coin, getInstanceId());
+  const cfgRows = await loadConfig(pair, getInstanceId());
   for (const c of cfgRows) {
-    consoleLog(`Creating configuration for ${coin}`);
+    consoleLog(`Creating configuration for ${pair}`);
     if (shouldSave) await sleep(10);
     const records = [];
     let buyPrice = parseFloat(c.entry_price);
     let sellPrice = buyPrice + (buyPrice * c.target_percent) / 100;
-    const priceKey = String(coin).replace(/[\/\-_]/g, '');
+    const priceKey = String(pair).replace(/[\/\-_]/g, '');
     const currentPrice = prices[priceKey];
     let sumQuantityCoin = 0; // Base asset required if price trends up (e.g., BTC)
     let sumQuantityUsd = 0;  // Quote required if price trends down (e.g., USDC/USDT)
@@ -1204,7 +1198,7 @@ const create = async function(coin, i, save) {
       sellPrice = buyPrice + (buyPrice * c.target_percent) / 100;
     }
     console.table(records);
-    consoleLog(`Finished ${coin} working between ${c.entry_price} and ${c.exit_price}`);
+    consoleLog(`Finished ${pair} working between ${c.entry_price} and ${c.exit_price}`);
     consoleLog(
       `Total ${records.length} records | target=${c.target_percent}% | spacing=${c.margin_percent}% | usd_per_order=${c.usd_transaction}`,
     );
@@ -1374,11 +1368,11 @@ const openOrders = async function(instance, pair) {
  * This is a CLI helper. It loads config for the pair to initialize credentials,
  * then cancels open orders through the exchange adapter.
  *
- * @param {string} pair - Trading pair (e.g., 'BTCUSDT').
  * @param {number|string} instance - Trade instance id.
+ * @param {string} pair - Trading pair (e.g., 'BTCUSDT').
  * @returns {Promise<void>}
  */
-const cancelOrders = async function(pair, instance) {
+const cancelOrders = async function( instance, pair) {
   setInstanceId(instance);
 
   await loadConfig(pair, getInstanceId());
@@ -1415,16 +1409,16 @@ const test = async function(instance) {
  *   npm run start -- <instanceId>
  *
  * - Create grid rows (dry-run / print only):
- *   npm run create -- <pair> <instanceId> false
+ *   npm run create -- <instanceId> <pair>  false
  *
  * - Create grid rows (persist to DB):
- *   npm run create -- <pair> <instanceId> true
+ *   npm run create -- <instanceId> <pair>  true
  *
  * - List open orders (raw adapter output):
  *   npm run openOrders -- <instanceId> <pair>
  *
  * - Cancel open orders for a pair:
- *   npm run cancelOrders -- <pair> <instanceId>
+ *   npm run cancelOrders -- <instanceId> <pair>
  */
 export {
   start,

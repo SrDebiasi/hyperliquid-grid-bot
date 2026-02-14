@@ -4,17 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:create": "node scripts/db_create.js",
+    "db:seed": "node scripts/db_seed.js",
+    "backtest": "node scripts/backtest.js",
     "api": "node src/api/server.js",
     "start": "run-func src/functions/init.js start",
     "openOrders": "run-func src/functions/init.js openOrders",
     "cancelOrders": "run-func src/functions/init.js cancelOrders",
-    "create": "run-func src/functions/init.js create",
+    "create": "run-func src/functions/init.js create"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@nktkas/hyperliquid": "^0.31.0",
     "axios": "^1.1.2",
-    "binance-api-node": "^0.12.0",
     "dotenv": "^17.2.4",
     "fastify": "^5.7.4",
     "luxon": "^3.7.2",

@@ -17,27 +17,56 @@ The idea is simple but powerful: **volatility becomes income**.
 
 ------------------------------------------------------------------------
 
+## Real Backtest Performance (BTC Grid Example)
+
+To demonstrate the effectiveness of this strategy, here is a real backtest using BTC:
+
+**Period:** 2025-11-01 → 2026-02-02 (93 days)  
+**Grid Levels:** 614  
+**Base USD per level:** $100  
+**Total Value Locked (BTC + USD):** $61,400
+
+### Results
+
+- Total Cycles Completed: 1,254
+- Total Profit: **$2,121.83**
+- Return on Total Capital: **3.46%**
+- Average Profit per Cycle: $1.69
+- Fee rate per side: 0.0384%
+
+### Performance Breakdown
+
+- Per day:   **$22.81** (0.04%)
+- Per week:  **$159.64** (0.26%)
+- Per month: **$684.16** (1.11%)
+- Per year:  **$8,323.96** (13.56%)
+
+---
+
+### Why This Is Powerful
+
+- 13.56% yearly return without leverage
+- No liquidation risk
+- Capital always inside a controlled price range
+- Profit generated purely from volatility
+- Scales linearly with capital
+
+The bot does not need trend prediction.  
+It simply monetizes market movement.
+
+------------------------------------------------------------------------
+
 ## Why This Strategy Is Strong
 
-### 1. No Stop-Loss Required
+1. No Stop-Loss Required - The bot operates inside a predefined range. It does not rely on stop-loss mechanisms to function.
 
-The bot operates inside a predefined range. It does not rely on stop-loss mechanisms to function.
+2. No Liquidation Risk - The strategy is spot-based (or non-liquidated environment). There is no leverage exposure.
 
-### 2. No Liquidation Risk
+3. Profits From Volatility - Sideways markets are ideal. Every oscillation between grid levels produces income.
 
-The strategy is spot-based (or non-liquidated environment). There is no leverage exposure.
+4. BTC Accumulation - When configured with rebuy logic, realized profits can be reinvested automatically, increasing long-term BTC exposure.
 
-### 3. Profits From Volatility
-
-Sideways markets are ideal. Every oscillation between grid levels produces income.
-
-### 4. BTC Accumulation
-
-When configured with rebuy logic, realized profits can be reinvested automatically, increasing long-term BTC exposure.
-
-### 5. Passive Structure
-
-After setup, the bot runs automatically: - Places limit orders - Detects fills - Reverses side - Tracks profits - Manages capital allocation
+5. Passive Structure - After setup, the bot runs automatically: - Places limit orders - Detects fills - Reverses side - Tracks profits - Manages capital allocation
 
 ------------------------------------------------------------------------
 
@@ -164,63 +193,6 @@ The more healthy sideways movement, the more consistent the returns.
 
 ------------------------------------------------------------------------
 
-## Core Execution Loop
-
-Each market runs independently.
-
-### runCoins()
-
-This is the engine loop for each trading pair.
-
-It:
-
-1. Loads config
-2. Updates prices
-3. Filters active grid levels near current price
-4. Places missing orders
-5. Detects filled orders
-6. Places opposite order
-7. Calculates profit
-8. Optionally performs rebuy
-9. Updates execution range
-10. Schedules next iteration
-
-------------------------------------------------------------------------
-
-## Order Flow
-
-For each grid row:
-
-If last side was BUY → place SELL\
-If last side was SELL → place BUY\
-If no side → determine based on current price
-
-When an order is filled:
-
-- Opposite order is created
-- last_side toggles
-- last_operation toggles
-- Profit may be recorded
-- Telegram notification is sent
-
-------------------------------------------------------------------------
-
-## Profit Calculation
-
-Two levels:
-
-### Gross Profit
-
-Sell price - Buy price
-
-### Net Profit
-
-Gross - (Buy Fee + Sell Fee)
-
-Fees are configurable per side.
-
-------------------------------------------------------------------------
-
 ## Capital Protection
 
 ### Order Block System
@@ -285,149 +257,25 @@ This allows reactive execution without constant polling.
 
 ------------------------------------------------------------------------
 
-## State Management
-
-state.js manages:
-
-- price cache
-- last operation
-- instance id
-- execution flags
-
-Prevents duplicate executions and controls loop timing.
-
-------------------------------------------------------------------------
-
-## Telegram Integration
-
-The bot sends:
-
-- Profit notifications
-- Order fills
-- Error messages
-- Startup confirmation
-
-### How to Create Telegram Bot
-
-1. Open Telegram
-2. Search for **@BotFather**
-3. Send `/start`
-4. Send `/newbot`
-5. Follow instructions
-6. Copy the generated BOT TOKEN
-
-Add to `.env`:
-
-    TELEGRAM_BOT_TOKEN=your_token_here
-    TELEGRAM_CHAT_ID=your_chat_id_here
-
-To get your chat ID:
-
-1. Start your bot in Telegram
-2. Send any message to it
-3. Open this URL in browser:
-
-   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
-
-4. Look for `"chat":{"id": ...}`
-   Perfect — add this section right after the Telegram setup instructions in your README:
-
-To get your Chat ID:
-
-1. Open Telegram.
-2. Search for your bot username.
-3. Press Start.
-4. Send any message to the bot (for example: "hi").
-5. Open this URL in your browser:
-
-   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
-
-6. Look for:
-
-   "chat": {
-   "id": 123456789 }
-
-That number is your Chat ID.
-
---------------------------------------------------
-
-If getUpdates Returns Empty Result
-
-If you call:
-
-https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
-
-And receive:
-
-{
-"ok": true,
-"result": []
-}
-
-This means Telegram has no new updates to return.
-
-Common reasons:
-
-- You have not sent a message to the bot yet.
-
-How to Fix
-
-Option 1 — Basic Method
-
-1. Open Telegram.
-2. Search your bot username.
-3. Press Start.
-4. Send any message (for example: "hi").
-5. Call getUpdates again.
-
-Security Notice
-
-If you ever expose your Bot Token publicly:
-
-1. Open @BotFather
-2. Use /revoke
-3. Generate a new token
-4. Update your .env file immediately
-
-Never share your Bot Token publicly.
-
-
-------------------------------------------------------------------------
-
 ## Environment Variables
 
-Required:
-
-    API_ENV=local
-    API_URL_LOCAL=http://127.0.0.1/api/
-    EXCHANGE=hyperliquid
-    BOT_TZ=America/Vancouver
-
-    HYPERLIQUID_PRIVATE_KEY=...
-    HYPERLIQUID_USER_ADDRESS=...
-
-    TELEGRAM_BOT_TOKEN=...
-    TELEGRAM_CHAT_ID=...
+Check .env.example
 
 ------------------------------------------------------------------------
 
-## CLI Commands
+## Main CLI Commands
 
-Start bot:
+Start api:
 
-    npm run start -- <instanceId>
+    npm run api
 
 Create grid:
 
     npm run create -- <pair> <instanceId> true
 
-List open orders:
+Start bot:
 
-    npm run openOrders -- <instanceId> <pair>
-
-Cancel open orders:
-
-    npm run cancelOrders -- <pair> <instanceId>
+    npm run start -- <instanceId>
 
 ------------------------------------------------------------------------
 
@@ -495,80 +343,9 @@ If you decide to run it in the cloud (AWS, etc.):
 
 ## Database Setup (PostgreSQL)
 
-This project requires PostgreSQL.
+Check README_HOW_TO_SETUP.md
 
-1) Create a database (example: `gridbot`).
-2) Run the SQL file to create database:
-   ./db/db.sql
-
-Or manually create the required tables below.
-
-### trade_instance
-
-Meaning:
-
-- wallet_address = Hyperliquid MAIN account address (linked account on Hyperliquid, not the API wallet).
-- private_key = Hyperliquid API wallet private key (generated on the API page).
-
-### trade_config (fields explained)
-
-Each row in `trade_config` represents ONE market configuration (one pair) for a given `trade_instance_id`. This table defines the grid behavior (
-range, spacing, profit target, order sizing, precision, and optional features).
-
-Core fields:
-
-- id Primary key.
-
-- trade_instance_id Links this config to your `trade_instance` (credentials + notifications).
-
-- pair Market symbol. Example: BTC/USDC
-
-- name Friendly name used in logs/Telegram. Example: BTC
-
-Range + grid behavior:
-
-- entry_price Bottom of the operating range (where grid starts). The bot will create buy/sell levels starting from this price.
-
-- exit_price Top of the operating range (where grid stops generating levels).
-
-- margin_percent Distance between grid levels (spacing). Example: 1.8 means each next BUY level is +1.8% above the previous BUY.
-
-- target_percent Profit target for each cycle. Each SELL is placed at BUY + target_percent.
-
-Sizing + precision:
-
-- usd_transaction Quote currency amount per grid order (how much USDC to use per BUY). Quantity is calculated as: usd_transaction / buy_price
-
-- decimal_price Price precision required by the exchange (how many decimals in price).
-
-- decimal_quantity Quantity precision required by the exchange (how many decimals in quantity).
-
-Optional features:
-
-- rebuy_profit If true, the bot accumulates profits into a rebuy wallet and can rebuy the asset (compound).
-
-- rebuy_percent Optional: percent of profit to allocate into rebuy logic (if your backend uses it).
-
-- rebuy_value Stored rebuy wallet amount (quote currency) accumulated from profits.
-
-- rebought_value Total quote currency spent on rebuys.
-
-- rebought_coin Total base asset acquired via rebuys.
-
-Order block (capital reserve):
-
-- order_block_price Price used to place a reserve BUY LIMIT to “block” free quote balance (USDC). This prevents allocating all free USDC into grid
-  orders.
-
-- order_block_id Stores the current reserve order id (managed by the bot).
-
-Execution boundaries (optional safety):
-
-- execution_price_min If set, the bot will not place BUY orders below this price.
-
-- execution_price_max If set, the bot will not place SELL orders above this price.
-
-Recommended Settings (Very Important)
+## Profit target
 
 We strongly recommend starting with:
 
@@ -585,17 +362,6 @@ Notes:
 - margin_percent controls the spacing between grid levels (how dense the grid is).
 - target_percent controls the profit target for each completed BUY->SELL (or SELL->BUY) cycle.
 - A common approach is margin_percent <= target_percent (so orders are not too dense compared to the profit target).
-
-After you insert:
-
-- one row in `trade_instance`
-- one or more rows in `trade_config` for that `trade_instance_id`
-
-You can generate the grid orders using the CLI create command:
-
-npm run create -- <pair> <instanceId> true
-
-This will create the grid rows (trade orders) for the configured range.
 
 ------------------------------------------------------------------------
 

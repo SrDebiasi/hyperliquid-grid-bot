@@ -205,8 +205,6 @@ This tool is intended for:
 - Fee sensitivity testing
 - Capital efficiency analysis
 - Comparing `target_percent` and `margin_percent` combinations
-- Based on our tests, a target between 1.5% and 2% has shown the highest profitability across different ranges. Therefore, 1.8% appears to be a
-  well-balanced and efficient target.
 
 ------------------------------------------------------------------------
 
