@@ -40,18 +40,19 @@ npm run create 1 BTC/USDC no
 ```
 This will print an estimate (BTC needed, USD needed, records generated). Example:
 ```bash
-11:09:37 - Finished BTC/USDC working between 60000 and 100000
-11:09:37 - Total 494 records | target=1.8% | spacing=0.1% | usd_per_order=11
-11:09:37 - Current BTC price 69782.5 | base_needed=0.048510 | base_value_usd=3385.15
-11:09:37 - Quote needed for downtrend: 1474.00 USD
-11:09:37 - Profit if buying required amount today and selling at exit (100000): 1465.85 USD
-11:09:37 -  - Buy value today: 3385.15 USD
-11:09:37 -  - Sell value at range top: 4851.00 USD
-11:09:37 - Gross profit per operation: 0.20 USD
-11:09:37 - Estimated fees per operation: 0.02 USD
-11:09:37 - Estimated net profit per operation: 0.18 USD
-11:09:37 - Estimated total USD needed: 4859.15
+13:55:00 - Finished BTC/USDC working between 60000 and 100000
+13:55:00 - Total 494 records | target=1.8% | spacing=0.1% | usd_per_order=50
+13:55:00 - Current BTC price 69973.5 | base_needed=0.218280 | base_value_usd=15273.82
+13:55:00 - Quote needed for downtrend: 6850.00 USD
+13:55:00 - Profit if buying required amount today and selling at exit (100000): 6554.18 USD
+13:55:00 -  - Buy value today: 15273.82 USD
+13:55:00 -  - Sell value at range top: 21828.00 USD
+13:55:00 - Gross profit per operation: 0.90 USD
+13:55:00 - Estimated fees per operation: 0.07 USD
+13:55:00 - Estimated net profit per operation: 0.83 USD
+13:55:00 - Estimated total USD needed: 22123.82
 ```
+
 If you are OK with the estimate, re-run with YES to persist the generated rows into the database:
 ```bash
 npm run create 1 BTC/USDC yes
