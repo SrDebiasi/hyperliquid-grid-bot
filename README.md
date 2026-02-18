@@ -1,5 +1,5 @@
 # Grid Trading Bot
-
+![Grid bot](docs/bot.png)
 ## Overview
 
 This Grid Trading Bot is designed to generate passive income from market volatility while operating strictly within a defined price range.
@@ -50,6 +50,7 @@ To demonstrate the effectiveness of this strategy, here is a real backtest using
 - Capital always inside a controlled price range
 - Profit generated purely from volatility
 - Scales linearly with capital
+- Does not require allocating 100% of your USD to active buy orders — unused capital can stay in yield strategies (like lending or liquidity pools), generating ~5% APY in parallel
 
 The bot does not need trend prediction.  
 It simply monetizes market movement.
@@ -363,6 +364,38 @@ Notes:
 - target_percent controls the profit target for each completed BUY->SELL (or SELL->BUY) cycle.
 - A common approach is margin_percent <= target_percent (so orders are not too dense compared to the profit target).
 
+------------------------------------------------------------------------
+
+Health Monitoring (Healthchecks.io)
+
+This bot supports optional uptime monitoring using Healthchecks.io.
+It will periodically ping a Healthchecks endpoint.
+If the bot stops running and no ping is received within the configured grace time, Healthchecks will trigger an alert.
+
+Setup
+
+Create a new check at https://healthchecks.io
+
+Copy your Ping URL (example):
+
+    https://hc-ping.com/your-uuid-here
+
+
+Add the following to your .env:
+
+    HEALTHCHECKS_PING_URL=https://hc-ping.com/your-uuid-here
+    HEALTHCHECKS_PING_INTERVAL_MS=60000
+
+HEALTHCHECKS_PING_INTERVAL_MS should match your check period (example: 60000 = 1 minute).
+
+How It Works
+
+When the bot starts, it begins pinging the configured URL.
+
+If the process crashes or stops, the pings stop.
+
+After the configured grace time, Healthchecks sends an alert.
+This feature is optional. If HEALTHCHECKS_PING_URL is not set, no monitoring is performed.
 ------------------------------------------------------------------------
 
 ## Final Notes

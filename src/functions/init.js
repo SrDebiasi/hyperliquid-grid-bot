@@ -12,6 +12,7 @@ import {
   addProfit,
   addMessage,
   consoleLog,
+  startHealthchecksPing,
 } from './functions.js';
 
 import { setPrices, setPrice, getInstanceId, setInstanceId, setLastOperation } from './state.js';
@@ -585,6 +586,20 @@ async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 10
   return uniqueSelected;
 }
 
+function getIntEnv(name, fallback, { min = 1, max = 100000 } = {}) {
+  const raw = process.env[name];
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  const v = Math.trunc(n);
+  if (v < min) return fallback;
+  if (v > max) return max;
+  return v;
+}
+
+// Keep a larger window when cleanup is enabled (so we cancel fewer "useful" rows by mistake)
+const ORDERS_WINDOW_DEFAULT = getIntEnv('GRID_ORDERS_WINDOW_DEFAULT', 70, { min: 10, max: 1000 });
+const ORDERS_WINDOW_CLEANUP  = getIntEnv('GRID_ORDERS_WINDOW_CLEANUP', 100, { min: 10, max: 2000 });
+
 /**
  * Loads grid orders from the database and optionally performs cleanup.
  *
@@ -606,8 +621,7 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
   const CLEANUP_EVERY = 100; // run cleanup on first loop and then every N cycles
   const shouldCleanup = timesExecuted === 1 || timesExecuted % CLEANUP_EVERY === 0;
 
-  // Keep a larger window when cleanup is enabled (so we cancel fewer "useful" rows by mistake)
-  const limit = shouldCleanup ? 100 : 70;
+  const limit = shouldCleanup ? ORDERS_WINDOW_CLEANUP : ORDERS_WINDOW_DEFAULT;
 
   const filtered = await filterAndCleanupOrders(orders, currentPrice, cfg, limit, shouldCleanup);
   consoleLog(`Filtered to ${filtered.length} orders around price`);
@@ -1307,19 +1321,19 @@ const start = async function(instance) {
   setApi();
 
   createTelegramBot({ polling: true });
-  void notifyTelegram('Bot grid initiated.');
-  consoleLog('Retrieving coin data.');
 
+  startHealthchecksPing()
   if (getInstanceId() == null) {
     console.log('Instance ID is mandatory.');
     process.exit();
   }
-
+  consoleLog('Retrieving coin data.');
   await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     console.log('Unable to load private_key');
     process.exit();
   });
+  void notifyTelegram('Bot grid initiated.');
 
   data = await retrieveConfig({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);

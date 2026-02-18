@@ -1,7 +1,6 @@
 import axios from 'axios';
 import moment from 'moment-timezone';
 
-
 import { notifyTelegram } from './services/telegramService.js';
 import HyperliquidAdapter from '../exchange/HyperliquidAdapter.js';
 
@@ -16,28 +15,52 @@ function nowTz() {
 }
 
 let exchange = null;
+let healthchecksTimer = null;
 const getExchange = () => exchange;
 
 const retrieveInstance = (data) => new Promise((resolve, reject) => {
   axios.get(apiUrl + 'trade-instance', { params: { id: data.id } }, headers)
-    .then(async (result) => {
-      const userAddress = process.env.WALLET_ADDRESS ?? result.data.wallet_address ??  '';
-      const privateKey = process.env.PRIVATE_KEY ?? result.data.private_key ??  '';
-      consoleLog('Private Key loaded.');
+      .then(async (result) => {
+        const userAddress = process.env.WALLET_ADDRESS ?? result.data.wallet_address ?? '';
+        const privateKey = process.env.PRIVATE_KEY ?? result.data.private_key ?? '';
+        consoleLog('Private Key loaded.');
 
-      if (!privateKey) throw new Error('Missing HYPERLIQUID PRIVATE KEY');
+        if (!privateKey) throw new Error('Missing HYPERLIQUID PRIVATE KEY');
 
-      exchange = new HyperliquidAdapter({
-        userAddress,
-        privateKey,
-        isTestnet: process.env.HYPERLIQUID_TESTNET === '1',
+        exchange = new HyperliquidAdapter({
+          userAddress,
+          privateKey,
+          isTestnet: process.env.HYPERLIQUID_TESTNET === '1',
+        });
+
+        await exchange.init();
+        resolve(result.data);
+      })
+      .catch((err) => {
+        if (isConnRefusedToLocalhost(err)) {
+          return reject({
+            error: `API server offline (did you run "npm run api"?)`,
+            code: err.code,
+          });
+        }
+        reject({ error: err?.toString?.() || String(err) });
       });
-
-      await exchange.init();
-      resolve(result.data);
-    })
-    .catch((ex) => reject({ error: ex.toString() }));
 });
+
+
+function isConnRefusedToLocalhost(err) {
+  const code = err?.code;
+  const msg = String(err?.message || err || '');
+  const url = String(err?.config?.url || '');
+
+  const looksLikeLocalApi =
+      url.includes('127.0.0.1:3000') ||
+      url.includes('localhost:3000') ||
+      msg.includes('127.0.0.1:3000') ||
+      msg.includes('localhost:3000');
+
+  return code === 'ECONNREFUSED' && looksLikeLocalApi;
+}
 
 const retrieveConfig = (data) => new Promise((resolve, reject) => {
   axios.get(apiUrl + 'trade-config', { params: { trade_instance_id: data.id } }, headers)
@@ -98,14 +121,6 @@ const updateTradeConfig = (data) => new Promise((resolve, reject) => {
     .catch((ex) => reject({ error: ex.toString() }));
 });
 
-const functionTime = () => {
-  try {
-    exchange?.refreshTime?.();
-  } catch (ex) {
-  }
-};
-setInterval(functionTime, 60000 * 10);
-
 const setApi = () => {
   const env = (process.env.API_ENV || 'local').toLowerCase();
 
@@ -125,7 +140,6 @@ const setApi = () => {
   apiUrl = resolved.endsWith('/') ? resolved : `${resolved}/`;
 
   console.log(`Running on ${env}`);
-  console.log(`API URL: ${apiUrl}`);
 };
 
 const addMessage = (message, color = null) => {
@@ -194,6 +208,24 @@ const consoleLog = (message, color = null) => {
   console.log(`${colorCode}${fullMessage}\x1b[0m`);
 };
 
+function startHealthchecksPing(
+    pingUrl = process.env.HEALTHCHECKS_PING_URL,
+    intervalMs = Number(process.env.HEALTHCHECKS_PING_INTERVAL_MS || 60000),
+) {
+  if (intervalMs === 0 || !pingUrl) return;
+  try {
+    clearInterval(healthchecksTimer);
+    const base = String(pingUrl).replace(/\/+$/, '');
+    const ping = () => fetch(base).catch(() => {});
+    void ping();
+    consoleLog('Start pinging healthchecks')
+    healthchecksTimer = setInterval(ping, intervalMs);
+    healthchecksTimer.unref?.();
+  } catch (ex) {
+    console.log('Error on pinging healthchecks.io')
+  }
+}
+
 export {
   setApi,
   getExchange,
@@ -207,4 +239,5 @@ export {
   addProfit,
   addMessage,
   consoleLog,
+  startHealthchecksPing
 };
