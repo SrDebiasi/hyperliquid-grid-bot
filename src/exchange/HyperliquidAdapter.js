@@ -58,7 +58,6 @@ export default class HyperliquidAdapter {
 
     this.pairs = new Map();
     this.midCache = new Map();
-    this.priceUnsubs = new Map();
   }
 
   async init() {
@@ -173,7 +172,7 @@ export default class HyperliquidAdapter {
 
 
   /**
-   * Spot limit order submitter (assumes symbol + asset already resolved).
+   * Spot order submitter (assumes symbol + asset already resolved).
    * postOnly defaults to true -> "Alo".
    *
    * @param {{
@@ -185,7 +184,7 @@ export default class HyperliquidAdapter {
    *  postOnly?: boolean
    * }} param
    */
-  async placeLimitOrder(param) {
+  async placeAnOrder(param) {
     const symbol = String(param.symbol || '').toUpperCase();
     const side = String(param.side || '').toUpperCase();
 
@@ -200,14 +199,9 @@ export default class HyperliquidAdapter {
     if (!Number.isFinite(price) || price <= 0) throw new Error(`Invalid LIMIT price: ${param.price}`);
     if (!Number.isFinite(quantity) || quantity <= 0) throw new Error(`Invalid quantity: ${param.quantity}`);
 
-    // Tick size handling (still your existing assumption)
-    const tick = 1;
-
-    // Snap price
-    price = Math.floor(price / tick) * tick;
-    price = Math.trunc(price);
-
-    const tif = postOnly ? 'Alo' : 'Gtc';
+    const tif = param.tif
+        ? String(param.tif)
+        : (postOnly ? 'Alo' : 'Gtc');
 
     const req = {
       orders: [
@@ -231,19 +225,25 @@ export default class HyperliquidAdapter {
     const side = String(param.side || '').toUpperCase();
     const quantity = Number(param.quantity);
     const price = param.price !== undefined ? Number(param.price) : undefined;
+    const postOnly = param.postOnly !== undefined ? !!param.postOnly : false;
 
     const { symbol, asset } = await this.resolveSpotAssetFromSymbol(param.symbol);
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new Error(`Invalid quantity: ${param.quantity}`);
     }
-    if (type !== 'LIMIT') {
+    if (type !== 'LIMIT' && type !== 'MARKET') {
       throw new Error(`Unsupported order type for HyperliquidAdapter: ${param.type}`);
     }
     if (!Number.isFinite(price) || price <= 0) {
       throw new Error(`Invalid LIMIT price: ${param.price}`);
     }
 
+    const tif =
+        type === 'MARKET'
+            ? 'Ioc'
+            : (postOnly ? 'Alo' : 'Gtc');
+    
     const orderToSubmit = {
       symbol,
       side,
@@ -251,8 +251,9 @@ export default class HyperliquidAdapter {
       quantity,
       postOnly: param.postOnly !== undefined ? !!param.postOnly : false,
       asset,
+      tif
     };
-    const res = await this.placeLimitOrder(orderToSubmit);
+    const res = await this.placeAnOrder(orderToSubmit);
     const st0 = res?.response?.data?.statuses?.[0] ?? {};
     const orderId =
       st0?.resting?.oid ??
@@ -266,7 +267,7 @@ export default class HyperliquidAdapter {
       throw new Error(`Hyperliquid order missing oid. status0=${JSON.stringify(st0)}`);
     }
     return {
-      type: 'LIMIT',
+      type,
       orderId: String(orderId),
       symbol: orderToSubmit.symbol,
       side: orderToSubmit.side,
@@ -333,6 +334,31 @@ export default class HyperliquidAdapter {
     return { status: 'NOT_OPEN_NO_FILL' };
   }
 
+  async getOrdersStatusMap({ orderIds }) {
+    const user = this._userAddress;
+
+    // 1) fetch once
+    const open = await this.info.openOrders({ user, dex: '' });
+    const fills = await this.info.userFills({ user });
+
+    // 2) build fast lookups
+    const openSet = new Set((open || []).map(o => Number(o.oid)));
+    const filledSet = new Set((fills || []).map(f => Number(f.oid)));
+
+    // 3) map statuses only for what you care about
+    const out = new Map();
+    for (const raw of orderIds) {
+      const oid = Number(raw);
+      if (!Number.isFinite(oid)) continue;
+
+      if (openSet.has(oid)) out.set(oid, { status: 'OPEN' });
+      else if (filledSet.has(oid)) out.set(oid, { status: 'FILLED' });
+      else out.set(oid, { status: 'NOT_OPEN_NO_FILL' });
+    }
+
+    return out;
+  }
+
   async getAccountInfo() {
     const res = await this.getBalances(); // currently returns { balances: [...] }
 
@@ -351,26 +377,20 @@ export default class HyperliquidAdapter {
    */
   async cancelOpenOrders({ symbol } = {}) {
     const open = await this.getOpenOrders();
-    const filtered = symbol ? (open ?? []).filter((o) => o.symbol === symbol) : (open ?? []);
-    const cancels = filtered
-      .map((o) => ({ oid: Number(o.oid ?? o.orderId) }))
-      .filter((c) => Number.isFinite(c.oid));
+    const filtered = symbol ? open.filter((x) => x.symbol === symbol) : open;
+
+    const cancels = [];
+    for (const o of filtered) {
+      const oid = Number(o.orderId);
+      if (!Number.isFinite(oid)) continue;
+      const { asset } = await this.resolveSpotAssetFromSymbol(o.symbol);
+      cancels.push({ a: asset, o: oid });
+    }
+
     if (cancels.length === 0) return { cancelled: 0 };
     const res = await this.exchange.cancel({ cancels });
     return { cancelled: cancels.length, raw: res };
   }
-
-  async close() {
-    for (const [symbol, unsub] of this.priceUnsubs.entries()) {
-      try {
-        await unsub();
-      } catch (e) {
-        // ignore
-      }
-      this.priceUnsubs.delete(symbol);
-    }
-  }
-
 
   subscribeAggTrades(symbols, handler) {
     const url = this.isTestnet

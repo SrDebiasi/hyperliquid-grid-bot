@@ -293,16 +293,19 @@ Important:
 ### Generate Hyperliquid API Wallet Private Key
 
 1) Log in to Hyperliquid.
-2) Open the API page:
+   https://app.hyperliquid.xyz/join/BOTGRID
+2) Use BOTGRID refferal to earn 4% discounts in fees.
+
+3) Open the API page:
    https://app.hyperliquid.xyz/API
-3) Create a new API Wallet:
+4) Create a new API Wallet:
 
 - Enter a name
 - Click Generate
 - Click "Authorize API Wallet" (do not skip authorization)
 
-4) Copy the Private Key shown (this is what you store as `private_key` in the bot).
-5) Copy your MAIN account address (top-right account dropdown / wallet shown in UI). That is what you store as `wallet_address` in the bot.
+5) Copy the Private Key shown (this is what you store as `private_key` in the bot).
+6) Copy your MAIN account address (top-right account dropdown / wallet shown in UI). That is what you store as `wallet_address` in the bot.
 
 Notes:
 

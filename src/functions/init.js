@@ -21,12 +21,12 @@ import {FEE_RATE_MAKER_PER_SIDE} from "./fees.js";
 
 let wallet = null;
 let enable = true;
-let checking = [];
+let checking = {};
 let timesExecuted = 0;
-let lastPrices = [];
-let prices = [];
+let prices = {};
+let lastPrices = {};
 let data = [];
-let rangePrices = [];
+let rangePrices = {};
 
 const ORDER_STATUS_NOT_OPEN = 'NOT_OPEN_NO_FILL';
 const ORDER_STATUS_FILLED = 'FILLED';
@@ -34,7 +34,6 @@ const ORDER_STATUS_OPEN = 'OPEN';
 
 const QUOTE_ASSET = process.env.QUOTE_ASSET || 'USDC';
 const BLOCK_USD_BUFFER = Number(process.env.BLOCK_USD_BUFFER ?? 50);
-const BALANCE_SYNC_DELAY_MS = 700;
 
 /**
  * Simple async delay helper.
@@ -294,11 +293,6 @@ async function createOrderBlock(coinIndex) {
   }
 
   await cancelOrderBlock(coinIndex);
-
-  // Optional: rebuy may change available quote balance
-  await sleep(BALANCE_SYNC_DELAY_MS);
-  await handleRebuyFromProfit(coinIndex, 0);
-  await sleep(BALANCE_SYNC_DELAY_MS);
 
   await balanceCheck();
 
@@ -649,7 +643,7 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
  * @returns {Promise<void>}
  */
 const runCoins = async function(coinIndex) {
-  data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => console.log(ex));
+  data = await retrieveConfig({ id: getInstanceId() }).catch((ex) => console.log(ex));
 
   const cfg = data[coinIndex];
   const pair = cfg.pair;
@@ -685,6 +679,12 @@ const runCoins = async function(coinIndex) {
   let timeToExecute = 20000;
 
   try {
+    const orderIds = orders
+        .flatMap(o => [o.buy_order, o.sell_order])
+        .filter(Boolean);
+
+    const statuses = await getExchange().getOrdersStatusMap({ orderIds });
+
     for (const order of orders) {
       await sleep(100);
 
@@ -738,9 +738,8 @@ const runCoins = async function(coinIndex) {
 
       // Existing SELL order path
       if (hasSell(order)) {
-        const orderInfo = await getExchange().getOrder({ orderId: order.sell_order });
-
-        if (orderInfo.status === ORDER_STATUS_FILLED) {
+        const sellStatus = statuses.get(Number(order.sell_order))?.status;
+        if (sellStatus === ORDER_STATUS_FILLED) {
           orderFilled = true;
           setLastOperation(pair);
 
@@ -799,17 +798,15 @@ const runCoins = async function(coinIndex) {
         }
 
         // We have an orderId locally, but the order is not open on the exchange.
-        if (orderInfo.status === ORDER_STATUS_NOT_OPEN) {
-          void updateTradeOrder({ id: order.id, sell_order: null }).catch((ex) => console.log(ex));
-          order.sell_order = null;
+        if (sellStatus === ORDER_STATUS_NOT_OPEN) {
+          clearMissingOrder({ order, side: 'SELL', tradeOrderId: order.id });
         }
       }
 
       // Existing BUY order path
       if (hasBuy(order)) {
-        const orderInfo = await getExchange().getOrder({ orderId: order.buy_order });
-
-        if (orderInfo.status === ORDER_STATUS_FILLED) {
+        const buyStatus  = statuses.get(Number(order.buy_order))?.status;
+        if (buyStatus === ORDER_STATUS_FILLED) {
           orderFilled = true;
           setLastOperation(pair);
 
@@ -867,11 +864,8 @@ const runCoins = async function(coinIndex) {
         }
 
         // We have an orderId locally, but the order is not open on the exchange.
-        if (orderInfo.status === ORDER_STATUS_NOT_OPEN) {
-          void notifyTelegram(`Order ${order.buy_order} not found.`);
-
-          void updateTradeOrder({ id: order.id, buy_order: null }).catch((ex) => console.log(ex));
-          order.buy_order = null;
+        if (buyStatus === ORDER_STATUS_NOT_OPEN) {
+          clearMissingOrder({ order, side: 'BUY', tradeOrderId: order.id, notify: true });
         }
       }
     }
@@ -883,7 +877,7 @@ const runCoins = async function(coinIndex) {
     if (orderFilled) {
       timeToExecute = 3000; // fast call after a fill
     } else {
-      timeToExecute = 1000 * 60 * 3; // slower call when idle
+      timeToExecute = 1000 * 60 * 10; // slower call when idle - 10m
     }
   } catch (e) {
     consoleLog(`runCoins error (${pair ?? 'unknown'}): ${e?.message ?? e}`, 'red');
@@ -898,6 +892,16 @@ const runCoins = async function(coinIndex) {
     runWithTime(coinIndex, timeToExecute);
   }
 };
+
+function clearMissingOrder({ order, side, tradeOrderId, notify = false }) {
+  const field = side === 'SELL' ? 'sell_order' : 'buy_order';
+  const orderId = order[field];
+  if (!orderId) return;
+
+  if (notify) void notifyTelegram(`Order ${orderId} not found.`);
+  void updateTradeOrder({ id: tradeOrderId, [field]: null }).catch(console.log);
+  order[field] = null;
+}
 
 /**
  * Computes the nearest active BUY and SELL boundaries for a pair.
@@ -1039,41 +1043,48 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     cfg.rebought_value = toNum(cfg.rebought_value, 0);
     cfg.rebought_coin = toNum(cfg.rebought_coin, 0);
 
-    consoleLog(`Testing rebuy: ${cfg.rebuy_profit ? 'true' : 'false'}`);
     if (!cfg.rebuy_profit) return;
 
     const profit = toNum(profitValue, 0);
-    if (profit <= 0) return;
 
     // Add profit to the rebuy wallet
     const newRebuyValue = round(cfg.rebuy_value + profit, 8);
-    consoleLog(`newRebuyValue ${newRebuyValue}`);
-
     await updateTradeConfig({ id: cfg.id, rebuy_value: newRebuyValue });
     cfg.rebuy_value = newRebuyValue;
 
-    const amountToBuy = 10; // Quote currency amount per rebuy (e.g., USDC/USDT)
-    if (cfg.rebuy_value + 1e-9 < amountToBuy) {
-      consoleLog(`Not enough profit to rebuy. rebuy_value=${cfg.rebuy_value.toFixed(8)}`);
+    const amountToBuyQuote = 10; // quote currency per rebuy (e.g., USDC/USDT)
+    if (cfg.rebuy_value + 1e-9 < amountToBuyQuote) return;
+
+    // Get latest prices so we can convert quote -> base quantity
+    await updatePrices();
+
+    const priceKey = String(cfg.pair).replace(/[\/\-_]/g, '');
+    const currentPrice = toNum(prices?.[priceKey], 0);
+    if (!currentPrice || currentPrice <= 0) {
+      consoleLog(`Rebuy aborted: invalid currentPrice for ${cfg.pair} (key=${priceKey})`);
       return;
     }
 
-    consoleLog(`Rebuy triggered: buying $${amountToBuy.toFixed(2)} of ${cfg.name}`);
+    const qtyDecimals = Number.isFinite(Number(cfg.decimal_quantity))
+        ? Number(cfg.decimal_quantity)
+        : 8;
 
-    const order = await getExchange().placeOrder({
-      symbol: cfg.pair,
-      side: 'BUY',
-      type: 'MARKET',
-      quoteOrderQty: amountToBuy.toFixed(2),
-    });
+    // Convert $10 into base qty using current price
+    const qtyToBuy = round(amountToBuyQuote / currentPrice, qtyDecimals);
+    if (!qtyToBuy || qtyToBuy <= 0) {
+      consoleLog(`Rebuy aborted: invalid qtyToBuy=${qtyToBuy} price=${currentPrice}`);
+      return;
+    }
 
-    const qtyBought = toNum(order.executedQty, 0);
-    const quoteSpent = toNum(order.cummulativeQuoteQty, amountToBuy);
+    // Force fill using IOC price with 0.5% slippage buffer
+    const slippage = 0.005; // 0.5%
+    const iocPrice = Number((currentPrice * (1 + slippage)).toFixed(cfg.decimal_price));
 
-    // Update values (numeric, rounded)
-    const updatedRebuyValue = round(cfg.rebuy_value - quoteSpent, 8);
-    const updatedReboughtValue = round(cfg.rebought_value + quoteSpent, 8);
-    const updatedReboughtCoin = round(cfg.rebought_coin + qtyBought, 8);
+    // Update local + DB bookkeeping immediately (fire-and-forget approach)
+    // We assume: spent = amountToBuyQuote, bought = qtyToBuy
+    const updatedRebuyValue = round(cfg.rebuy_value - amountToBuyQuote, 8);
+    const updatedReboughtValue = round(cfg.rebought_value + amountToBuyQuote, 8);
+    const updatedReboughtCoin = round(cfg.rebought_coin + qtyToBuy, 8);
 
     await updateTradeConfig({
       id: cfg.id,
@@ -1087,12 +1098,44 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     cfg.rebought_coin = updatedReboughtCoin;
 
     consoleLog(
-      `Rebuy completed: bought ${qtyBought.toFixed(8)} ${cfg.name} (spent ${quoteSpent.toFixed(2)} quote)`,
+        `Rebuy triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${cfg.name} @ IOC ${iocPrice}`
     );
+
+    // Place IOC order and do not wait for/parse fills.
+    // If it errors, we revert the bookkeeping.
+    try {
+      await getExchange().placeOrder({
+        symbol: cfg.pair,
+        side: 'BUY',
+        type: 'MARKET',      // your adapter maps this to LIMIT + Ioc
+        quantity: qtyToBuy,  // base qty
+        price: iocPrice,     // aggressive price to force fill
+        postOnly: false,
+      });
+    } catch (err) {
+      // Revert accounting on failure
+      const revertedRebuyValue = round(cfg.rebuy_value + amountToBuyQuote, 8);
+      const revertedReboughtValue = round(cfg.rebought_value - amountToBuyQuote, 8);
+      const revertedReboughtCoin = round(cfg.rebought_coin - qtyToBuy, 8);
+
+      await updateTradeConfig({
+        id: cfg.id,
+        rebuy_value: revertedRebuyValue,
+        rebought_value: revertedReboughtValue,
+        rebought_coin: revertedReboughtCoin,
+      });
+
+      cfg.rebuy_value = revertedRebuyValue;
+      cfg.rebought_value = revertedReboughtValue;
+      cfg.rebought_coin = revertedReboughtCoin;
+
+      consoleLog(`Rebuy failed (reverted): ${err?.message ?? String(err)}`);
+    }
   } catch (e) {
     console.log(e?.message ?? String(e));
   }
 }
+
 
 /**
  * Loads bot configuration for a specific pair and instance id, then fetches initial prices.
@@ -1129,7 +1172,7 @@ const loadConfig = async function(pair, instance) {
   // Allow the exchange client to finish initialization
   await sleep(1000);
 
-  data = await retrieveConfig({ pair, trade_instance_id: getInstanceId() }).catch((ex) => {
+  data = await retrieveConfig({ pair, id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
@@ -1176,6 +1219,7 @@ const create = async function(instance, pair, save) {
 
   const shouldSave = parseSaveFlag(save);
   const cfgRows = await loadConfig(pair, getInstanceId());
+
   for (const c of cfgRows) {
     consoleLog(`Creating configuration for ${pair}`);
     if (shouldSave) await sleep(10);
@@ -1186,16 +1230,20 @@ const create = async function(instance, pair, save) {
     const currentPrice = prices[priceKey];
     let sumQuantityCoin = 0; // Base asset required if price trends up (e.g., BTC)
     let sumQuantityUsd = 0;  // Quote required if price trends down (e.g., USDC/USDT)
+
     while (sellPrice < parseFloat(c.exit_price)) {
       if (shouldSave) await sleep(10);
       const quantity = parseFloat((c.usd_transaction / buyPrice).toFixed(c.decimal_quantity));
+
       if (sellPrice > currentPrice) sumQuantityCoin += quantity;
       else sumQuantityUsd += 1;
+
       records.push({
         buy_price: buyPrice,
         sell_price: sellPrice,
         quantity,
       });
+
       if (shouldSave) {
         void saveTradeOrder({
           pair: c.pair,
@@ -1226,6 +1274,7 @@ const create = async function(instance, pair, save) {
     const sellValueIfRangeTop = sumQuantityCoin * parseFloat(c.exit_price);
     const buyValueToday = sumQuantityCoin * currentPrice;
     const profitIfSoldAtTop = sellValueIfRangeTop - buyValueToday;
+
     consoleLog(
       `Profit if buying required amount today and selling at exit (${c.exit_price}): ${profitIfSoldAtTop.toFixed(2)} USD`,
     );
@@ -1293,6 +1342,8 @@ async function startCoinsStaggered() {
 
     if (checking[coin.pair] == null) checking[coin.pair] = true;
 
+    // Trigger once when bot is started
+    await handleRebuyFromProfit(idx, 0);
     consoleLog(`Starting market ${coin.pair}`);
     startMarket(idx);
 

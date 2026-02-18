@@ -9,8 +9,15 @@ brew services start postgresql
 ```
 - Linux: use your distro service manager
 ## 2) Create your .env
-Copy `.env` from `.env.example` file in the project root:
+Create a copy of `.env.example` named `.env` from project root folder:
+
 ### Wallet + Secret Key (Important)
+ Create your account on Hyperliquid.\
+   https://app.hyperliquid.xyz/join/BOTGRID \
+ Use BOTGRID refferal to earn 4% discounts in fees.\
+If you still don't have your wallet + secret key read:  
+ Generate Hyperliquid API Wallet Private Key on README file
+
 For local usage, you can keep credentials in `.env`.
 For multi-account setups, use the `trade_instance` table.
 If you only want to run one account locally, set:
@@ -70,6 +77,8 @@ npm run api
 ```bash
 npm run start
 ```
+## 9) Read the Readme about Telegram
+For notifications and commands, read README_TELEGRAM.md
 ## Troubleshooting
 ### “password authentication failed”
 Double-check DB_USER/DB_PASS and that Postgres is running.
