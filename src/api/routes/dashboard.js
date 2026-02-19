@@ -2,7 +2,7 @@
 
 
 import {getProfitSummary} from "../../reports/profitReportService.js";
-import {ensureBotRunning, getBotStatus, stopBot} from "../../services/pm2Service.js";
+import {ensureBotRunning, getBotLogs, getBotStatus, stopBot} from "../../services/pm2Service.js";
 
 export async function dashboardRoutes(app, opts) {
     const { models } = opts;
@@ -81,5 +81,16 @@ export async function dashboardRoutes(app, opts) {
 
         await stopBot({ instanceId });
         return reply.redirect("/dashboard");
+    });
+
+    app.get("/dashboard/instances/:id/logs", async (request, reply) => {
+        const instanceId = Number(request.params.id);
+        const lines = Math.min(Number(request.query.lines ?? 100) || 100, 500);
+
+        if (!Number.isFinite(instanceId)) return reply.code(400).send("Invalid instance id");
+
+        const logs = await getBotLogs({ instanceId, lines });
+
+        return reply.view("partials/pm2_logs.ejs", { logs, lines });
     });
 }

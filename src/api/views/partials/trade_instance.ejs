@@ -60,6 +60,30 @@
                 </button>
             </form>
         <% } %>
+            <button
+                    class="btn btn-outline-secondary btn-sm"
+                    hx-get="/dashboard/instances/<%= instance.id %>/logs?lines=100"
+                    hx-target="#pm2LogsBody"
+                    hx-trigger="click"
+                    data-bs-toggle="modal"
+                    data-bs-target="#pm2LogsModal"
+            >
+                Check logs
+            </button>
+    </div>
+
+    <div class="modal fade" id="pm2LogsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Bot Logs</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="pm2LogsBody">
+                    <div class="text-muted small">Loading…</div>
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>

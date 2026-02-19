@@ -243,9 +243,18 @@ async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
     const totalCoinUsd = sumQuantityCoin * pxNow;
     const quoteNeededUsd = sumQuantityUsd * usdPerLevel;
 
-    const sellValueIfRangeTop = sumQuantityCoin * exit;
-    const buyValueToday = sumQuantityCoin * pxNow;
-    const profitIfSoldAtTop = sellValueIfRangeTop - buyValueToday;
+    const sellRowsAbove = rows.filter(r => r.sell_price > pxNow);
+    const baseNeeded = sellRowsAbove.reduce((acc, r) => acc + r.quantity, 0);
+
+    const proceedsIfSoldAlongTheWay = sellRowsAbove.reduce(
+        (acc, r) => acc + (r.quantity * r.sell_price),
+        0
+    );
+
+    const costIfBoughtNow = baseNeeded * pxNow;
+
+    const profitIfSoldAlongTheWay = proceedsIfSoldAlongTheWay - costIfBoughtNow;
+    const profitIfHeldToExit = baseNeeded * (exit - pxNow);
 
     const orderValue = usdPerLevel;
     const grossProfitPerOp = orderValue * (targetPct / 100);
@@ -277,7 +286,8 @@ async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
             quote_levels_below_price: sumQuantityUsd,
             quote_needed_usd: quoteNeededUsd,
 
-            profit_if_sold_at_exit_usd: profitIfSoldAtTop,
+            profit_if_sold_along_the_way: profitIfSoldAlongTheWay,
+            profit_if_held_to_exit: profitIfHeldToExit,
 
             gross_profit_per_op_usd: grossProfitPerOp,
             est_fees_per_op_usd: exchangeFees,

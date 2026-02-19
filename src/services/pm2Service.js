@@ -1,5 +1,6 @@
 // src/services/pm2Service.js
 import pm2 from 'pm2';
+import fs from 'node:fs';
 
 function pm2Connect() {
     return new Promise((resolve, reject) => {
@@ -66,6 +67,57 @@ function getStartOptions({ instanceId }) {
             NODE_ENV: process.env.NODE_ENV ?? 'development',
         },
     };
+}
+
+function stripAnsi(s) {
+    return String(s).replace(
+        // eslint-disable-next-line no-control-regex
+        /[\u001B\u009B][[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g,
+        ''
+    );
+}
+
+function normalizeLogText(s) {
+    return stripAnsi(String(s))
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\n');
+}
+
+function tailFile(filePath, lines = 100) {
+    try {
+        if (!filePath || !fs.existsSync(filePath)) return [];
+
+        const raw = fs.readFileSync(filePath, 'utf-8');
+
+        // normalize first (so \\n becomes real newlines), then split lines
+        const normalized = normalizeLogText(raw);
+        const arr = normalized.split(/\r?\n/);
+
+        return arr.slice(-lines).filter(Boolean).reverse();
+    } catch {
+        return [];
+    }
+}
+
+export async function getBotLogs({ instanceId, lines = 100 }) {
+    await pm2Connect();
+    try {
+        const name = getBotProcessName(instanceId);
+        const desc = await pm2Describe(name);
+        const proc = Array.isArray(desc) ? desc[0] : null;
+
+        const outPath = proc?.pm2_env?.pm_out_log_path;
+        const errPath = proc?.pm2_env?.pm_err_log_path;
+
+        return {
+            name,
+            out: tailFile(outPath, lines),
+            err: tailFile(errPath, lines),
+        };
+    } finally {
+        pm2Disconnect();
+    }
 }
 
 export async function ensureBotRunning({ instanceId }) {
