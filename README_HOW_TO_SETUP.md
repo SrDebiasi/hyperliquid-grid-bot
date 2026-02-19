@@ -1,94 +1,220 @@
-# First Setup (Local)
-This is the quickest way to get the project running locally.
+# README — How to Setup (Local)
+
+This guide gets the project running locally with **PostgreSQL**, the **Dashboard UI**, and the **PM2-controlled bot**.
+
+---
+
 ## 1) Install PostgreSQL
-Install PostgreSQL (v13+ recommended) and make sure the service is running.
-- Windows: ensure the “PostgreSQL” service is started
-- macOS:
-```bash
-brew services start postgresql
-```
-- Linux: use your distro service manager
-## 2) Create your .env
-Create a copy of `.env.example` named `.env` from project root folder:
+
+Install PostgreSQL (**v13+ recommended**) and make sure the service is running.
+
+- **Windows:** ensure the **PostgreSQL** service is started
+- **macOS:**
+  ```bash
+  brew services start postgresql
+  ```
+- **Linux:** use your distro service manager (systemd, etc.)
+
+---
+
+## 2) Create your `.env`
+
+Copy `.env.example` to `.env` in the project root.
 
 ### Wallet + Secret Key (Important)
- Create your account on Hyperliquid.\
-   https://app.hyperliquid.xyz/join/BOTGRID \
- Use BOTGRID refferal to earn 4% discounts in fees.\
-If you still don't have your wallet + secret key read:  
- Generate Hyperliquid API Wallet Private Key on README file
 
-For local usage, you can keep credentials in `.env`.
-For multi-account setups, use the `trade_instance` table.
-If you only want to run one account locally, set:
+Create your Hyperliquid account (referral):
+- https://app.hyperliquid.xyz/join/BOTGRID  
+Use the **BOTGRID** referral to get fee discounts.
+
+#### Local (single account) setup
+For local usage, you can keep credentials in `.env`:
+
 ```bash
 WALLET_ADDRESS=your_wallet_address
 SECRET_KEY=your_secret_key
 ```
-If these env vars are set, the bot can run without requiring `wallet_address` / `private_key` to be filled in the database (useful for keeping secrets local).
+
+If these env vars are set, the bot can run **without** requiring `wallet_address` / `private_key` to be filled in the database (useful for keeping secrets local).
+
+#### Multi-account setup
+For multi-account setups, use the `trade_instance` table to store:
+- `wallet_address`
+- `private_key`
+
+---
+
 ## 3) Install dependencies
+
 ```bash
 npm install
 ```
-## 4) Create DB schema (runs db/db.sql)
+
+---
+
+## 4) Create DB schema
+
+Creates the schema using `db/db.sql`.
+
 ```bash
 npm run db:create
 ```
-## 5) Seed initial data (trade_instance + trade_config defaults)
+
+---
+
+## 5) Seed initial data
+
+Seeds a default `trade_instance` and a basic `trade_config` (BTC/USDC).
+
 ```bash
 npm run db:seed
 ```
-This inserts a basic default config (BTC/USDC) that you can adjust later directly in the database.
-## 6) Create the grid range (required)
-Before starting the API, you need to generate the grid levels for your pair.
-Run a dry-run first (does NOT save anything):
-```bash
-npm run create 1 BTC/USDC no
-```
-This will print an estimate (BTC needed, USD needed, records generated). Example:
-```bash
-13:55:00 - Finished BTC/USDC working between 60000 and 100000
-13:55:00 - Total 494 records | target=1.8% | spacing=0.1% | usd_per_order=50
-13:55:00 - Current BTC price 69973.5 | base_needed=0.218280 | base_value_usd=15273.82
-13:55:00 - Quote needed for downtrend: 6850.00 USD
-13:55:00 - Profit if buying required amount today and selling at exit (100000): 6554.18 USD
-13:55:00 -  - Buy value today: 15273.82 USD
-13:55:00 -  - Sell value at range top: 21828.00 USD
-13:55:00 - Gross profit per operation: 0.90 USD
-13:55:00 - Estimated fees per operation: 0.07 USD
-13:55:00 - Estimated net profit per operation: 0.83 USD
-13:55:00 - Estimated total USD needed: 22123.82
-```
 
-If you are OK with the estimate, re-run with YES to persist the generated rows into the database:
-```bash
-npm run create 1 BTC/USDC yes
-```
-### Adjusting the range
-The default seeded config currently uses:
-- entry_price = 60000
-- exit_price = 100000
-  You can adjust `entry_price` / `exit_price` (and other parameters) in the `trade_config` table, then re-run create again.
-## 7) Start the server API
+---
+
+## 6) Start the API server
+
 ```bash
 npm run api
 ```
-## 8) Start the bot
-```bash
-npm run start
+
+Open the Dashboard:
+
+- http://127.0.0.1:3000/dashboard
+
+---
+
+## 7) Configure the bot in the Dashboard
+
+### 7.1 Update your config
+In the **Config** section, adjust your parameters (example):
+- Pair (e.g., `BTC/USDC`)
+- Entry price / Exit price
+- Target percent
+- Margin percent
+- USD per order
+- Decimal precision
+
+### 7.2 Simulate (recommended)
+Use **Simulate** to preview how many levels will be generated, capital estimates, and profit estimates.
+
+Example output you may see:
+
 ```
-## 9) Read the Readme about Telegram
-For notifications and commands, read README_TELEGRAM.md
+GRID SUMMARY (BTC/USDC)
+Range: 62000 → 102000
+Levels (orders): 481
+Per order: $99.00 | Profit target per level: 1.8% | Grid spacing: 0.1%
+
+CAPITAL NEEDED (ESTIMATE)
+Current price: 66828.50
+If price goes UP: need ~0.520060 (≈ $34754.83)
+If price goes DOWN: need ~$5742.00
+
+POTENTIAL UPSIDE (IF IT REACHES THE TOP)
+If you buy the required amount now and price reaches 102000:
+- Buy cost today: $34754.83
+- Value at 102000: $53046.12
+- Potential gain: $18291.29
+
+PER-TRADE PROFIT (ESTIMATE)
+Gross profit per completed cycle: $1.78
+Estimated fees per cycle: $0.15
+Estimated net profit per operation: $1.63
+Total estimated capital required: $40496.83
+```
+
+### 7.3 Generate the grid
+If the simulation looks correct, click **Generate Grid**.
+
+This will create the grid rows in the database (trade orders / levels) for the selected config.
+
+---
+
+## 8) Start / Stop the bot (Dashboard)
+
+The Dashboard provides **Start** and **Stop** buttons for your instance.  
+Under the hood, it uses **PM2** to run the bot process (so it survives crashes and can be controlled cleanly).
+
+### Verify status from terminal (optional)
+
+```bash
+npx pm2 status
+```
+
+View logs:
+
+```bash
+npx pm2 logs gridbot-1 --lines 200
+npx pm2 logs gridbot-1 --err --lines 200
+```
+
+> Process naming pattern: `gridbot-<instanceId>` (example: `gridbot-1`).
+
+---
+
+## Optional: CLI commands (keep for terminal usage)
+
+You can still run bot actions directly from terminal if you prefer.
+
+### Start the bot (foreground)
+```bash
+npm run start -- 1
+```
+
+### List open orders for a pair
+```bash
+npm run openOrders -- 1 BTC/USDC
+```
+
+### Cancel open orders for a pair
+```bash
+npm run cancelOrders -- 1 BTC/USDC
+```
+
+---
+
+## Telegram
+
+For notifications and commands, read:
+
+- `README_TELEGRAM.md`
+
+---
+
 ## Troubleshooting
+
 ### “password authentication failed”
-Double-check DB_USER/DB_PASS and that Postgres is running.
+- Double-check `DB_USER` / `DB_PASS`
+- Confirm Postgres is running
+
 ### “database does not exist”
 Run:
 ```bash
 npm run db:create
 ```
-### Rerun seed
+
+### Re-run seed
 Seeding is idempotent (won’t duplicate). You can re-run:
 ```bash
 npm run db:seed
 ```
+
+### PM2 shows nothing running
+If you started via Dashboard but PM2 shows nothing:
+- Check your API logs
+- Confirm the Start button is calling the correct POST route
+- Try:
+  ```bash
+  npx pm2 status
+  npx pm2 logs --err --lines 200
+  ```
+
+### Bot starts but immediately stops / restarts
+Check error logs:
+```bash
+npx pm2 logs gridbot-1 --err --lines 200
+```
+Most common causes:
+- missing env vars (wallet/keys)
+- wrong DB config

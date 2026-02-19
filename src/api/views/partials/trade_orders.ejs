@@ -1,0 +1,151 @@
+<h2 class="h5 mb-3">Orders</h2>
+
+<% if (!orders || orders.length === 0) { %>
+    <div class="alert alert-secondary mb-0">No orders found.</div>
+<% } else { %>
+
+    <%
+        // Build the filtered list (default view)
+        const num = (v) => {
+            const n = Number(v);
+            return Number.isFinite(n) ? n : null;
+        };
+
+        const hasBuy = (o) => !!o.buy_order;
+        const hasSell = (o) => !!o.sell_order;
+
+        const buys = orders
+                .filter(hasBuy)
+                .map(o => ({ o, p: num(o.buy_price) }))
+                .filter(x => x.p !== null)
+                .sort((a, b) => b.p - a.p) // highest buys
+                .slice(0, 6)
+                .map(x => x.o);
+
+        const sells = orders
+                .filter(hasSell)
+                .map(o => ({ o, p: num(o.sell_price) }))
+                .filter(x => x.p !== null)
+                .sort((a, b) => a.p - b.p) // lowest sells
+                .slice(0, 6)
+                .map(x => x.o);
+
+        const map = new Map();
+        for (const o of [...buys, ...sells]) map.set(o.id, o);
+
+        const displayOrders = Array.from(map.values()).sort((a, b) => {
+            const ab = num(a.buy_price);
+            const bb = num(b.buy_price);
+            if (ab !== null && bb !== null) return ab - bb;
+
+            const as = num(a.sell_price);
+            const bs = num(b.sell_price);
+            if (as !== null && bs !== null) return as - bs;
+
+            return (a.id ?? 0) - (b.id ?? 0);
+        });
+    %>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="text-muted small">Last $ means profit in next cycle.</div>
+
+        <button
+                id="ordersToggleBtn"
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                data-state="filtered"
+        >
+            Show all
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle text-center mb-0">
+            <thead>
+            <tr>
+                <th class="text-nowrap">Last</th>
+                <th class="text-end text-nowrap">Buy price</th>
+                <th class="text-nowrap">Buy order</th>
+                <th class="text-end text-nowrap">Sell price</th>
+                <th class="text-nowrap">Sell order</th>
+                <th class="text-end">Qty</th>
+                <th class="text-nowrap">Last side</th>
+                <th class="text-end text-nowrap">Entry price</th>
+            </tr>
+            </thead>
+
+            <!-- Default: filtered slice -->
+            <tbody id="ordersTbodyFiltered">
+            <% displayOrders.forEach((o) => { %>
+                <tr>
+                    <td class="text-center">
+                        <% if (o.last_operation) { %>
+                            <span title="Last operation">$</span>
+                        <% } else { %>
+                            <span class="text-muted">-</span>
+                        <% } %>
+                    </td>
+
+                    <td class="text-end"><%= (o.buy_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
+                    <td class="text-end"><%= (o.sell_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
+                    <td class="text-end"><%= (o.quantity ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
+                    <td class="text-end"><%= (o.entry_price ?? '-') %></td>
+                </tr>
+            <% }) %>
+            </tbody>
+
+            <!-- Hidden: all orders -->
+            <tbody id="ordersTbodyAll" class="d-none">
+            <% orders.forEach((o) => { %>
+                <tr>
+                    <td class="text-center">
+                        <% if (o.last_operation) { %>
+                            <span title="Last operation">$</span>
+                        <% } else { %>
+                            <span class="text-muted">-</span>
+                        <% } %>
+                    </td>
+
+                    <td class="text-end"><%= (o.buy_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
+                    <td class="text-end"><%= (o.sell_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
+                    <td class="text-end"><%= (o.quantity ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
+                    <td class="text-end"><%= (o.entry_price ?? '-') %></td>
+                </tr>
+            <% }) %>
+            </tbody>
+
+        </table>
+    </div>
+
+    <script>
+        (function () {
+            const btn = document.getElementById('ordersToggleBtn');
+            const tbFiltered = document.getElementById('ordersTbodyFiltered');
+            const tbAll = document.getElementById('ordersTbodyAll');
+            if (!btn || !tbFiltered || !tbAll) return;
+
+            btn.addEventListener('click', function () {
+                const state = btn.getAttribute('data-state');
+
+                if (state === 'filtered') {
+                    tbFiltered.classList.add('d-none');
+                    tbAll.classList.remove('d-none');
+                    btn.setAttribute('data-state', 'all');
+                    btn.textContent = 'Show around price';
+                } else {
+                    tbAll.classList.add('d-none');
+                    tbFiltered.classList.remove('d-none');
+                    btn.setAttribute('data-state', 'filtered');
+                    btn.textContent = 'Show all';
+                }
+            });
+        })();
+    </script>
+
+<% } %>

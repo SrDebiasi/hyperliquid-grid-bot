@@ -1,15 +1,19 @@
 import 'dotenv/config';
 import TelegramBot from 'node-telegram-bot-api';
 import moment from 'moment-timezone';
+import pino from 'pino';
 
+const log = pino({
+  level: process.env.LOG_LEVEL || 'info',
+});
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
 
 if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN');
 if (!chatId) throw new Error('Missing TELEGRAM_CHAT_ID');
 
-import { retrieveConfig, retrieveOrders, retrieveTradeProfit } from './../functions.js';
-import { getInstanceId, getLastOperation, getPrices } from './../state.js';
+import {getExchange, retrieveConfig, retrieveOrders, retrieveTradeProfit} from '../functions/functions.js';
+import { getInstanceId, getLastOperation } from '../functions/state.js';
 
 import {
   periodDay,
@@ -18,8 +22,9 @@ import {
   periodMonthToDate,
   periodPreviousDay,
   periodPreviousWeek,
-  periodPreviousMonth, periodYear,
-} from './../datePeriods.js';
+  periodPreviousMonth,
+  periodYear,
+} from '../functions/datePeriods.js';
 
 function mustGetTelegramToken() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -151,8 +156,8 @@ async function getProfitTotalForPeriod(periodFn) {
 
   const rows = await retrieveTradeProfit({
     trade_instance_id: instanceId,
-    date_transaction_from: period.from,
-    date_transaction_to: period.to,
+    date_start: period.from,
+    date_end: period.to,
   });
 
   const { total, count } = sumProfit(rows);
@@ -173,8 +178,8 @@ async function getAggregatedStatusSnapshot() {
   if (!cfg?.pair) throw new Error('Missing pair in config');
 
   // price
-  const prices = getPrices() || {};
-  const currentPrice = toNumberSafe(prices[cfg.pair]);
+  const exchangePrices = await getExchange().getPrices();
+  const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
 
   // orders
   const orders = (await retrieveOrders({
@@ -264,26 +269,26 @@ async function getAggregatedStatusSnapshot() {
 async function getGridBotStatusSnapshot() {
   const instanceId = getInstanceId();
 
-  let data;
+  let cfg;
   try {
-    data = await retrieveConfig({ trade_instance_id: instanceId });
-    data = data[0];
+    cfg = await retrieveConfig({ trade_instance_id: instanceId });
+    cfg = cfg[0];
   } catch (err) {
     console.log(err);
     throw new Error('Failed to load config for /status');
   }
 
-  if (!data?.pair) {
+  if (!cfg?.pair) {
     throw new Error('Missing pair in config');
   }
 
-  const prices = getPrices() || {};
-  const currentPrice = toNumberSafe(prices[data.pair]);
+  const exchangePrices = await getExchange().getPrices();
+  const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
 
   let orders = [];
   try {
     orders = (await retrieveOrders({
-      pair: data.pair,
+      pair: cfg.pair,
       trade_instance_id: instanceId,
     })) || [];
   } catch (err) {
@@ -295,15 +300,15 @@ async function getGridBotStatusSnapshot() {
 
   return {
     isRunning: true,
-    symbol: data.pair,
-    rangeMin: toNumberSafe(data.entry_price),
-    rangeMax: toNumberSafe(data.exit_price),
+    symbol: cfg.pair,
+    rangeMin: toNumberSafe(cfg.entry_price),
+    rangeMax: toNumberSafe(cfg.exit_price),
     currentPrice,
 
     waitingCycles,
 
-    totalReboughtValueUsd: toNumberSafe(data.rebought_value),
-    totalReboughtCoin: toNumberSafe(data.rebought_coin),
+    totalReboughtValueUsd: toNumberSafe(cfg.rebought_value),
+    totalReboughtCoin: toNumberSafe(cfg.rebought_coin),
   };
 }
 
@@ -460,8 +465,8 @@ async function getPnlForPeriod(periodFn) {
   if (!cfg?.pair) throw new Error('Missing pair in config');
 
   // price (current)
-  const prices = getPrices() || {};
-  const currentPrice = toNumberSafe(prices[cfg.pair]);
+  const exchangePrices = await getExchange().getPrices();
+  const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
 
   // orders + exposure (now includes avgEntryPrice)
   const orders = (await retrieveOrders({
@@ -474,8 +479,8 @@ async function getPnlForPeriod(periodFn) {
   // realized profit for the period
   const rows = await retrieveTradeProfit({
     trade_instance_id: instanceId,
-    date_transaction_from: period.from,
-    date_transaction_to: period.to,
+    date_start: period.from,
+    date_end: period.to,
   });
   const { total: profitUsd, count: trades } = sumProfit(rows);
 
@@ -556,8 +561,8 @@ async function handleProfitSummaryCommand(msg, { title, periodFn }) {
 
   const rows = await retrieveTradeProfit({
     trade_instance_id: instanceId,
-    date_transaction_from: period.from,
-    date_transaction_to: period.to,
+    date_start: period.from,
+    date_end: period.to,
   });
 
   const { total, count } = sumProfit(rows);
@@ -573,39 +578,48 @@ async function handleProfitSummaryCommand(msg, { title, periodFn }) {
 function calcExposureFromOrders(orders, currentPrice) {
   const list = Array.isArray(orders) ? orders : [];
 
-  let coinQty = 0;          // qty de coins “rodando” (sell acima do preço)
-  let coinValueUsd = 0;     // coinQty * currentPrice
+  let coinQty = 0;
+  let coinCostUsd = 0;
+  let unknownCostQty = 0;
 
-  let reservedUsd = 0;      // USDT necessário para buys (buy_price * qty)
+  let reservedUsd = 0;
 
   for (const o of list) {
-    const qty = toNumberSafe(o.quantity ?? o.qty ?? o.amount);
+    const qty = toNumberSafe(o.quantity);
     if (qty <= 0) continue;
 
     const sellPrice = toNumberSafe(o.sell_price);
     const buyPrice = toNumberSafe(o.buy_price);
+    const entryPrice = toNumberSafe(o.entry_price);
 
-    // Se tem sell_price e ele está acima do preço atual => temos coin exposto
+    // Open coin blocks: have a sell above current price
     if (sellPrice > 0 && sellPrice > currentPrice) {
       coinQty += qty;
+
+      const costPrice = buyPrice > 0 ? buyPrice : entryPrice;
+      if (costPrice > 0) coinCostUsd += costPrice * qty;
+      else unknownCostQty += qty;
+
       continue;
     }
 
-    // Caso contrário, trata como “USDT reservado” (buy)
-    // (usa buy_price; se não tiver, tenta entry_price)
-    const p = buyPrice > 0 ? buyPrice : toNumberSafe(o.entry_price);
-    if (p > 0) {
-      reservedUsd += p * qty;
-    }
+    // Otherwise: reserved USD for pending buys
+    const p = buyPrice > 0 ? buyPrice : entryPrice;
+    if (p > 0) reservedUsd += p * qty;
   }
 
-  coinValueUsd = coinQty * currentPrice;
+  const coinValueUsd = coinQty * currentPrice;
+  const totalExposureUsd = coinValueUsd + reservedUsd;
+  const avgEntryPrice = coinQty > 0 ? (coinCostUsd / coinQty) : 0;
 
   return {
     coinQty,
     coinValueUsd,
     reservedUsd,
-    totalExposureUsd: coinValueUsd + reservedUsd,
+    totalExposureUsd,
+    coinCostUsd,
+    avgEntryPrice,
+    unknownCostQty,
   };
 }
 
@@ -620,13 +634,12 @@ function buildPnlMessage({ symbol, currentPrice, exposure, periods }) {
     `${eM('Coin qty')}: *${eM(formatNumber(exposure.coinQty, 8))}*`,
     `${eM('USDT reserved')}: *${eM(formatUSD(exposure.reservedUsd))}*`,
     `${eM('Current exposure')}: *${eM(formatUSD(exposure.totalExposureUsd))}*`,
-    exposure.unknownCostQty > 0
-      ? `${eM('•')} ${eM('Warning')}: *${eM(formatNumber(exposure.unknownCostQty, 8))}* ${eM('coin qty has unknown entry cost')}`
-      : null,
+    ``,
     ``,
     `*${eM('How to read')}*`,
     `${eM('•')} ${eM('Current-value PnL')} ${eM('= period profit / current equity')}`,
     `${eM('•')} ${eM('Entry-based PnL')} ${eM('= period profit + unrealized vs avg entry')}`,
+    ``,
     ``,
     `*${eM('Periods')}*`,
     ...periods.flatMap(p => ([
@@ -635,8 +648,8 @@ function buildPnlMessage({ symbol, currentPrice, exposure, periods }) {
       `${eM('Range')}: *${eM(p.period.from)}* ${eM('to')} *${eM(p.period.to)}*`,
       `${eM('•')} ${eM('Profit')} : *${eM(formatUSD(p.profitUsd))}* \\(${eM(String(p.trades))} ${eM('trades')}\\)`,
       `${eM('•')} ${eM('Current-value')} : *${eM(sign(p.currentValuePct) + Math.abs(p.currentValuePct).toFixed(2) + '%')}*`,
-      `${eM('•')} ${eM('Unrealized vs entry')} : *${eM(sign(p.unrealizedUsd) + formatUSD(Math.abs(p.unrealizedUsd)))}*`,
       `${eM('•')} ${eM('Entry-based')} : *${eM(sign(p.entryBasedPct) + Math.abs(p.entryBasedPct).toFixed(2) + '%')}* \\(${eM(sign(p.entryBasedUsd) + formatUSD(Math.abs(p.entryBasedUsd)))}\\)`,
+      ``,
       ``,
     ])),
   ].filter(Boolean);
@@ -744,8 +757,8 @@ function createTelegramBot({ polling = true } = {}) {
 
         const rows = await retrieveTradeProfit({
           trade_instance_id: instanceId,
-          date_transaction_from: period.from,
-          date_transaction_to: period.to,
+          date_start: period.from,
+          date_end: period.to,
         });
 
         const { days, monthTotal, monthCount } = groupProfitByDay(rows, period.timezone);
@@ -866,8 +879,8 @@ function createTelegramBot({ polling = true } = {}) {
 
         const rows = await retrieveTradeProfit({
           trade_instance_id: instanceId,
-          date_transaction_from: period.from,
-          date_transaction_to: period.to,
+          date_start: period.from,
+          date_end: period.to,
         });
 
         const { total, count } = sumProfit(rows);
@@ -913,8 +926,8 @@ function createTelegramBot({ polling = true } = {}) {
 
         if (!cfg?.pair) throw new Error('Missing pair in config');
 
-        const prices = getPrices() || {};
-        const currentPrice = toNumberSafe(prices[cfg.pair]);
+        const exchangePrices = await getExchange().getPrices();
+        const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
 
         const orders = (await retrieveOrders({
           pair: cfg.pair,
@@ -1002,6 +1015,7 @@ function createTelegramBot({ polling = true } = {}) {
         );
       }
     });
+
     if (polling) {
       scheduleDailyStatus(bot);
     }

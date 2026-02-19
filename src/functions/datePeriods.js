@@ -17,7 +17,6 @@ function periodDay(ref = now()) {
   return {
     key: 'day',
     label: `Today (${ymd(ref)})`,
-    timezone: BOT_TZ,
     from: ymd(start),
     to: ymd(end),
   };
@@ -76,6 +75,7 @@ function periodPreviousWeek(ref = now()) {
 function periodMonth(ref = now()) {
   const start = ref.startOf('month');
   const end = ref.endOf('month');
+
   return {
     key: 'month',
     label: `This month (${ref.toFormat('LLLL yyyy')})`,
@@ -85,17 +85,16 @@ function periodMonth(ref = now()) {
   };
 }
 
+function periodYear(ref = now()) {
+  const start = ref.startOf('year');
+  const end = ref.endOf('year');
 
-function periodYear() {
-  const now = DateTime.now().setZone(BOT_TZ);
-  const start = now.startOf('year');
-  const end = now.endOf('year');
   return {
-    label: `Year-to-date (${now.toFormat('yyyy')})`,
-    from: start.toFormat('yyyy-LL-dd HH:mm:ss'),
-    to: end.toFormat('yyyy-LL-dd HH:mm:ss'),
+    key: 'year',
+    label: `Year-to-date (${ref.toFormat('yyyy')})`,
     timezone: BOT_TZ,
-    meta: { year: now.year },
+    from: ymd(start),
+    to: ymd(end),
   };
 }
 

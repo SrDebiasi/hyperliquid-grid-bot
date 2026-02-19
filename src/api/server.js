@@ -1,7 +1,14 @@
-// src/api/server.js
 import "dotenv/config";
 import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
 import cors from "@fastify/cors";
+import formbody from "@fastify/formbody";
+import view from "@fastify/view";
+import ejs from "ejs";
+import path from "node:path";
+
+import { fileURLToPath } from "node:url";
+
 import { connectDb, sequelize } from "./db.js";
 import { tradeConfigRoutes } from "./routes/trade-config.js";
 import { tradeOrderRoutes } from "./routes/trade-order.js";
@@ -11,15 +18,32 @@ import { messageRoutes } from "./routes/message.js";
 import { openOrdersRoutes } from "./routes/open-orders.js";
 import { orderHistoryRoutes } from "./routes/order-history.js";
 import { buildModels } from "./models/index.js";
+import { dashboardRoutes } from "./routes/dashboard.js";
 
 const PORT = Number(process.env.API_PORT ?? 3000);
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 
 export async function buildServer() {
     const app = Fastify({ logger: true });
 
     await app.register(cors, { origin: true, credentials: true });
+    await app.register(formbody);
 
-    // cria models UMA vez e injeta nas rotas
+    // Static
+    await app.register(fastifyStatic, {
+        root: path.join(__dirname, "public"),
+        prefix: "/",
+    });
+
+    // Views (EJS)
+    await app.register(view, {
+        engine: { ejs },
+        root: path.join(__dirname, "views"),
+    });
+
     const models = buildModels(sequelize);
 
     app.get("/health", async () => ({ ok: true }));
@@ -33,6 +57,10 @@ export async function buildServer() {
         }
     });
 
+
+    // Dashboard page routes (no /api prefix)
+    await app.register(dashboardRoutes, { models });
+    // Existing API routes
     await app.register(tradeConfigRoutes, { prefix: "/api", models });
     await app.register(tradeOrderRoutes, { prefix: "/api", models });
     await app.register(tradeInstanceRoutes, { prefix: "/api", models });

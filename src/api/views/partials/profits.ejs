@@ -1,0 +1,107 @@
+<% if (profitSummary) { %>
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h2 class="h5 mb-1">Profits</h2>
+                    <div class="text-muted small">
+                        Daily chart: <%= profitSummary.dailyProfitMtd.period.label %>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 mt-2">
+                <% const t = profitSummary.totals; %>
+
+                <% function fmtUsd(n) { return `$${Number(n||0).toFixed(2)}`; } %>
+
+                <div class="col-12 col-md-4 col-xl">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">Today</div>
+                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.today.totalUsd) %></div>
+                        <div class="text-muted small"><%= t.today.trades %> trades</div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 col-xl">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">Week</div>
+                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.week.totalUsd) %></div>
+                        <div class="text-muted small"><%= t.week.trades %> trades</div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 col-xl">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">Month</div>
+                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.month.totalUsd) %></div>
+                        <div class="text-muted small"><%= t.month.trades %> trades</div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 col-xl">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">Year</div>
+                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.year.totalUsd) %></div>
+                        <div class="text-muted small"><%= t.year.trades %> trades</div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4 col-xl">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">All-time</div>
+                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.allTime.totalUsd) %></div>
+                        <div class="text-muted small"><%= t.allTime.trades %> trades</div>
+                    </div>
+                </div>
+            </div>
+
+            <%
+                const days = profitSummary.dailyProfitMtd.days || [];
+                const maxAbs = Math.max(1, ...days.map(d => Math.abs(Number(d.totalUsd || 0))));
+            %>
+
+            <hr class="my-4" />
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold">Daily profit (MTD)</div>
+                <div class="text-muted small">
+                    Total: <%= fmtUsd(profitSummary.dailyProfitMtd.totalUsd) %>
+                    • Trades: <%= profitSummary.dailyProfitMtd.trades %>
+                </div>
+            </div>
+
+            <div class="small text-muted mb-2">Last <%= days.length %> days</div>
+
+            <div class="vstack gap-0">
+                <% days.forEach(d => {
+                    const v = Number(d.totalUsd || 0);
+                    const pct = Math.round((Math.abs(v) / maxAbs) * 100);
+                    const isNeg = v < 0;
+                %>
+                <div class="d-flex align-items-center gap-0 small">
+                    <div style="width:110px" class="text-muted"><%= d.date %></div>
+
+                    <div class="progress flex-grow-1" style="height: 10px;">
+                        <div
+                                class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
+                                role="progressbar"
+                                style="width: <%= pct %>%"
+                                aria-valuenow="<%= pct %>"
+                                aria-valuemin="0"
+                                aria-valuemax="100">
+                        </div>
+                    </div>
+
+                    <div style="width:120px" class="text-end fw-semibold">
+                        <%= fmtUsd(v) %>
+                    </div>
+                    <div style="width:85px" class="text-end text-muted">
+                        <%= d.trades %> trades
+                    </div>
+                </div>
+                <% }) %>
+            </div>
+        </div>
+    </div>
+<% } %>

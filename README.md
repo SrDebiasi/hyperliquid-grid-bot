@@ -264,21 +264,51 @@ Check .env.example
 
 ------------------------------------------------------------------------
 
-## Main CLI Commands
+## Quick Start (Local)
 
-Start api:
+1) Setup Postgres + env + db + seed:
+- See `README_HOW_TO_SETUP.md`
 
-    npm run api
+2) Start the API:
+```bash
+npm run api
+```
 
-Create grid:
+3) Open the Dashboard:
+- http://127.0.0.1:3000/dashboard
 
-    npm run create -- <pair> <instanceId> true
+4) Create your grid:
+- Config → **Simulate** → **Generate Grid**
 
-Start bot:
+5) Start/Stop the bot:
+- Use the **Start bot / Stop bot** buttons in the Dashboard (PM2-managed)
 
-    npm run start -- <instanceId>
+---
 
-------------------------------------------------------------------------
+## Optional: CLI Commands
+
+Start the bot in foreground:
+```bash
+npm run start -- 1
+```
+
+List open orders:
+```bash
+npm run openOrders -- 1 BTC/USDC
+```
+
+Cancel open orders:
+```bash
+npm run cancelOrders -- 1 BTC/USDC
+```
+
+PM2 (used by Dashboard):
+```bash
+npx pm2 status
+npx pm2 logs gridbot-1 --lines 200
+npx pm2 logs gridbot-1 --err --lines 200
+```
+
 
 ## Hyperliquid Setup (API Wallet + Keys)
 

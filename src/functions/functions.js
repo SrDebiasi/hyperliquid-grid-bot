@@ -1,7 +1,7 @@
 import axios from 'axios';
 import moment from 'moment-timezone';
 
-import { notifyTelegram } from './services/telegramService.js';
+import { notifyTelegram } from '../services/telegramService.js';
 import HyperliquidAdapter from '../exchange/HyperliquidAdapter.js';
 
 let apiUrl = process.env.API_URL_LOCAL || 'http://127.0.0.1/api/';
@@ -63,7 +63,7 @@ function isConnRefusedToLocalhost(err) {
 }
 
 const retrieveConfig = (data) => new Promise((resolve, reject) => {
-  axios.get(apiUrl + 'trade-config', { params: { trade_instance_id: data.id } }, headers)
+  axios.get(apiUrl + 'trade-config', { params: { trade_instance_id: data.trade_instance_id } }, headers)
     .then(result => {
       resolve(result.data);
     })
@@ -75,21 +75,16 @@ const retrieveTradeProfit = (data) => new Promise((resolve, reject) => {
     trade_instance_id: data.trade_instance_id,
   };
 
-  if (data.date_transaction) {
-    params.date_transaction = data.date_transaction; // YYYY-MM-DD
-  }
-  if (data.date_transaction_from) {
-    params.date_transaction_from = data.date_transaction_from; // YYYY-MM-DD
-  }
-  if (data.date_transaction_to) {
-    params.date_transaction_to = data.date_transaction_to; // YYYY-MM-DD
-  }
+  if (data.pair) params.pair = data.pair;
+
+  // Always normalize to YYYY-MM-DD (handles "YYYY-MM-DD HH:mm:ss" too)
+  if (data.date_start) params.date_start = String(data.date_start).slice(0, 10);
+  if (data.date_end) params.date_end = String(data.date_end).slice(0, 10);
 
   axios.get(apiUrl + 'trade-profit', { params }, headers)
-    .then(result => resolve(result.data))
-    .catch((ex) => reject({ error: ex.toString() }));
+      .then(result => resolve(result.data))
+      .catch((ex) => reject({ error: ex.toString() }));
 });
-
 
 const retrieveOrders = (data) => new Promise((resolve, reject) => {
   axios.get(apiUrl + 'trade-order', {
@@ -159,20 +154,18 @@ const addMessage = (message, color = null) => {
 
 const addProfit = (data) => {
   const nowMoment = nowTz();
-  const nowDb = nowMoment.format('YYYY-MM-DD HH:mm:ss');      // for DB
+  const nowDb = nowMoment.format('YYYY-MM-DD HH:mm:ss');
 
-  const coin = {
+  const payload = {
     pair: data.pair,
     profit: data.profit,
     name: data.name,
     value: data.value,
     trade_instance_id: data.trade_instance_id,
-    percentual: data.target_percent,
+    target_percent: data.target_percent,
     fee: null,
     price_intermediate: data.price_intermediate,
     price_final: data.price_final,
-    quantity_intermediate: null,
-    quantity_final: null,
     date_transaction: nowDb,
   };
 
@@ -184,7 +177,7 @@ const addProfit = (data) => {
   addMessage(msg, 'green bg');
   notifyTelegram(msg);
 
-  axios.post(apiUrl + 'trade-profit', coin, headers).catch((error) => {
+  axios.post(apiUrl + 'trade-profit', payload, headers).catch((error) => {
     console.log(error);
     consoleLog('Erro no addCoin');
   });
@@ -225,10 +218,45 @@ function startHealthchecksPing(
     console.log('Error on pinging healthchecks.io')
   }
 }
+async function fetchHyperliquidAllMids() {
+  const res = await fetch('https://api.hyperliquid.xyz/info', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'allMids' }),
+  });
+
+  if (!res.ok) throw new Error(`Hyperliquid allMids failed: ${res.status}`);
+  return res.json(); // { BTC: "66155.5", ... }
+}
+
+function baseSymbolFromPair(pair) {
+  // "BTC/USDC" -> "BTC"
+  return String(pair || '').split('/')[0].trim().toUpperCase();
+}
+
+async function fetchHyperliquidMidFromPair(pair) {
+  const mids = await fetchHyperliquidAllMids();
+  const base = baseSymbolFromPair(pair);
+
+  const candidates = [
+    base,                         // BTC
+    base.replace(/^U/, ''),        // UBTC -> BTC
+    `U${base}`,                    // BTC -> UBTC
+  ];
+
+  for (const k of candidates) {
+    const n = Number(mids?.[k]);
+    if (Number.isFinite(n)) return n;
+  }
+
+  return null;
+}
+
 
 export {
   setApi,
   getExchange,
+  fetchHyperliquidMidFromPair,
   retrieveConfig,
   retrieveOrders,
   retrieveInstance,

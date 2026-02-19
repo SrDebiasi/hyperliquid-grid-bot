@@ -1,0 +1,40 @@
+<%
+const pageData = {
+  configId: config?.id ?? null,
+  pair: config?.pair ?? null,
+};
+%>
+
+<script>
+  window.__GRID_UI__ = <%- JSON.stringify(pageData) %>;
+</script>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <%- include('../partials/trade_instance', { instance , botStatus}) %>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <%- include('../partials/trade_config', { instance, config }) %>
+  </div>
+
+  <%- include('../partials/modals/grid-simulate') %>
+</div>
+
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <%- include('../partials/profits', { profitSummary }) %>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <%- include('../partials/trade_orders', { orders }) %>
+  </div>
+</div>
+
+<%- include('../partials/modals/secrets-modal', { instance }) %>
+<%- include('../partials/modals/trade_config', { config }) %>

@@ -1,0 +1,26 @@
+<div class="modal fade" id="simModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Grid Simulation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div id="simError" class="mb-3"></div>
+                <div id="simStatus" class="mb-3"></div>
+                <pre id="simText" class="bg-light border rounded p-3 small mb-0"></pre>
+            </div>
+
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    Close
+                </button>
+
+                <button type="button" class="btn btn-success" id="simApproveBtn" disabled>
+                    Agree & Generate grid
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

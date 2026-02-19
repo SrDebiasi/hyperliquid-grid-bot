@@ -5,7 +5,6 @@ import {
   getExchange,
   retrieveConfig,
   retrieveInstance,
-  saveTradeOrder,
   retrieveOrders,
   updateTradeOrder,
   updateTradeConfig,
@@ -16,7 +15,7 @@ import {
 } from './functions.js';
 
 import { setPrices, setPrice, getInstanceId, setInstanceId, setLastOperation } from './state.js';
-import { notifyTelegram, createTelegramBot } from './services/telegramService.js';
+import { notifyTelegram, createTelegramBot } from '../services/telegramService.js';
 import {FEE_RATE_MAKER_PER_SIDE} from "./fees.js";
 
 let wallet = null;
@@ -643,7 +642,7 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
  * @returns {Promise<void>}
  */
 const runCoins = async function(coinIndex) {
-  data = await retrieveConfig({ id: getInstanceId() }).catch((ex) => console.log(ex));
+  data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => console.log(ex));
 
   const cfg = data[coinIndex];
   const pair = cfg.pair;
@@ -782,6 +781,7 @@ const runCoins = async function(coinIndex) {
               pair: order.pair,
               profit: 'SELL',
               value: profitReal,
+              fee: calculateFeesForCycle(order),
               target_percent: cfg.target_percent,
               price_intermediate: order.buy_price,
               price_final: order.sell_price,
@@ -844,11 +844,12 @@ const runCoins = async function(coinIndex) {
 
             addProfit({
               trade_instance_id: tradeInstanceId,
-              name: data[coinIndex].name,
+              name: cfg.name,
               pair: order.pair,
               profit: 'BUY',
               value: profitReal,
-              target_percent: data[coinIndex].target_percent,
+              fee: calculateFeesForCycle(order),
+              target_percent: cfg.target_percent,
               price_intermediate: order.buy_price,
               price_final: order.sell_price,
             });
@@ -892,6 +893,13 @@ const runCoins = async function(coinIndex) {
     runWithTime(coinIndex, timeToExecute);
   }
 };
+
+function calculateFeesForCycle(order, feeRatePerSide = FEE_RATE_MAKER_PER_SIDE) {
+  const qty = Number(order.quantity);
+  const notionalBuy = Number(order.buy_price) * qty;
+  const notionalSell = Number(order.sell_price) * qty;
+  return (notionalBuy * feeRatePerSide) + (notionalSell * feeRatePerSide);
+}
 
 function clearMissingOrder({ order, side, tradeOrderId, notify = false }) {
   const field = side === 'SELL' ? 'sell_order' : 'buy_order';
@@ -1172,7 +1180,7 @@ const loadConfig = async function(pair, instance) {
   // Allow the exchange client to finish initialization
   await sleep(1000);
 
-  data = await retrieveConfig({ pair, id: getInstanceId() }).catch((ex) => {
+  data = await retrieveConfig({ pair, trade_instance_id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
@@ -1196,101 +1204,6 @@ function parseSaveFlag(save) {
   if (save == null) return false;
   return String(save).trim().toUpperCase() === 'YES';
 }
-
-/**
- * Builds grid configuration rows for a given market and optionally persists them in the database.
- *
- * This is primarily a CLI utility:
- * - Generates buy/sell levels from entry_price to exit_price using margin_percent and target_percent.
- * - Prints a table of generated levels.
- * - Estimates required capital for uptrend/downtrend scenarios.
- * - If `save` is enabled, inserts each generated row in the DB via `saveTradeOrder`.
- *
- * Backward compatibility:
- * - `save` can be boolean (true/false) or string ("YES"/"NO").
- *
- * @param {number|string} instance - Trade instance id.
- * @param {string} pair - Trading pair to generate grid for (e.g., 'BTCUSDT').
- * @param {boolean|string} save - Whether to persist generated rows (true/"YES" to save).
- * @returns {Promise<void>}
- */
-const create = async function(instance, pair, save) {
-  setInstanceId(instance);
-
-  const shouldSave = parseSaveFlag(save);
-  const cfgRows = await loadConfig(pair, getInstanceId());
-
-  for (const c of cfgRows) {
-    consoleLog(`Creating configuration for ${pair}`);
-    if (shouldSave) await sleep(10);
-    const records = [];
-    let buyPrice = parseFloat(c.entry_price);
-    let sellPrice = buyPrice + (buyPrice * c.target_percent) / 100;
-    const priceKey = String(pair).replace(/[\/\-_]/g, '');
-    const currentPrice = prices[priceKey];
-    let sumQuantityCoin = 0; // Base asset required if price trends up (e.g., BTC)
-    let sumQuantityUsd = 0;  // Quote required if price trends down (e.g., USDC/USDT)
-
-    while (sellPrice < parseFloat(c.exit_price)) {
-      if (shouldSave) await sleep(10);
-      const quantity = parseFloat((c.usd_transaction / buyPrice).toFixed(c.decimal_quantity));
-
-      if (sellPrice > currentPrice) sumQuantityCoin += quantity;
-      else sumQuantityUsd += 1;
-
-      records.push({
-        buy_price: buyPrice,
-        sell_price: sellPrice,
-        quantity,
-      });
-
-      if (shouldSave) {
-        void saveTradeOrder({
-          pair: c.pair,
-          buy_price: buyPrice.toFixed(c.decimal_price),
-          sell_price: sellPrice.toFixed(c.decimal_price),
-          quantity,
-          entry_price: currentPrice,
-          last_operation: false,
-          trade_instance_id: getInstanceId(),
-        }).catch((ex) => console.log(ex));
-      }
-      // Next grid level
-      buyPrice = buyPrice + (buyPrice * c.margin_percent) / 100;
-      sellPrice = buyPrice + (buyPrice * c.target_percent) / 100;
-    }
-    console.table(records);
-    consoleLog(`Finished ${pair} working between ${c.entry_price} and ${c.exit_price}`);
-    consoleLog(
-      `Total ${records.length} records | target=${c.target_percent}% | spacing=${c.margin_percent}% | usd_per_order=${c.usd_transaction}`,
-    );
-    const totalCoinUsd = sumQuantityCoin * currentPrice;
-    consoleLog(
-      `Current ${c.name} price ${currentPrice} | base_needed=${sumQuantityCoin.toFixed(6)} | base_value_usd=${totalCoinUsd.toFixed(2)}`,
-    );
-    consoleLog(
-      `Quote needed for downtrend: ${(sumQuantityUsd * c.usd_transaction).toFixed(2)} USD`,
-    );
-    const sellValueIfRangeTop = sumQuantityCoin * parseFloat(c.exit_price);
-    const buyValueToday = sumQuantityCoin * currentPrice;
-    const profitIfSoldAtTop = sellValueIfRangeTop - buyValueToday;
-
-    consoleLog(
-      `Profit if buying required amount today and selling at exit (${c.exit_price}): ${profitIfSoldAtTop.toFixed(2)} USD`,
-    );
-    consoleLog(` - Buy value today: ${buyValueToday.toFixed(2)} USD`);
-    consoleLog(` - Sell value at range top: ${sellValueIfRangeTop.toFixed(2)} USD`);
-    const orderValue = Number(c.usd_transaction);
-    const grossProfitPerOp = orderValue * (Number(c.target_percent) / 100);
-    // Note: this is an estimate; fee model depends on venue and maker/taker behavior.
-    const exchangeFees = orderValue * 0.0015;
-    const netProfitPerOp = grossProfitPerOp - exchangeFees;
-    consoleLog(`Gross profit per operation: ${grossProfitPerOp.toFixed(2)} USD`);
-    consoleLog(`Estimated fees per operation: ${exchangeFees.toFixed(2)} USD`);
-    consoleLog(`Estimated net profit per operation: ${netProfitPerOp.toFixed(2)} USD`);
-    consoleLog(`Estimated total USD needed: ${(sumQuantityUsd * c.usd_transaction + totalCoinUsd).toFixed(2)}`);
-  }
-};
 
 /**
  * Boots the bot runtime for a given instance id (dev/CLI helper).
@@ -1386,7 +1299,7 @@ const start = async function(instance) {
   });
   void notifyTelegram('Bot grid initiated.');
 
-  data = await retrieveConfig({ id: getInstanceId() }).catch((ex) => {
+  data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
@@ -1452,32 +1365,11 @@ const cancelOrders = async function( instance, pair) {
   }
 };
 
-
-const test = async function(instance) {
-  setInstanceId(instance);
-  addProfit({
-    trade_instance_id: 1,
-    name: 'btc',
-    pair: 'btc/usdc',
-    profit: 'BUY',
-    value: 1,
-    target_percent: 1.8,
-    price_intermediate: 65000,
-    price_final: 65000,
-  });
-};
-
 /**
  * CLI usage examples:
  *
  * - Start bot (runs the grid engine):
  *   npm run start -- <instanceId>
- *
- * - Create grid rows (dry-run / print only):
- *   npm run create -- <instanceId> <pair>  false
- *
- * - Create grid rows (persist to DB):
- *   npm run create -- <instanceId> <pair>  true
  *
  * - List open orders (raw adapter output):
  *   npm run openOrders -- <instanceId> <pair>
@@ -1487,8 +1379,6 @@ const test = async function(instance) {
  */
 export {
   start,
-  create,
-  test,
   openOrders,
   cancelOrders,
   startBot,
