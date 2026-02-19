@@ -1,5 +1,10 @@
 # Grid Trading Bot
+
+Hyperliquid view:
 ![Grid bot](docs/bot.png)
+
+Dashboard view:
+![Dashboard](docs/dashboard.jpg)
 ## Overview
 
 This Grid Trading Bot is designed to generate passive income from market volatility while operating strictly within a defined price range.
