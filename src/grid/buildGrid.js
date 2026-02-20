@@ -24,21 +24,27 @@ export function buildGrid(entryPrice, exitPrice, marginPercent, targetPercent) {
     const margin = 1 + marginP / 100;
     const target = 1 + targetP / 100;
 
-    // guard: evita loop infinito se margin <= 1
     if (margin <= 1) return grid;
 
-    // mesmo comportamento do seu while atual
     while (price <= exit) {
         const buy = price;
         const sell = price * target;
 
         grid.push({
-            buy_price: buy,
-            sell_price: sell,
+            buy_price: quantizeBuy(buy, 1),
+            sell_price: quantizeSell(sell, 1),
         });
 
         price = price * margin;
     }
 
     return grid;
+}
+
+function quantizeBuy(price, tick = 1) {
+    return Math.floor(price / tick) * tick;
+}
+
+function quantizeSell(price, tick = 1) {
+    return Math.ceil(price / tick) * tick;
 }

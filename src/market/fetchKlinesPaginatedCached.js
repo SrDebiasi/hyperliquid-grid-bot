@@ -11,7 +11,6 @@ export async function fetchKlinesPaginatedCached(symbol, interval, startTime, en
 
     let all = [];
 
-    // alinhamos no início do dia UTC do startTime
     let dayStart = startOfDayUTC(startTime);
 
     while (dayStart < endTime) {
@@ -29,17 +28,15 @@ export async function fetchKlinesPaginatedCached(symbol, interval, startTime, en
         } else {
             console.log("🌐 Fetching day:", key);
 
-            // baixa o dia inteiro (independente do chunk pedido), pra reutilizar depois
             const fullDayStart = dayStart;
             const fullDayEnd = dayEnd;
 
             dayData = await fetchKlines(symbol, interval, fullDayStart, fullDayEnd, limit);
 
             fs.writeFileSync(file, JSON.stringify(dayData), "utf8");
-            console.log("💾 Cache salvo:", file);
+            console.log("File saved:", file);
         }
 
-        // filtra só o range necessário desse dia
         if (dayData && dayData.length) {
             const filtered = dayData.filter(k => {
                 const openTime = k[0];
@@ -48,11 +45,9 @@ export async function fetchKlinesPaginatedCached(symbol, interval, startTime, en
             all = all.concat(filtered);
         }
 
-        // próximo dia
         dayStart += 24 * 60 * 60 * 1000;
     }
 
-    // garantir ordenação e remover duplicados (por segurança)
     all.sort((a, b) => a[0] - b[0]);
     all = all.filter((k, idx) => idx === 0 || k[0] !== all[idx - 1][0]);
 

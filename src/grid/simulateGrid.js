@@ -69,10 +69,8 @@ export function simulateGrid(grid, candles, params = {}) {
   const state = grid.map((level, idx) => ({
     side: level.sell_price > entryPrice ? 'SELL' : 'BUY',
     active: false,
-    lastOperation: false,
     usdPerOrder: baseUsdPerOrder,
     cycles: 0, // counted cycles (same as trade_profit rows)
-    rawCycles: 0, // raw closes (every time a leg closes)
     profit: 0,
     index: idx,
     // Ledger while active (one leg executed, waiting for the opposite leg)
@@ -160,7 +158,7 @@ export function simulateGrid(grid, candles, params = {}) {
     dailyReports.push(report);
     if (typeof dailyReportFn === 'function') {
       dailyReportFn(report);
-    } else {
+    } else if (enableLogs) {
       console.log(
         `[${report.day}] close=${report.priceClose}` +
         ` | pending BUY=${report.pendingBuyCount} (USDT=${report.usdtNeededForPendingBuys})` +
@@ -210,15 +208,11 @@ export function simulateGrid(grid, candles, params = {}) {
           const netProfit = gross - fees;
           s.side = 'SELL';
           s.active = false;
-          const shouldCount = s.lastOperation === true;
-          s.lastOperation = !s.lastOperation;
-          s.rawCycles++;
-          if (shouldCount) {
-            s.cycles++;
-            cycles++;
-            s.profit += netProfit;
-            totalProfit += netProfit;
-          }
+          s.cycles++;
+          cycles++;
+          s.profit += netProfit;
+          totalProfit += netProfit;
+
           // Clear position
           s.openUsd = 0;
           s.openBtcQty = 0;
@@ -263,15 +257,11 @@ export function simulateGrid(grid, candles, params = {}) {
           const netProfit = gross - fees;
           s.side = 'BUY';
           s.active = false;
-          const shouldCount = s.lastOperation === true;
-          s.lastOperation = !s.lastOperation;
-          s.rawCycles++;
-          if (shouldCount) {
-            s.cycles++;
-            cycles++;
-            s.profit += netProfit;
-            totalProfit += netProfit;
-          }
+          s.cycles++;
+          cycles++;
+          s.profit += netProfit;
+          totalProfit += netProfit;
+
           // Clear position
           s.openUsd = 0;
           s.openBtcQty = 0;
