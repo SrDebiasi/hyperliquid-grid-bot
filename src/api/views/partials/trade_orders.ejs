@@ -47,7 +47,10 @@
     %>
 
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="text-muted small">Last $ means profit in next cycle.</div>
+        <div class="text-muted small">
+            <span class="me-3">💲 Profit on next fill</span>
+            <span>⏳ Waiting for cycle</span>
+        </div>
 
         <button
                 id="ordersToggleBtn"
@@ -63,14 +66,14 @@
         <table class="table table-sm table-striped align-middle text-center mb-0">
             <thead>
             <tr>
-                <th class="text-nowrap">Last</th>
-                <th class="text-end text-nowrap">Buy price</th>
+                <th class="text-nowrap">Status</th>
+                <th class="text-nowrap">Buy price</th>
                 <th class="text-nowrap">Buy order</th>
-                <th class="text-end text-nowrap">Sell price</th>
+                <th class="text-nowrap">Sell price</th>
                 <th class="text-nowrap">Sell order</th>
-                <th class="text-end">Qty</th>
-                <th class="text-nowrap">Last side</th>
-                <th class="text-end text-nowrap">Entry price</th>
+                <th class="text-nowrap">Qty</th>
+                <th class="text-nowrap">Last order placed</th>
+                <th class="text-nowrap">Entry price</th>
             </tr>
             </thead>
 
@@ -79,20 +82,18 @@
             <% displayOrders.forEach((o) => { %>
                 <tr>
                     <td class="text-center">
-                        <% if (o.last_operation) { %>
-                            <span title="Last operation">$</span>
-                        <% } else { %>
-                            <span class="text-muted">-</span>
-                        <% } %>
+                      <span style="font-size: 0.75rem; line-height: 1; display: inline-block;">
+                        <%= o.last_operation ? '💲' : '⏳' %>
+                      </span>
                     </td>
 
-                    <td class="text-end"><%= (o.buy_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.buy_price ?? '-') %></td>
                     <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
-                    <td class="text-end"><%= (o.sell_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.sell_price ?? '-') %></td>
                     <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
-                    <td class="text-end"><%= (o.quantity ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.quantity ?? '-') %></td>
                     <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
-                    <td class="text-end"><%= (o.entry_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.entry_price ?? '-') %></td>
                 </tr>
             <% }) %>
             </tbody>
@@ -102,20 +103,18 @@
             <% orders.forEach((o) => { %>
                 <tr>
                     <td class="text-center">
-                        <% if (o.last_operation) { %>
-                            <span title="Last operation">$</span>
-                        <% } else { %>
-                            <span class="text-muted">-</span>
-                        <% } %>
+                      <span style="font-size: 0.75rem; line-height: 1; display: inline-block;">
+                        <%= o.last_operation ? '💲' : '⏳' %>
+                      </span>
                     </td>
 
-                    <td class="text-end"><%= (o.buy_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.buy_price ?? '-') %></td>
                     <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
-                    <td class="text-end"><%= (o.sell_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.sell_price ?? '-') %></td>
                     <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
-                    <td class="text-end"><%= (o.quantity ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.quantity ?? '-') %></td>
                     <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
-                    <td class="text-end"><%= (o.entry_price ?? '-') %></td>
+                    <td class="text-nowrap"><%= (o.entry_price ?? '-') %></td>
                 </tr>
             <% }) %>
             </tbody>

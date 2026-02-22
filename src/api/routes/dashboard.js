@@ -5,42 +5,40 @@ import {getProfitSummary} from "../../reports/profitReportService.js";
 import {ensureBotRunning, getBotLogs, getBotStatus, stopBot} from "../../services/pm2Service.js";
 import {fetchHyperliquidMidFromPair} from "../../functions/functions.js";
 
-export async function dashboardRoutes(app, opts) {
-    const { models } = opts;
 
-    app.get("/dashboard", async (request, reply) => {
-        // Adjust this key if your buildModels() exports a different name
-        const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
-        const instance = instanceRow ? instanceRow.toJSON() : null;
+// Shared loader used by /dashboard and /dashboard/profits
+async function loadDashboardData({ models }) {
+    const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
+    const instance = instanceRow ? instanceRow.toJSON() : null;
 
-        let config = null;
-        let rebuy = {};
-        let orders = [];
-        let profitSummary = null;
-        if (instance) {
-            const configRow = await models.TradeConfig.findOne({
-                where: { trade_instance_id: instance.id },
-                order: [["id", "ASC"]],
-            });
-            config = configRow ? configRow.toJSON() : null;
+    let config = null;
+    let orders = [];
+    let profitSummary = null;
+    let rebuy = {};
 
-            const ordersRaw = await models.TradeOrder.findAll({
-                where: { trade_instance_id: instance.id },
-            });
+    if (instance) {
+        const configRow = await models.TradeConfig.findOne({
+            where: { trade_instance_id: instance.id },
+            order: [["id", "ASC"]],
+        });
+        config = configRow ? configRow.toJSON() : null;
 
-             orders = ordersRaw
-                .map((o) => o.get({ plain: true }))
-                .sort((a, b) => {
-                    const ap = Number(a.buy_price ?? 0);
-                    const bp = Number(b.buy_price ?? 0);
-                    return ap - bp; // ascending by buy_price
-                });
+        const ordersRaw = await models.TradeOrder.findAll({
+            where: { trade_instance_id: instance.id },
+        });
 
+        orders = ordersRaw
+            .map((o) => o.get({ plain: true }))
+            .sort((a, b) => Number(a.buy_price ?? 0) - Number(b.buy_price ?? 0));
+
+        if (config) {
             const currentPrice = await fetchHyperliquidMidFromPair(config.pair);
+
             const reboughtCoin = Number(config.rebought_coin ?? 0);
             const reboughtValueUsd = Number(config.rebought_value ?? 0);
             const currentValueUsd = reboughtCoin * currentPrice;
-            const avgPriceUsd = reboughtCoin > 0 ? (reboughtValueUsd / reboughtCoin) : 0;
+            const avgPriceUsd = reboughtCoin > 0 ? reboughtValueUsd / reboughtCoin : 0;
+
             rebuy = {
                 active: config.rebuy_profit,
                 reboughtCoin,
@@ -48,17 +46,26 @@ export async function dashboardRoutes(app, opts) {
                 currentPrice,
                 currentValueUsd,
                 avgPriceUsd,
-                name : config.name
+                name: config.name,
             };
-
-             profitSummary = instance
-                ? await getProfitSummary({ models, tradeInstanceId: instance.id })
-                : null;
         }
 
-        const botStatus = instance
-            ? await getBotStatus({ instanceId: instance.id })
-            : { isRunning: false, statusText: 'stopped' };
+        profitSummary = await getProfitSummary({ models, tradeInstanceId: instance.id });
+    }
+
+    const botStatus = instance
+        ? await getBotStatus({ instanceId: instance.id })
+        : { isRunning: false, statusText: "stopped" };
+
+    return { instance, config, orders, profitSummary, rebuy, botStatus };
+}
+
+export async function dashboardRoutes(app, opts) {
+    const { models } = opts;
+
+    app.get("/dashboard", async (request, reply) => {
+        const { instance, config, orders, profitSummary, rebuy, botStatus } =
+            await loadDashboardData({ models });
 
         return reply.view("layout.ejs", {
             page: "pages/dashboard.ejs",
@@ -69,8 +76,14 @@ export async function dashboardRoutes(app, opts) {
             config,
             orders,
             profitSummary,
-            rebuy
+            rebuy,
         });
+    });
+
+    app.get("/dashboard/profits", async (request, reply) => {
+        const { profitSummary, rebuy } = await loadDashboardData({ models });
+
+        return reply.view("partials/profits.ejs", { profitSummary, rebuy });
     });
 
     app.post("/dashboard/instances/:id/start", async (request, reply) => {
@@ -87,17 +100,6 @@ export async function dashboardRoutes(app, opts) {
 
         await stopBot({ instanceId });
         return reply.redirect("/dashboard");
-    });
-
-    app.get("/dashboard/profits", async (request, reply) => {
-        const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
-        const instance = instanceRow ? instanceRow.toJSON() : null;
-
-        const profitSummary = instance
-            ? await getProfitSummary({ models, tradeInstanceId: instance.id })
-            : null;
-
-        return reply.view("partials/profits.ejs", { profitSummary });
     });
 
     app.get("/dashboard/instances/:id/logs", async (request, reply) => {
