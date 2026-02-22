@@ -10,17 +10,105 @@
             rel="stylesheet"
     />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script>
+        function copyText(text) {
+            navigator.clipboard.writeText(text);
+        }
+    </script>
 </head>
 
 <body class="bg-light">
 <div class="container py-4">
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h1 class="h3 m-0"><%= title %></h1>
-        <span class="text-muted small">Server time: <%= now %></span>
+
+        <div class="d-flex align-items-center gap-2">
+            <div class="dropdown">
+                <button
+                        class="btn btn-outline-success btn-sm dropdown-toggle"
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                >
+                    Donate
+                </button>
+
+                <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;">
+                    <div class="small text-muted mb-2">Send crypto to support BotGrid.</div>
+
+                    <!-- BTC -->
+                    <div class="mb-3">
+                        <div class="fw-semibold">Bitcoin (BTC)</div>
+                        <div class="font-monospace small text-break">bc1qz54alkzd3vtr9zgk3l76mqneecelvxsvtc9w27</div>
+                        <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm mt-2"
+                                onclick="copyText('bc1qz54alkzd3vtr9zgk3l76mqneecelvxsvtc9w27')"
+                        >
+                            Copy BTC address
+                        </button>
+                    </div>
+
+                    <!-- EVM -->
+                    <div class="mb-3">
+                        <div class="fw-semibold">EVM (0x)</div>
+                        <div class="font-monospace small text-break">0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207</div>
+
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm"
+                                    onclick="copyText('0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207')"
+                            >
+                                Copy EVM address
+                            </button>
+
+                            <!-- MetaMask deep links (choose the right network) -->
+                            <a class="btn btn-outline-success btn-sm"
+                               href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@1"
+                               target="_blank" rel="noopener noreferrer">
+                                MetaMask (ETH)
+                            </a>
+
+                            <a class="btn btn-outline-success btn-sm"
+                               href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@42161"
+                               target="_blank" rel="noopener noreferrer">
+                                MetaMask (ARB)
+                            </a>
+
+                            <a class="btn btn-outline-success btn-sm"
+                               href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@8453"
+                               target="_blank" rel="noopener noreferrer">
+                                MetaMask (BASE)
+                            </a>
+                        </div>
+
+                        <div class="text-muted small mt-2">
+                            Tip: pick the same network you’re sending on (ETH / ARB / BASE).
+                        </div>
+                    </div>
+
+                    <!-- Solana -->
+                    <div>
+                        <div class="fw-semibold">Solana (SOL)</div>
+                        <div class="font-monospace small text-break">BejrknxAdRp3KscAwpRUHVHG3sKUah6eSyPmFTJpwo1s</div>
+                        <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-sm mt-2"
+                                onclick="copyText('BejrknxAdRp3KscAwpRUHVHG3sKUah6eSyPmFTJpwo1s')"
+                        >
+                            Copy SOL address
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <span class="text-muted small">Server time: <%= now %></span>
+        </div>
     </div>
 
-    <%- include(page, { instance, config, botStatus, orders, profitSummary }) %>
-</div>
+    <%- include(page, { instance, config, botStatus, orders, profitSummary, rebuy }) %>
+</div>v>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/js/grid-ui.js"></script>

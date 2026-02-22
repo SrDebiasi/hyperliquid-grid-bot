@@ -1,15 +1,29 @@
 <% if (profitSummary) { %>
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex justify-content-between align-items-end">
                 <div>
                     <h2 class="h5 mb-1">Profits</h2>
                     <div class="text-muted small">
                         Daily chart: <%= profitSummary.dailyProfitMtd.period.label %>
                     </div>
                 </div>
-            </div>
+                <% if (rebuy && (rebuy.reboughtCoin > 0 || rebuy.reboughtValueUsd > 0)) { %>
+                    <div class="text-end small" style="line-height: 1.5;">
+                        <div class="fw-semibold">Rebuy <%= rebuy.active ? 'Active' : 'Disabled' %></div>
 
+                        <div class="text-muted">
+                            Bought <%= rebuy.reboughtCoin.toFixed(5) %> <%= rebuy.name %> for <%= fmtUsd(rebuy.reboughtValueUsd) %>
+                            → Now <%= fmtUsd(rebuy.currentValueUsd) %>
+                        </div>
+
+                        <div class="text-muted">
+                            Avg. buy price <%= fmtUsd(rebuy.avgPriceUsd) %> →
+                              <%= rebuy.name %> today: <%= fmtUsd(rebuy.currentPrice) %>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
             <div class="row g-3 mt-2">
                 <% const t = profitSummary.totals; %>
 
@@ -17,7 +31,13 @@
 
                 <div class="col-12 col-md-4 col-xl">
                     <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Today</div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="text-muted small">Today</div>
+
+                            <div class="small fw-semibold text-success">
+                                +<%= t.today.pnlPercent.toFixed(2) %>%
+                            </div>
+                        </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.today.totalUsd) %></div>
                         <div class="text-muted small"><%= t.today.trades %> trades</div>
                     </div>
@@ -25,7 +45,13 @@
 
                 <div class="col-12 col-md-4 col-xl">
                     <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Week</div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="text-muted small">Week</div>
+
+                            <div class="small fw-semibold text-success">
+                                +<%= t.week.pnlPercent.toFixed(2) %>%
+                            </div>
+                        </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.week.totalUsd) %></div>
                         <div class="text-muted small"><%= t.week.trades %> trades</div>
                     </div>
@@ -33,7 +59,13 @@
 
                 <div class="col-12 col-md-4 col-xl">
                     <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Month</div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="text-muted small">Month</div>
+
+                            <div class="small fw-semibold text-success">
+                                +<%= t.month.pnlPercent.toFixed(2) %>%
+                            </div>
+                        </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.month.totalUsd) %></div>
                         <div class="text-muted small"><%= t.month.trades %> trades</div>
                     </div>
@@ -41,7 +73,14 @@
 
                 <div class="col-12 col-md-4 col-xl">
                     <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">Year</div>
+
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="text-muted small">Year</div>
+
+                            <div class="small fw-semibold text-success">
+                                +<%= t.year.pnlPercent.toFixed(2) %>%
+                            </div>
+                        </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.year.totalUsd) %></div>
                         <div class="text-muted small"><%= t.year.trades %> trades</div>
                     </div>
@@ -49,7 +88,12 @@
 
                 <div class="col-12 col-md-4 col-xl">
                     <div class="border rounded p-3 h-100">
-                        <div class="text-muted small">All-time</div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="text-muted small">All-time</div>
+                            <div class="small fw-semibold text-success">
+                                +<%= t.allTime.pnlPercent.toFixed(2) %>%
+                            </div>
+                        </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.allTime.totalUsd) %></div>
                         <div class="text-muted small"><%= t.allTime.trades %> trades</div>
                     </div>

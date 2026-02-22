@@ -52,27 +52,17 @@ npm install
 
 ---
 
-## 4) Create DB schema
+## 4) Create Db and seed
 
 Creates the schema using `db/db.sql`.
 
 ```bash
-npm run db:create
+npm run db:setup
 ```
 
 ---
 
-## 5) Seed initial data
-
-Seeds a default `trade_instance` and a basic `trade_config` (BTC/USDC).
-
-```bash
-npm run db:seed
-```
-
----
-
-## 6) Start the API server
+## 5) Start the API server
 
 ```bash
 npm run api
@@ -84,9 +74,9 @@ Open the Dashboard:
 
 ---
 
-## 7) Configure the bot in the Dashboard
+## 6) Configure the bot in the Dashboard
 
-### 7.1 Update your config
+### 6.1 Update your config
 In the **Config** section, adjust your parameters (example):
 - Pair (e.g., `BTC/USDC`)
 - Entry price / Exit price
@@ -95,7 +85,7 @@ In the **Config** section, adjust your parameters (example):
 - USD per order
 - Decimal precision
 
-### 7.2 Simulate (recommended)
+### 6.2 Simulate (recommended)
 Use **Simulate** to preview how many levels will be generated, capital estimates, and profit estimates.
 
 Example output you may see:
@@ -124,14 +114,14 @@ Estimated net profit per operation: $1.63
 Total estimated capital required: $40496.83
 ```
 
-### 7.3 Generate the grid
+### 6.3 Generate the grid
 If the simulation looks correct, click **Generate Grid**.
 
 This will create the grid rows in the database (trade orders / levels) for the selected config.
 
 ---
 
-## 8) Start / Stop the bot (Dashboard)
+## 7) Start / Stop the bot (Dashboard)
 
 The Dashboard provides **Start** and **Stop** buttons for your instance.  
 Under the hood, it uses **PM2** to run the bot process (so it survives crashes and can be controlled cleanly).

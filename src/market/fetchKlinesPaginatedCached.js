@@ -26,7 +26,7 @@ export async function fetchKlinesPaginatedCached(symbol, interval, startTime, en
         if (fs.existsSync(file)) {
             dayData = JSON.parse(fs.readFileSync(file, "utf8"));
         } else {
-            console.log("🌐 Fetching day:", key);
+            console.log(" Fetching day:", key);
 
             const fullDayStart = dayStart;
             const fullDayEnd = dayEnd;
@@ -101,7 +101,8 @@ function cacheFileForDay(cacheDir, symbol, interval, dayKey) {
 }
 
 function ensureCacheDir() {
-    const dir = path.join(__dirname, "cache");
+    const projectRoot = path.resolve(__dirname, "..", "..");
+    const dir = path.join(projectRoot, "cache");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
 }

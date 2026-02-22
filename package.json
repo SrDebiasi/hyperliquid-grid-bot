@@ -6,6 +6,7 @@
   "scripts": {
     "db:create": "node scripts/db_create.js",
     "db:seed": "node scripts/db_seed.js",
+    "db:setup": "npm run db:create && npm run db:seed",
     "backtest": "node scripts/backtest.js",
     "api": "node src/api/server.js",
 

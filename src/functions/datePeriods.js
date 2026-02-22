@@ -8,7 +8,7 @@ function now() {
 }
 
 function ymd(dt) {
-  return dt.toFormat('yyyy-LL-dd'); // YYYY-MM-DD
+  return dt.toFormat('yyyy-LL-dd');
 }
 
 function periodDay(ref = now()) {
@@ -33,12 +33,11 @@ function periodPreviousDay(ref = now()) {
   };
 }
 
-// Luxon normalmente considera week começando na Monday dependendo do locale.
-// Pra garantir Monday, calculamos manualmente.
+
 function startOfWeekMonday(ref) {
   // Luxon: Monday=1 ... Sunday=7
   const weekday = ref.weekday;
-  const diff = weekday - 1; // dias desde Monday
+  const diff = weekday - 1;
   return ref.minus({ days: diff }).startOf('day');
 }
 
@@ -111,7 +110,6 @@ function periodPreviousMonth(ref = now()) {
   };
 }
 
-// Mês até hoje (pra estimate)
 function periodMonthToDate(ref = now()) {
   const start = ref.startOf('month');
   return {

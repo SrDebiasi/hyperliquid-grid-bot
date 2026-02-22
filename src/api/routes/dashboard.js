@@ -3,6 +3,7 @@
 
 import {getProfitSummary} from "../../reports/profitReportService.js";
 import {ensureBotRunning, getBotLogs, getBotStatus, stopBot} from "../../services/pm2Service.js";
+import {fetchHyperliquidMidFromPair} from "../../functions/functions.js";
 
 export async function dashboardRoutes(app, opts) {
     const { models } = opts;
@@ -13,6 +14,7 @@ export async function dashboardRoutes(app, opts) {
         const instance = instanceRow ? instanceRow.toJSON() : null;
 
         let config = null;
+        let rebuy = {};
         let orders = [];
         let profitSummary = null;
         if (instance) {
@@ -34,6 +36,21 @@ export async function dashboardRoutes(app, opts) {
                     return ap - bp; // ascending by buy_price
                 });
 
+            const currentPrice = await fetchHyperliquidMidFromPair(config.pair);
+            const reboughtCoin = Number(config.rebought_coin ?? 0);
+            const reboughtValueUsd = Number(config.rebought_value ?? 0);
+            const currentValueUsd = reboughtCoin * currentPrice;
+            const avgPriceUsd = reboughtCoin > 0 ? (reboughtValueUsd / reboughtCoin) : 0;
+            rebuy = {
+                active: config.rebuy_profit,
+                reboughtCoin,
+                reboughtValueUsd,
+                currentPrice,
+                currentValueUsd,
+                avgPriceUsd,
+                name : config.name
+            };
+
              profitSummary = instance
                 ? await getProfitSummary({ models, tradeInstanceId: instance.id })
                 : null;
@@ -51,20 +68,9 @@ export async function dashboardRoutes(app, opts) {
             botStatus,
             config,
             orders,
-            profitSummary
+            profitSummary,
+            rebuy
         });
-    });
-
-    app.get("/api/dashboard/profit-summary", async (request, reply) => {
-        const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
-        const instance = instanceRow ? instanceRow.toJSON() : null;
-
-        if (!instance) {
-            return reply.code(404).send({ error: "No TradeInstance found" });
-        }
-
-        const profitSummary = await getProfitSummary({ models, tradeInstanceId: instance.id });
-        return reply.send(profitSummary);
     });
 
     app.post("/dashboard/instances/:id/start", async (request, reply) => {
@@ -81,6 +87,17 @@ export async function dashboardRoutes(app, opts) {
 
         await stopBot({ instanceId });
         return reply.redirect("/dashboard");
+    });
+
+    app.get("/dashboard/profits", async (request, reply) => {
+        const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
+        const instance = instanceRow ? instanceRow.toJSON() : null;
+
+        const profitSummary = instance
+            ? await getProfitSummary({ models, tradeInstanceId: instance.id })
+            : null;
+
+        return reply.view("partials/profits.ejs", { profitSummary });
     });
 
     app.get("/dashboard/instances/:id/logs", async (request, reply) => {

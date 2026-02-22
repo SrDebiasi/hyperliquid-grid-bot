@@ -235,21 +235,24 @@ function baseSymbolFromPair(pair) {
 }
 
 async function fetchHyperliquidMidFromPair(pair) {
-  const mids = await fetchHyperliquidAllMids();
-  const base = baseSymbolFromPair(pair);
+  try {
+    const mids = await fetchHyperliquidAllMids();
+    const base = baseSymbolFromPair(pair);
 
-  const candidates = [
-    base,                         // BTC
-    base.replace(/^U/, ''),        // UBTC -> BTC
-    `U${base}`,                    // BTC -> UBTC
-  ];
+    const candidates = [
+      base,                         // BTC
+      base.replace(/^U/, ''),        // UBTC -> BTC
+      `U${base}`,                    // BTC -> UBTC
+    ];
 
-  for (const k of candidates) {
-    const n = Number(mids?.[k]);
-    if (Number.isFinite(n)) return n;
+    for (const k of candidates) {
+      const n = Number(mids?.[k]);
+      if (Number.isFinite(n)) return n;
+    }
+    return null;
+  } catch (e) {
+    return null;
   }
-
-  return null;
 }
 
 

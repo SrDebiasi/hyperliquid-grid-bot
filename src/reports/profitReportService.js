@@ -12,6 +12,8 @@ import {
     findAllProfitRows,
     findProfitRowsForPeriod,
 } from './profitRepo.js';
+import {calcExposureFromOrders} from "./exposureService.js";
+import {fetchHyperliquidMidFromPair, retrieveConfig, retrieveOrders} from "../functions/functions.js";
 
 function toPlainRows(rows) {
     return (rows || []).map(r => (r?.get ? r.get({ plain: true }) : r));
@@ -137,25 +139,62 @@ async function buildDailyProfitMtd({ models, tradeInstanceId }) {
     };
 }
 
+function pnlPercent(totalUsd, exposureUsd) {
+    const exp = Number(exposureUsd || 0);
+    if (!exp) return null;
+    return (Number(totalUsd || 0) / exp) * 100;
+}
+
+
+async function buildExposureNow({ tradeInstanceId }) {
+    // config
+    let cfg = await retrieveConfig({ trade_instance_id: tradeInstanceId });
+    cfg = cfg?.[0];
+    if (!cfg?.pair) return null;
+
+    // price
+    const currentPrice = await fetchHyperliquidMidFromPair(cfg.pair);
+
+    // orders
+    const orders =
+        (await retrieveOrders({ pair: cfg.pair, trade_instance_id: tradeInstanceId })) || [];
+
+    return calcExposureFromOrders(orders, currentPrice);
+}
+
 async function getProfitSummary({ models, tradeInstanceId }) {
-    const [today, week, month, year, allTime, dailyProfitMtd] = await Promise.all([
+    const [today, week, month, year, allTime, dailyProfitMtd, exposure] = await Promise.all([
         buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodDay }),
         buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodWeek }),
         buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodMonth }),
         buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodYear }),
         buildAllTimeTotals({ models, tradeInstanceId }),
         buildDailyProfitMtd({ models, tradeInstanceId }),
+        buildExposureNow({ tradeInstanceId }),
     ]);
 
+    const exposureUsd = exposure?.totalExposureUsd ?? null;
+
+    const totals = { today, week, month, year, allTime };
+    for (const k of Object.keys(totals)) {
+        totals[k].pnlPercent = pnlPercent(totals[k].totalUsd, exposureUsd);
+    }
+
     return {
-        totals: { today, week, month, year, allTime },
+        exposure: exposure
+            ? {
+                totalExposureUsd: exposure.totalExposureUsd,
+                coinQty: exposure.coinQty,
+                reservedUsd: exposure.reservedUsd,
+            }
+            : null,
+        totals,
         dailyProfitMtd,
     };
-}
+};
 
 export {
     getProfitSummary,
-    // exporting these is useful later for Telegram refactor
     sumProfit,
     groupProfitByDay,
     parseRowDateTime,
