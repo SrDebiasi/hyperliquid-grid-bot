@@ -19,6 +19,7 @@ import { openOrdersRoutes } from "./routes/open-orders.js";
 import { orderHistoryRoutes } from "./routes/order-history.js";
 import { buildModels } from "./models/index.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
+import { marketRoutes } from "./routes/market.js";
 
 const PORT = Number(process.env.API_PORT ?? 3000);
 
@@ -60,6 +61,7 @@ export async function buildServer() {
 
     // Dashboard page routes (no /api prefix)
     await app.register(dashboardRoutes, { models });
+    await app.register(marketRoutes, { models });
     // Existing API routes
     await app.register(tradeConfigRoutes, { prefix: "/api", models });
     await app.register(tradeOrderRoutes, { prefix: "/api", models });

@@ -10,6 +10,7 @@
             rel="stylesheet"
     />
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://unpkg.com/lightweight-charts@5.1.0/dist/lightweight-charts.standalone.production.js"></script>
     <script>
         function copyText(text) {
             navigator.clipboard.writeText(text);
@@ -108,7 +109,7 @@
     </div>
 
     <%- include(page, { instance, config, botStatus, orders, profitSummary, rebuy }) %>
-</div>v>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/js/grid-ui.js"></script>

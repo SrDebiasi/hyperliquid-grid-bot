@@ -9,7 +9,6 @@
     "db:setup": "npm run db:create && npm run db:seed",
     "backtest": "node scripts/backtest.js",
     "api": "node src/api/server.js",
-
     "start": "node cli.js start",
     "openOrders": "node cli.js openOrders",
     "cancelOrders": "node cli.js cancelOrders",
@@ -25,6 +24,7 @@
     "dotenv": "^17.2.4",
     "ejs": "^4.0.1",
     "fastify": "^5.7.4",
+    "lightweight-charts": "^5.1.0",
     "luxon": "^3.7.2",
     "moment": "^2.29.4",
     "moment-timezone": "^0.6.0",

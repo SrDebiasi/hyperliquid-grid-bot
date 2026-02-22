@@ -1,0 +1,23 @@
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+        <div class="fw-semibold">Market</div>
+        <div class="text-muted small">
+            <span id="mktSymbol">BTCUSDT</span> ·
+            <span id="mktInterval">5m</span> ·
+            last <span id="mktDays">5</span> days
+        </div>
+    </div>
+
+    <div class="text-end small">
+        <div class="text-muted">Price</div>
+        <div class="fw-semibold" id="mktLastPrice">—</div>
+    </div>
+</div>
+
+<div id="mktChart" style="height: 340px;"></div>
+
+<div class="mt-2 small text-muted d-flex gap-3 flex-wrap">
+    <div>Range (<span id="mktRangePctLabel">—</span>%): <span class="fw-semibold" id="mktRange">—</span></div>
+</div>
+
+<script type="module" src="/js/market.js"></script>
