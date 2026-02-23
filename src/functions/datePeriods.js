@@ -11,28 +11,48 @@ function ymd(dt) {
   return dt.toFormat('yyyy-LL-dd');
 }
 
-function periodDay(ref = now()) {
-  const start = ref.startOf('day');
-  const end = ref.endOf('day');
+function toUtcJsDate(dt) {
+  return dt.toUTC().toJSDate();
+}
+
+function withUtcBounds({ startLocal, endLocalExclusive, ...rest }) {
   return {
-    key: 'day',
-    label: `Today (${ymd(ref)})`,
-    from: ymd(start),
-    to: ymd(end),
+    ...rest,
+    timezone: BOT_TZ,
+
+    // For DB filtering (UTC instants)
+    fromUtc: toUtcJsDate(startLocal),
+    toUtc: toUtcJsDate(endLocalExclusive),
+
+    // For display/range text (date-only)
+    from: ymd(startLocal),
+    to: ymd(endLocalExclusive.minus({ milliseconds: 1 })),
   };
+}
+
+function periodDay(ref = now()) {
+  const startLocal = ref.startOf('day');
+  const endLocalExclusive = startLocal.plus({ days: 1 });
+
+  return withUtcBounds({
+    key: 'day',
+    label: `Today (${ymd(startLocal)})`,
+    startLocal,
+    endLocalExclusive,
+  });
 }
 
 function periodPreviousDay(ref = now()) {
-  const d = ref.minus({ days: 1 });
-  return {
-    key: 'previous_day',
-    label: `Previous day (${ymd(d)})`,
-    timezone: BOT_TZ,
-    from: ymd(d.startOf('day')),
-    to: ymd(d.endOf('day')),
-  };
-}
+  const startLocal = ref.minus({ days: 1 }).startOf('day');
+  const endLocalExclusive = startLocal.plus({ days: 1 });
 
+  return withUtcBounds({
+    key: 'previous_day',
+    label: `Previous day (${ymd(startLocal)})`,
+    startLocal,
+    endLocalExclusive,
+  });
+}
 
 function startOfWeekMonday(ref) {
   // Luxon: Monday=1 ... Sunday=7
@@ -41,83 +61,79 @@ function startOfWeekMonday(ref) {
   return ref.minus({ days: diff }).startOf('day');
 }
 
-function endOfWeekSunday(ref) {
-  const start = startOfWeekMonday(ref);
-  return start.plus({ days: 6 }).endOf('day');
-}
-
 function periodWeek(ref = now()) {
-  const start = startOfWeekMonday(ref);
-  const end = endOfWeekSunday(ref);
-  return {
+  const startLocal = startOfWeekMonday(ref);
+  const endLocalExclusive = startLocal.plus({ days: 7 });
+
+  return withUtcBounds({
     key: 'week',
-    label: `This week (${ymd(start)} → ${ymd(end)})`,
-    timezone: BOT_TZ,
-    from: ymd(start),
-    to: ymd(end),
-  };
+    label: `This week (${ymd(startLocal)} → ${ymd(endLocalExclusive.minus({ days: 1 }))})`,
+    startLocal,
+    endLocalExclusive,
+  });
 }
 
 function periodPreviousWeek(ref = now()) {
-  const lastWeekRef = ref.minus({ weeks: 1 });
-  const start = startOfWeekMonday(lastWeekRef);
-  const end = endOfWeekSunday(lastWeekRef);
-  return {
+  const startLocal = startOfWeekMonday(ref.minus({ weeks: 1 }));
+  const endLocalExclusive = startLocal.plus({ days: 7 });
+
+  return withUtcBounds({
     key: 'previous_week',
-    label: `Previous week (${ymd(start)} → ${ymd(end)})`,
-    timezone: BOT_TZ,
-    from: ymd(start),
-    to: ymd(end),
-  };
+    label: `Previous week (${ymd(startLocal)} → ${ymd(endLocalExclusive.minus({ days: 1 }))})`,
+    startLocal,
+    endLocalExclusive,
+  });
 }
 
 function periodMonth(ref = now()) {
-  const start = ref.startOf('month');
-  const end = ref.endOf('month');
+  const startLocal = ref.startOf('month');
+  const endLocalExclusive = startLocal.plus({ months: 1 });
 
-  return {
+  return withUtcBounds({
     key: 'month',
-    label: `This month (${ref.toFormat('LLLL yyyy')})`,
-    timezone: BOT_TZ,
-    from: ymd(start),
-    to: ymd(end),
-  };
-}
-
-function periodYear(ref = now()) {
-  const start = ref.startOf('year');
-  const end = ref.endOf('year');
-
-  return {
-    key: 'year',
-    label: `Year-to-date (${ref.toFormat('yyyy')})`,
-    timezone: BOT_TZ,
-    from: ymd(start),
-    to: ymd(end),
-  };
+    label: `This month (${startLocal.toFormat('LLLL yyyy')})`,
+    startLocal,
+    endLocalExclusive,
+  });
 }
 
 function periodPreviousMonth(ref = now()) {
   const d = ref.minus({ months: 1 });
-  const start = d.startOf('month');
-  const end = d.endOf('month');
-  return {
+  const startLocal = d.startOf('month');
+  const endLocalExclusive = startLocal.plus({ months: 1 });
+
+  return withUtcBounds({
     key: 'previous_month',
-    label: `Previous month (${d.toFormat('LLLL yyyy')})`,
-    timezone: BOT_TZ,
-    from: ymd(start),
-    to: ymd(end),
-  };
+    label: `Previous month (${startLocal.toFormat('LLLL yyyy')})`,
+    startLocal,
+    endLocalExclusive,
+  });
+}
+
+function periodYear(ref = now()) {
+  const startLocal = ref.startOf('year');
+  const endLocalExclusive = startLocal.plus({ years: 1 });
+
+  return withUtcBounds({
+    key: 'year',
+    label: `Year-to-date (${startLocal.toFormat('yyyy')})`,
+    startLocal,
+    endLocalExclusive,
+  });
 }
 
 function periodMonthToDate(ref = now()) {
-  const start = ref.startOf('month');
+  const startLocal = ref.startOf('month');
+  const endLocalExclusive = ref.plus({ days: 1 }).startOf('day'); // end-exclusive (next midnight)
+
   return {
-    key: 'month_to_date',
-    label: `Month-to-date (${ref.toFormat('LLLL yyyy')})`,
-    timezone: BOT_TZ,
-    from: ymd(start),
-    to: ymd(ref),
+    ...withUtcBounds({
+      key: 'month_to_date',
+      label: `Month-to-date (${startLocal.toFormat('LLLL yyyy')})`,
+      startLocal,
+      endLocalExclusive,
+    }),
+
     meta: {
       dayOfMonth: ref.day,
       daysInMonth: ref.daysInMonth,

@@ -1,16 +1,14 @@
 // src/reports/profitRepo.js
-import { Op, Sequelize } from 'sequelize';
+import { Op } from 'sequelize';
 
 async function findProfitRowsForPeriod({ models, tradeInstanceId, period }) {
     return models.TradeProfit.findAll({
         where: {
             trade_instance_id: tradeInstanceId,
-            [Op.and]: [
-                Sequelize.where(
-                    Sequelize.fn('DATE', Sequelize.col('date_transaction')),
-                    { [Op.between]: [period.from, period.to] }
-                ),
-            ],
+            date_transaction: {
+                [Op.gte]: period.fromUtc,
+                [Op.lt]: period.toUtc,
+            },
         },
         order: [['date_transaction', 'ASC']],
     });
