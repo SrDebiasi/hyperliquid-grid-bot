@@ -1,6 +1,9 @@
 # README — How to Setup (Local)
 
-This guide gets the project running locally with **PostgreSQL**, the **Dashboard UI**, and the **PM2-controlled bot**.
+This guide helps you run the project locally with **PostgreSQL**, the **Dashboard UI**, and the **PM2-managed bot**.
+
+Please read this README first. If you run into any issues, join the Telegram group for setup help:
+https://t.me/hyperliquidbotgrid
 
 ---
 
