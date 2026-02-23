@@ -1,10 +1,14 @@
 import { Op } from "sequelize";
+import {DateTime} from "luxon";
+
+const BOT_TZ = process.env.BOT_TZ || "America/Edmonton";
 
 export async function tradeProfitRoutes(app, { models }) {
     const { TradeProfit } = models;
 
     app.get("/trade-profit", async (request) => {
-        const { trade_instance_id, date_start, date_end, pair } = request.query ?? {};
+        const { trade_instance_id, date_start, date_end, pair, timezone } = request.query ?? {};
+        const tz = timezone || BOT_TZ;
 
         const where = {};
         if (trade_instance_id != null && trade_instance_id !== "") {
@@ -14,8 +18,24 @@ export async function tradeProfitRoutes(app, { models }) {
 
         if (date_start || date_end) {
             where.date_transaction = {};
-            if (date_start) where.date_transaction[Op.gte] = new Date(`${date_start}T00:00:00Z`);
-            if (date_end) where.date_transaction[Op.lte] = new Date(`${date_end}T23:59:59Z`);
+
+            if (date_start) {
+                const startUtc = DateTime.fromISO(date_start, { zone: tz })
+                    .startOf("day")
+                    .toUTC()
+                    .toJSDate();
+                where.date_transaction[Op.gte] = startUtc;
+            }
+
+            if (date_end) {
+                // end-exclusive: next day at 00:00 in tz, converted to UTC
+                const endUtcExclusive = DateTime.fromISO(date_end, { zone: tz })
+                    .startOf("day")
+                    .plus({ days: 1 })
+                    .toUTC()
+                    .toJSDate();
+                where.date_transaction[Op.lt] = endUtcExclusive;
+            }
         }
 
         const rows = await TradeProfit.findAll({

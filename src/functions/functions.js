@@ -8,7 +8,7 @@ let apiUrl = process.env.API_URL_LOCAL || 'http://127.0.0.1/api/';
 
 let headers = { headers: { 'Content-Type': 'application/json' }, validateStatus: false };
 
-const BOT_TZ = process.env.BOT_TZ || 'America/Vancouver';
+const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton';
 
 function nowTz() {
   return moment().tz(BOT_TZ);
@@ -153,8 +153,7 @@ const addMessage = (message, color = null) => {
 };
 
 const addProfit = (data) => {
-  const nowMoment = nowTz();
-  const nowDb = nowMoment.format('YYYY-MM-DD HH:mm:ss');
+  const nowUtc = moment.utc().format('YYYY-MM-DD HH:mm:ss');
 
   const payload = {
     pair: data.pair,
@@ -166,7 +165,7 @@ const addProfit = (data) => {
     fee: null,
     price_intermediate: data.price_intermediate,
     price_final: data.price_final,
-    date_transaction: nowDb,
+    date_transaction: nowUtc,
   };
 
   const profitStr = Number.parseFloat(data.value).toFixed(2);

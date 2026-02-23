@@ -44,7 +44,13 @@ const pageData = {
 
 <div class="card shadow-sm mt-3">
   <div class="card-body">
-    <%- include("../partials/market.ejs") %>
+    <div
+            hx-get="/dashboard/market"
+            hx-trigger="load, every 10m"
+            hx-swap="outerHTML"
+    >
+      <%- include("../partials/market.ejs", { market }) %>
+    </div>
   </div>
 </div>
 
