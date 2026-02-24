@@ -44,15 +44,11 @@ const pageData = {
 
 <div class="card shadow-sm mt-3">
   <div class="card-body">
-    <div
-            hx-get="/dashboard/market"
-            hx-trigger="load, every 10m"
-            hx-swap="outerHTML"
-    >
       <%- include("../partials/market.ejs") %>
-    </div>
   </div>
 </div>
 
 <%- include('../partials/modals/secrets-modal', { instance }) %>
 <%- include('../partials/modals/trade_config', { config }) %>
+
+<script type="module" src="/js/market.js"></script>

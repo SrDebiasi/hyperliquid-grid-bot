@@ -1,289 +1,252 @@
 // public/js/market.js
-(async function () {
+// Keeps chart/zoom stable: updates candles + removes/redraws price lines.
+// IMPORTANT: uses series.removePriceLine(pl) (v5 correct API), not pl.remove().
 
-    const cfg = {
-        symbol: "BTCUSDT",
-        interval: "5m",
-        days: 5,
+if (!window.__marketSingletonLoaded) {
+    window.__marketSingletonLoaded = true;
 
-        // grid
-        stepPct: 0.1,
-        levels: 120,
+    (function () {
+        let chart = null;
+        let series = null;
+        let ro = null;
 
-        // dynamic band
-        rangePct: 1.8,
-        useWicks: true,
-    };
+        // Keep handles so we can remove lines properly
+        let orderLineObjs = [];
+        let bandLineObjs = [];
 
-    const el = document.getElementById("mktChart");
-    if (!el) return;
+        function fmt(n) {
+            if (!Number.isFinite(n)) return "—";
+            return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
 
-    const priceEl = document.getElementById("mktLastPrice");
-    const anchorEl = document.getElementById("mktAnchor");
-    const rangeEl = document.getElementById("mktRange");
-
-    const LC = window.LightweightCharts;
-    if (!LC?.createChart) {
-        console.error("[market] LightweightCharts not found");
-        return;
-    }
-
-    function fmt(n) {
-        if (!Number.isFinite(n)) return "—";
-        return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-    }
-
-    function startOfDayUTCFromSec(sec) {
-        const ms = sec * 1000;
-        const d = new Date(ms);
-        return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0) / 1000;
-    }
-
-    function computeDailyOpenAnchor(candles) {
-        if (!candles.length) return null;
-
-        const last = candles[candles.length - 1];
-        const todayStart = startOfDayUTCFromSec(last.time);
-
-        const exact = candles.find((x) => x.time === todayStart);
-        if (exact) return exact.open;
-
-        const fallback = candles.find((x) => x.time >= todayStart);
-        return fallback ? fallback.open : candles[0].open;
-    }
-
-    function computeDynamicRange(candles, rangePct, useWicks) {
-        if (!candles.length) return null;
-
-        const mult = 1 + rangePct / 100;
-
-        let top = candles[0].close;
-        let bot = top / mult;
-
-        for (const c of candles) {
-            const hi = useWicks ? c.high : c.close;
-            const lo = useWicks ? c.low : c.close;
-
-            if (hi > top) {
-                top = hi;
-                bot = top / mult;
+        function ensureChart(container) {
+            const LC = window.LightweightCharts;
+            if (!LC?.createChart) {
+                console.error("[market] LightweightCharts not found");
+                return false;
             }
-            if (lo < bot) {
-                bot = lo;
-                top = bot * mult;
+
+            if (chart && series) return true;
+
+            chart = LC.createChart(container, {
+                height: 340,
+                rightPriceScale: { borderVisible: false },
+                timeScale: { borderVisible: false },
+                grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+            });
+
+            series = chart.addSeries(LC.CandlestickSeries, {});
+            chart.timeScale().fitContent(); // only once on init
+
+            ro = new ResizeObserver(() => {
+                chart?.applyOptions({ width: container.clientWidth });
+            });
+            ro.observe(container);
+
+            return true;
+        }
+
+        function destroyChart() {
+            // clear timer
+            if (window.__marketTimer) {
+                clearInterval(window.__marketTimer);
+                window.__marketTimer = null;
+            }
+
+            // remove lines
+            if (series) {
+                removeLines(orderLineObjs);
+                removeLines(bandLineObjs);
+            } else {
+                orderLineObjs.length = 0;
+                bandLineObjs.length = 0;
+            }
+
+            try { ro?.disconnect(); } catch (_) {}
+            ro = null;
+
+            try { chart?.remove(); } catch (_) {}
+            chart = null;
+            series = null;
+        }
+
+        function removeLines(list) {
+            // Correct v5 removal: series.removePriceLine(handle)
+            if (!series) {
+                list.length = 0;
+                return;
+            }
+
+            for (const pl of list) {
+                try {
+                    series.removePriceLine(pl);
+                } catch (_) {
+                    // fallback (older examples use pl.remove(); keep as no-op safety)
+                    try { pl?.remove?.(); } catch (_) {}
+                }
+            }
+            list.length = 0;
+        }
+
+        function readCfgFromDom() {
+            const symbol = document.getElementById("mktSymbol")?.textContent?.trim() || "BTCUSDT";
+            const interval = document.getElementById("mktInterval")?.textContent?.trim() || "5m";
+            const daysRaw = Number(document.getElementById("mktDays")?.textContent?.trim() || 5);
+            const days = Number.isFinite(daysRaw) ? daysRaw : 5;
+            return { symbol, interval, days };
+        }
+
+        function computeDynamicRange(candles, rangePct, useWicks) {
+            if (!candles.length) return null;
+
+            const mult = 1 + rangePct / 100;
+
+            let top = candles[0].close;
+            let bot = top / mult;
+
+            for (const c of candles) {
+                const hi = useWicks ? c.high : c.close;
+                const lo = useWicks ? c.low : c.close;
+
+                if (hi > top) {
+                    top = hi;
+                    bot = top / mult;
+                }
+                if (lo < bot) {
+                    bot = lo;
+                    top = bot * mult;
+                }
+            }
+
+            return { top, bot };
+        }
+
+        function drawBandTopBot(candles, bandCfg) {
+            if (!series) return;
+
+            // remove previous band lines
+            removeLines(bandLineObjs);
+
+            const rangePct = Number(bandCfg?.rangePct ?? 0);
+            if (!Number.isFinite(rangePct) || rangePct <= 0) {
+                const rangeEl = document.getElementById("mktRange");
+                const rangePctLabelEl = document.getElementById("mktRangePctLabel");
+                if (rangePctLabelEl) rangePctLabelEl.textContent = "—";
+                if (rangeEl) rangeEl.textContent = "—";
+                return;
+            }
+
+            const useWicks = Boolean(bandCfg?.useWicks ?? true);
+            const band = computeDynamicRange(candles, rangePct, useWicks);
+            if (!band) return;
+
+            const LC = window.LightweightCharts;
+
+            bandLineObjs.push(
+                series.createPriceLine({
+                    price: band.top,
+                    color: "rgba(0,0,0,0.85)",
+                    lineWidth: 2,
+                    lineStyle: LC.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: "Top",
+                }),
+                series.createPriceLine({
+                    price: band.bot,
+                    color: "rgba(0,0,0,0.85)",
+                    lineWidth: 2,
+                    lineStyle: LC.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: "Bot",
+                })
+            );
+
+            const rangeEl = document.getElementById("mktRange");
+            const rangePctLabelEl = document.getElementById("mktRangePctLabel");
+            if (rangePctLabelEl) rangePctLabelEl.textContent = String(rangePct);
+            if (rangeEl) rangeEl.textContent = `${fmt(band.bot)} → ${fmt(band.top)}`;
+        }
+
+        function drawOrderLines(orderLines) {
+            if (!series) return;
+
+            // remove previous order lines
+            removeLines(orderLineObjs);
+
+            const LC = window.LightweightCharts;
+
+            for (const ol of orderLines || []) {
+                const price = Number(ol.price);
+                if (!Number.isFinite(price)) continue;
+
+                const isBuy = ol.side === "BUY";
+                const color = isBuy
+                    ? "rgba(34, 197, 94, 0.10)"
+                    : "rgba(59, 130, 246, 0.10)";
+
+                const pl = series.createPriceLine({
+                    price,
+                    color,
+                    lineWidth: 0.5,
+                    lineStyle: LC.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: "",
+                });
+
+                orderLineObjs.push(pl);
             }
         }
 
-        return { top, bot };
-    }
+        async function refreshMarket() {
+            if (window.__marketRefreshInFlight) return;
+            window.__marketRefreshInFlight = true;
 
-    const res = await fetch(
-        `/api/market/klines?symbol=${encodeURIComponent(cfg.symbol)}&interval=${encodeURIComponent(cfg.interval)}&days=${cfg.days}`
-    );
-    const json = await res.json();
-
-    cfg.stepPct = Number(json?.grid?.stepPct ?? cfg.stepPct);
-    cfg.levels  = Number(json?.grid?.levels ?? cfg.levels);
-    cfg.rangePct = Number(json?.band?.rangePct ?? cfg.rangePct);
-    cfg.useWicks = Boolean(json?.band?.useWicks ?? cfg.useWicks);
-
-    const stepPct = Number(json?.grid?.stepPct ?? cfg.stepPct);
-    const rangePct = Number(json?.band?.rangePct ?? cfg.rangePct);
-
-    const stepEl = document.getElementById("mktStepPct");
-    const rangePctEl = document.getElementById("mktRangePct");
-    const rangePctLabelEl = document.getElementById("mktRangePctLabel");
-
-    if (stepEl) stepEl.textContent = String(stepPct);
-    if (rangePctEl) rangePctEl.textContent = String(rangePct);
-    if (rangePctLabelEl) rangePctLabelEl.textContent = String(rangePct);
-
-    const candles = (json.candles || []).slice().sort((a, b) => a.time - b.time);
-    const last = candles[candles.length - 1];
-
-    const chart = LC.createChart(el, {
-        height: 340,
-        rightPriceScale: { borderVisible: false },
-        timeScale: { borderVisible: false },
-
-        grid: {
-            vertLines: { visible: false },
-            horzLines: { visible: false },
-        },
-    });
-
-    const series = chart.addSeries(LC.CandlestickSeries, {});
-
-    series.setData(candles);
-    chart.timeScale().fitContent();
-
-    // --- UI texts ---
-    if (priceEl) priceEl.textContent = last ? fmt(last.close) : "—";
-
-    const anchor = computeDailyOpenAnchor(candles);
-    if (anchorEl) anchorEl.textContent = fmt(anchor);
-
-    const band = computeDynamicRange(candles, cfg.rangePct, cfg.useWicks);
-    if (rangeEl && band) rangeEl.textContent = `${fmt(band.bot)} → ${fmt(band.top)}`;
-    if (rangeEl && !band) rangeEl.textContent = "—";
-
-    // --- Draw lines ---
-    const gridLines = [];
-    const bandLines = [];
-
-    function removePriceLines(list) {
-        for (const pl of list) {
             try {
-                pl.remove();
-            } catch (_) {}
-        }
-        list.length = 0;
-    }
+                const container = document.getElementById("mktChart");
+                if (!container) return;
 
-    function drawLines() {
-        removePriceLines(gridLines);
-        removePriceLines(bandLines);
+                if (!ensureChart(container)) return;
 
-        if (!Number.isFinite(anchor)) return;
+                const { symbol, interval, days } = readCfgFromDom();
 
-        // grid lines — SKIP the middle range (bot..top)
-        for (let i = -cfg.levels; i <= cfg.levels; i++) {
-            const p = anchor * (1 + (i * cfg.stepPct) / 100);
+                const res = await fetch(
+                    `/api/market/klines?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval)}&days=${days}`
+                );
+                const json = await res.json();
 
-            if (band && p >= band.bot && p <= band.top) continue;
+                const candles = (json.candles || []).slice().sort((a, b) => a.time - b.time);
+                const last = candles[candles.length - 1];
 
-            const pl = series.createPriceLine({
-                price: p,
-                color: "rgba(0, 140, 255, 0.18)",
-                lineWidth: 1,
-                lineStyle: LC.LineStyle.Solid,
-                axisLabelVisible: false,
-                title: "",
-            });
-            gridLines.push(pl);
-        }
+                series.setData(candles);
 
-        // band top/bot lines
-        if (band) {
-            const topLine = series.createPriceLine({
-                price: band.top,
-                color: "rgba(0,0,0,0.85)",
-                lineWidth: 2,
-                lineStyle: LC.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: "Top",
-            });
+                const priceEl = document.getElementById("mktLastPrice");
+                if (priceEl) priceEl.textContent = last ? fmt(last.close) : "—";
 
-            const botLine = series.createPriceLine({
-                price: band.bot,
-                color: "rgba(0,0,0,0.85)",
-                lineWidth: 2,
-                lineStyle: LC.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: "Bot",
-            });
-
-            bandLines.push(topLine, botLine);
-
-            // --- filled band (simple way) ---
-            // LightweightCharts doesn't support "fill between two price lines" directly,
-            // so we draw a translucent rectangle overlay in the chart container.
-            // This is a lightweight hack and looks close to TradingView.
-
-            renderBandOverlay(chart, band.bot, band.top);
-        } else {
-            renderBandOverlay(chart, null, null);
-        }
-    }
-
-    let bandOverlayEl = null;
-
-    function renderBandOverlay(chart, bot, top) {
-        const container = el; // chart container div (mktChart)
-        if (!bandOverlayEl) {
-            bandOverlayEl = document.createElement("div");
-            bandOverlayEl.style.position = "absolute";
-            bandOverlayEl.style.left = "0";
-            bandOverlayEl.style.right = "0";
-            bandOverlayEl.style.pointerEvents = "none";
-            bandOverlayEl.style.background = "rgba(255,255,255,0.12)";
-            bandOverlayEl.style.borderTop = "1px solid rgba(255,255,255,0.25)";
-            bandOverlayEl.style.borderBottom = "1px solid rgba(255,255,255,0.25)";
-
-            // make sure container can host an absolute overlay
-            const cs = getComputedStyle(container);
-            if (cs.position === "static") container.style.position = "relative";
-
-            container.appendChild(bandOverlayEl);
+                drawBandTopBot(candles, json.band);
+                drawOrderLines(json.orderLines);
+            } catch (e) {
+                console.error("[market] refresh failed", e);
+            } finally {
+                window.__marketRefreshInFlight = false;
+            }
         }
 
-        if (!Number.isFinite(bot) || !Number.isFinite(top)) {
-            bandOverlayEl.style.display = "none";
-            return;
-        }
+        window.initMarket = function initMarket() {
+            // Always restart timer globally (never duplicates)
+            if (window.__marketTimer) clearInterval(window.__marketTimer);
 
-        bandOverlayEl.style.display = "block";
+            refreshMarket();
 
-        // Convert prices to Y pixels using price scale
-        const priceScale = series.priceScale();
-        const yTop = priceScale.priceToCoordinate(top);
-        const yBot = priceScale.priceToCoordinate(bot);
+            window.__marketTimer = setInterval(() => {
+                refreshMarket();
+            }, 60_000);
+        };
 
-        if (yTop == null || yBot == null) {
-            bandOverlayEl.style.display = "none";
-            return;
-        }
+        document.addEventListener("DOMContentLoaded", () => {
+            window.initMarket?.();
+        });
 
-        const y1 = Math.min(yTop, yBot);
-        const y2 = Math.max(yTop, yBot);
-
-        bandOverlayEl.style.top = `${y1}px`;
-        bandOverlayEl.style.height = `${Math.max(1, y2 - y1)}px`;
-    }
-
-    const orderLineObjs = [];
-
-    function clearOrderLines() {
-        for (const pl of orderLineObjs) {
-            try { pl.remove(); } catch (_) {}
-        }
-        orderLineObjs.length = 0;
-    }
-
-    function drawOrderLines(orderLines) {
-        clearOrderLines();
-
-        for (const ol of orderLines || []) {
-            const price = Number(ol.price);
-            if (!Number.isFinite(price)) continue;
-
-            const isBuy = ol.side === "BUY";
-            const color = isBuy
-                ? "rgba(0, 160, 0, 0.18)"
-                : "rgba(200, 0, 0, 0.18)";
-
-
-            const pl = series.createPriceLine({
-                price,
-                color,
-                lineWidth: 0.5,
-                lineStyle: LC.LineStyle.Solid,
-
-                axisLabelVisible: true,
-                title : "",
-            });
-
-            orderLineObjs.push(pl);
-        }
-    }
-
-
-
-    drawOrderLines(json.orderLines);
-
-    // Resize handling
-    const ro = new ResizeObserver(() => {
-        chart.applyOptions({ width: el.clientWidth });
-    });
-    ro.observe(el);
-})();
+        // Optional cleanup if you ever navigate away / replace DOM:
+        window.__destroyMarketChart = destroyChart;
+    })();
+}

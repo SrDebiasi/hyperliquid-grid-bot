@@ -1,6 +1,4 @@
 // src/api/routes/market.js
-
-
 import {fetchLastNDaysKlinesCached} from "../../services/binanceKlinesCacheServices.js";
 
 function toCandle(k) {
@@ -21,90 +19,90 @@ export async function marketRoutes(app, opts) {
 
         // GET /api/market/klines?symbol=BTCUSDT&interval=5m&days=5
         app.get("/api/market/klines", async (request, reply) => {
-        const symbol = String(request.query.symbol ?? "BTCUSDT").toUpperCase().trim();
-        const interval = String(request.query.interval ?? "5m").trim();
+            const symbol = String(request.query.symbol ?? "BTCUSDT").toUpperCase().trim();
+            const interval = String(request.query.interval ?? "5m").trim();
 
-        const daysRaw = Number(request.query.days ?? 5);
-        const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 30) : 5;
+            const daysRaw = Number(request.query.days ?? 5);
+            const days = Number.isFinite(daysRaw) ? Math.min(Math.max(daysRaw, 1), 30) : 5;
 
-        // Load instance + config (same logic as dashboard)
-        const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
-        const instance = instanceRow ? instanceRow.toJSON() : null;
+            // Load instance + config (same logic as dashboard)
+            const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
+            const instance = instanceRow ? instanceRow.toJSON() : null;
 
-        let config = null;
-        if (instance) {
-            const configRow = await models.TradeConfig.findOne({
-                where: { trade_instance_id: instance.id },
-                order: [["id", "ASC"]],
+            let config = null;
+            if (instance) {
+                const configRow = await models.TradeConfig.findOne({
+                    where: { trade_instance_id: instance.id },
+                    order: [["id", "ASC"]],
+                });
+                config = configRow ? configRow.toJSON() : null;
+            }
+
+            // Defaults if config missing
+            const grid = {
+                stepPct: Number(config?.margin_percent ?? 0.1),
+                levels: 120,
+            };
+
+            const band = {
+                rangePct: Number(config?.target_percent ?? 1.8),
+                useWicks: true,
+            };
+
+            const klines = await fetchLastNDaysKlinesCached({
+                symbol,
+                interval,
+                days,
+                refetchYesterday: false,
             });
-            config = configRow ? configRow.toJSON() : null;
-        }
 
-        // Defaults if config missing
-        const grid = {
-            stepPct: Number(config?.margin_percent ?? 0.1),
-            levels: 120,
-        };
+            const candles = klines.map(toCandle);
 
-        const band = {
-            rangePct: Number(config?.target_percent ?? 1.8),
-            useWicks: true,
-        };
+            const ordersRaw = instance
+                ? await models.TradeOrder.findAll({ where: { trade_instance_id: instance.id } })
+                : [];
 
-        const klines = await fetchLastNDaysKlinesCached({
-            symbol,
-            interval,
-            days,
-            refetchYesterday: false,
-        });
+            const orders = ordersRaw.map((o) => o.get({ plain: true }));
 
-        const candles = klines.map(toCandle);
+            const orderLines = orders.flatMap((o) => {
+                const out = [];
 
-        const ordersRaw = instance
-            ? await models.TradeOrder.findAll({ where: { trade_instance_id: instance.id } })
-            : [];
+                const buyPrice = Number(o.buy_price);
+                if (o.buy_order) {
+                    out.push({
+                        side: "BUY",
+                        price: buyPrice,
+                        hasOrderId: !!o.buy_order,
+                        orderId: o.buy_order ?? null,
+                        qty: Number(o.quantity) || null,
+                    });
+                }
 
-        const orders = ordersRaw.map((o) => o.get({ plain: true }));
+                const sellPrice = Number(o.sell_price);
+                if (o.sell_order) {
+                    out.push({
+                        side: "SELL",
+                        price: sellPrice,
+                        hasOrderId: !!o.sell_order,
+                        orderId: o.sell_order ?? null,
+                        qty: Number(o.quantity) || null,
+                    });
+                }
 
-        const orderLines = orders.flatMap((o) => {
-            const out = [];
+                return out;
+            });
 
-            const buyPrice = Number(o.buy_price);
-            if (o.buy_order) {
-                out.push({
-                    side: "BUY",
-                    price: buyPrice,
-                    hasOrderId: !!o.buy_order,
-                    orderId: o.buy_order ?? null,
-                    qty: Number(o.quantity) || null,
-                });
-            }
-
-            const sellPrice = Number(o.sell_price);
-            if (o.sell_order) {
-                out.push({
-                    side: "SELL",
-                    price: sellPrice,
-                    hasOrderId: !!o.sell_order,
-                    orderId: o.sell_order ?? null,
-                    qty: Number(o.quantity) || null,
-                });
-            }
-
-            return out;
-        });
-
-        return reply.send({
-            symbol,
-            interval,
-            days,
-            count: candles.length,
-            candles,
-            grid,
-            band,
-            instanceId: instance?.id ?? null,
-            configId: config?.id ?? null,
-            orderLines,
-        });
+            return reply.send({
+                symbol,
+                interval,
+                days,
+                count: candles.length,
+                candles,
+                grid,
+                band,
+                instanceId: instance?.id ?? null,
+                configId: config?.id ?? null,
+                orderLines,
+            });
     });
 }

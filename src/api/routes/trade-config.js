@@ -133,14 +133,12 @@ export async function tradeConfigRoutes(app, { models }) {
 
         await row.save();
 
-        const isHtmx = String(request.headers["hx-request"] ?? "") === "true";
-        if (isHtmx) {
-            return reply
-                .type("text/html; charset=utf-8")
-                .send('<div class="alert alert-success mb-0">Config saved ✅</div>');
-        }
-
-        return { ok: true, id: row.id };
+        return reply
+            .type("application/json; charset=utf-8")
+            .send({
+                success: true,
+                data: row.toJSON ? row.toJSON() : row,
+            });
     });
 }
 

@@ -13,20 +13,9 @@
                     <div id="configResult" class="mb-3"></div>
 
                     <form
+                            id="tradeConfigForm"
                             hx-put="/api/trade-config/<%= config.id %>"
-                            hx-target="#configResult"
-                            hx-swap="innerHTML"
-                            hx-headers='{"Accept":"text/html"}'
-                            hx-on::after-request="
-              if (event.detail.successful && event.detail.requestConfig.verb === 'put') {
-                setTimeout(() => {
-                  const el = document.getElementById('configModal');
-                  const modal = bootstrap.Modal.getInstance(el);
-                  modal?.hide();
-                  window.location.reload();
-                }, 2000);
-              }
-            "
+                            hx-swap="none"
                     >
                         <div class="row g-3">
 
@@ -165,3 +154,41 @@
         </div>
     </div>
 <% } %>
+
+<script>
+    function renderAlert(targetEl, type, message) {
+        targetEl.innerHTML = `
+      <div class="alert alert-${type} d-flex align-items-center gap-2 mb-0 py-2" role="alert">
+        <span class="fw-semibold">${message}</span>
+      </div>
+    `;
+    }
+
+    document.body.addEventListener("htmx:afterRequest", (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.id !== "tradeConfigForm") return;
+
+        const target = document.getElementById("configResult");
+        if (!target) return;
+
+        let payload = null;
+        try {
+            payload = JSON.parse(e.detail.xhr.responseText || "{}");
+        } catch {
+            renderAlert(target, "danger", "Unexpected response from server.");
+            return;
+        }
+
+        if (e.detail.successful && payload && payload.success) {
+            renderAlert(target, "success", "Config saved.");
+            setTimeout(() => { target.innerHTML = ""; }, 2500);
+        } else {
+            const msg =
+                payload?.message ||
+                payload?.error ||
+                "Could not save config. Please try again.";
+            renderAlert(target, "danger", msg);
+        }
+    });
+</script>

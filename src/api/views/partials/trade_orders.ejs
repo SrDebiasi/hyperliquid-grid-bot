@@ -10,7 +10,6 @@
             const n = Number(v);
             return Number.isFinite(n) ? n : null;
         };
-
         const hasBuy = (o) => !!o.buy_order;
         const hasSell = (o) => !!o.sell_order;
 
@@ -29,6 +28,20 @@
                 .sort((a, b) => a.p - b.p) // lowest sells
                 .slice(0, 6)
                 .map(x => x.o);
+
+        const fmtUsd = (v) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return '-';
+            return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+        };
+
+        const usdFor = (qty, price) => {
+            const q = num(qty);
+            const p = num(price);
+            if (q === null || p === null) return null;
+            return q * p;
+        };
+
 
         const map = new Map();
         for (const o of [...buys, ...sells]) map.set(o.id, o);
@@ -69,8 +82,10 @@
                 <th class="text-nowrap">Status</th>
                 <th class="text-nowrap">Buy price</th>
                 <th class="text-nowrap">Buy order</th>
+                <th class="text-nowrap">Buy USD</th>
                 <th class="text-nowrap">Sell price</th>
                 <th class="text-nowrap">Sell order</th>
+                <th class="text-nowrap">Sell USD</th>
                 <th class="text-nowrap">Qty</th>
                 <th class="text-nowrap">Last order placed</th>
                 <th class="text-nowrap">Entry price</th>
@@ -79,43 +94,57 @@
 
             <!-- Default: filtered slice -->
             <tbody id="ordersTbodyFiltered">
-            <% displayOrders.forEach((o) => { %>
-                <tr>
-                    <td class="text-center">
-                      <span style="font-size: 0.75rem; line-height: 1; display: inline-block;">
-                        <%= o.last_operation ? '💲' : '⏳' %>
-                      </span>
-                    </td>
+            <% displayOrders.forEach((o) => {
+                const buyUsd = usdFor(o.quantity, o.buy_price);
+                const sellUsd = usdFor(o.quantity, o.sell_price);
+            %>
+            <tr>
+                <td class="text-center">
+                  <span style="font-size: 0.75rem; line-height: 1; display: inline-block;">
+                    <%= o.last_operation ? '💲' : '⏳' %>
+                  </span>
+                </td>
 
-                    <td class="text-nowrap"><%= (o.buy_price ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.sell_price ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.quantity ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.entry_price ?? '-') %></td>
-                </tr>
+                <td class="text-nowrap"><%= (o.buy_price ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
+                <td class="text-nowrap"><%= buyUsd === null ? '-' : fmtUsd(buyUsd) %></td>
+
+                <td class="text-nowrap"><%= (o.sell_price ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
+                <td class="text-nowrap"><%= sellUsd === null ? '-' : fmtUsd(sellUsd) %></td>
+
+                <td class="text-nowrap"><%= (o.quantity ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.entry_price ?? '-') %></td>
+            </tr>
             <% }) %>
             </tbody>
 
             <!-- Hidden: all orders -->
             <tbody id="ordersTbodyAll" class="d-none">
-            <% orders.forEach((o) => { %>
-                <tr>
-                    <td class="text-center">
-                      <span style="font-size: 0.75rem; line-height: 1; display: inline-block;">
-                        <%= o.last_operation ? '💲' : '⏳' %>
-                      </span>
-                    </td>
+            <% orders.forEach((o) => {
+                const buyUsd = usdFor(o.quantity, o.buy_price);
+                const sellUsd = usdFor(o.quantity, o.sell_price);
+            %>
+            <tr>
+                <td class="text-center">
+                  <span style="font-size: 0.75rem; line-height: 1; display: inline-block;">
+                    <%= o.last_operation ? '💲' : '⏳' %>
+                  </span>
+                </td>
 
-                    <td class="text-nowrap"><%= (o.buy_price ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.sell_price ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.quantity ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
-                    <td class="text-nowrap"><%= (o.entry_price ?? '-') %></td>
-                </tr>
+                <td class="text-nowrap"><%= (o.buy_price ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.buy_order ?? '-') %></td>
+                <td class="text-nowrap"><%= buyUsd === null ? '-' : fmtUsd(buyUsd) %></td>
+
+                <td class="text-nowrap"><%= (o.sell_price ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.sell_order ?? '-') %></td>
+                <td class="text-nowrap"><%= sellUsd === null ? '-' : fmtUsd(sellUsd) %></td>
+
+                <td class="text-nowrap"><%= (o.quantity ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.last_side ?? '-') %></td>
+                <td class="text-nowrap"><%= (o.entry_price ?? '-') %></td>
+            </tr>
             <% }) %>
             </tbody>
 
@@ -145,6 +174,6 @@
                 }
             });
         })();
-    </script>
 
+    </script>
 <% } %>

@@ -21,6 +21,9 @@ export function defineTradeConfig(sequelize) {
             decimal_price: { type: DataTypes.INTEGER, allowNull: true },
             decimal_quantity: { type: DataTypes.INTEGER, allowNull: true },
 
+            execution_price_min: { type: DataTypes.INTEGER, allowNull: true },
+            execution_price_max: { type: DataTypes.INTEGER, allowNull: true },
+
             order_block_id: { type: DataTypes.STRING(64), allowNull: true },
             order_block_price: { type: DataTypes.DECIMAL(24, 12), allowNull: true },
 
