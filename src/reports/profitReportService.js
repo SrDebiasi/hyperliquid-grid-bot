@@ -8,12 +8,8 @@ import {
     periodMonthToDate,
     now,
 } from '../functions/datePeriods.js';
-import {
-    findAllProfitRows,
-    findProfitRowsForPeriod,
-} from './profitRepo.js';
 import {calcExposureFromOrders} from "./exposureService.js";
-import {fetchHyperliquidMidFromPair, retrieveConfig, retrieveOrders} from "../functions/functions.js";
+import {fetchHyperliquidMidFromPair, retrieveConfig, retrieveOrders, retrieveTradeProfit} from "../functions/functions.js";
 
 function toPlainRows(rows) {
     return (rows || []).map(r => (r?.get ? r.get({ plain: true }) : r));
@@ -79,7 +75,8 @@ function groupProfitByDay(rows, timezone) {
 
     const days = Array.from(map.entries())
         .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-        .map(([date, v]) => ({ date, totalUsd: v.totalUsd, trades: v.trades }));
+        .map(([date, v]) => ({ date, totalUsd: v.totalUsd, trades: v.trades }))
+        .reverse();
 
     const totalUsd = days.reduce((acc, d) => acc + d.totalUsd, 0);
     const trades = days.reduce((acc, d) => acc + d.trades, 0);
@@ -87,9 +84,14 @@ function groupProfitByDay(rows, timezone) {
     return { days, totalUsd, trades };
 }
 
-async function buildTotalsForPeriod({ models, tradeInstanceId, periodFn }) {
+async function buildTotalsForPeriod({ tradeInstanceId, periodFn }) {
     const period = periodFn();
-    const rows = await findProfitRowsForPeriod({ models, tradeInstanceId, period });
+    const rows = await retrieveTradeProfit({
+        trade_instance_id: tradeInstanceId,
+        date_start: period.from,
+        date_end: period.to,
+    });
+
     const plain = toPlainRows(rows);
 
     const { totalUsd, trades } = sumProfit(plain);
@@ -100,8 +102,10 @@ async function buildTotalsForPeriod({ models, tradeInstanceId, periodFn }) {
     };
 }
 
-async function buildAllTimeTotals({ models, tradeInstanceId }) {
-    const rows = await findAllProfitRows({ models, tradeInstanceId });
+async function buildAllTimeTotals({ tradeInstanceId }) {
+    const rows = await retrieveTradeProfit({
+        trade_instance_id: tradeInstanceId
+    });
     const plain = toPlainRows(rows);
 
     const { totalUsd, trades } = sumProfit(plain);
@@ -126,7 +130,11 @@ async function buildAllTimeTotals({ models, tradeInstanceId }) {
 
 async function buildDailyProfitMtd({ models, tradeInstanceId }) {
     const period = periodMonthToDate();
-    const rows = await findProfitRowsForPeriod({ models, tradeInstanceId, period });
+    const rows = await retrieveTradeProfit({
+        trade_instance_id: tradeInstanceId,
+        date_start: period.from,
+        date_end: period.to,
+    });
     const plain = toPlainRows(rows);
 
     const grouped = groupProfitByDay(plain, period.timezone);
@@ -164,12 +172,12 @@ async function buildExposureNow({ tradeInstanceId }) {
 
 async function getProfitSummary({ models, tradeInstanceId }) {
     const [today, week, month, year, allTime, dailyProfitMtd, exposure] = await Promise.all([
-        buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodDay }),
-        buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodWeek }),
-        buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodMonth }),
-        buildTotalsForPeriod({ models, tradeInstanceId, periodFn: periodYear }),
-        buildAllTimeTotals({ models, tradeInstanceId }),
-        buildDailyProfitMtd({ models, tradeInstanceId }),
+        buildTotalsForPeriod({ tradeInstanceId, periodFn: periodDay }),
+        buildTotalsForPeriod({ tradeInstanceId, periodFn: periodWeek }),
+        buildTotalsForPeriod({ tradeInstanceId, periodFn: periodMonth }),
+        buildTotalsForPeriod({ tradeInstanceId, periodFn: periodYear }),
+        buildAllTimeTotals({  tradeInstanceId }),
+        buildDailyProfitMtd({  tradeInstanceId }),
         buildExposureNow({ tradeInstanceId }),
     ]);
 

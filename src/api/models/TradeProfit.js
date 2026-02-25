@@ -15,6 +15,7 @@ export function defineTradeProfit(sequelize) {
       price_intermediate: { type: DataTypes.DOUBLE, allowNull: true },
       price_final: { type: DataTypes.DOUBLE, allowNull: true },
       date_transaction: { type: DataTypes.DATE, allowNull: true },
+      date_transaction_utc: { type: DataTypes.DATE, allowNull: true },
     },
     { tableName: 'trade_profit', timestamps: false },
   );

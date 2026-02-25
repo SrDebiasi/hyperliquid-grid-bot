@@ -153,8 +153,6 @@ const addMessage = (message, color = null) => {
 };
 
 const addProfit = (data) => {
-  const nowUtc = moment.utc().format('YYYY-MM-DD HH:mm:ss');
-
   const payload = {
     pair: data.pair,
     profit: data.profit,
@@ -165,7 +163,8 @@ const addProfit = (data) => {
     fee: null,
     price_intermediate: data.price_intermediate,
     price_final: data.price_final,
-    date_transaction: nowUtc,
+    date_transaction_utc: moment.utc().toISOString(),
+    date_transaction: moment.utc().tz(BOT_TZ).format("YYYY-MM-DD HH:mm:ss.SSS"),
   };
 
   const profitStr = Number.parseFloat(data.value).toFixed(2);

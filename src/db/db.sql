@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS trade_profit (
   profit                varchar(255) NOT NULL,
   value                 real NOT NULL,
   date_transaction      timestamp(6),
+  date_transaction_utc  timestamp(6),
   target_percent        real,
   price_intermediate    double precision,
   price_final           double precision,

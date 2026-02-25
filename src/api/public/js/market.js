@@ -1,7 +1,4 @@
 // public/js/market.js
-// Keeps chart/zoom stable: updates candles + removes/redraws price lines.
-// IMPORTANT: uses series.removePriceLine(pl) (v5 correct API), not pl.remove().
-
 if (!window.__marketSingletonLoaded) {
     window.__marketSingletonLoaded = true;
 

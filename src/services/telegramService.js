@@ -1,18 +1,24 @@
 import 'dotenv/config';
 import TelegramBot from 'node-telegram-bot-api';
 import moment from 'moment-timezone';
-import pino from 'pino';
 
-const log = pino({
-  level: process.env.LOG_LEVEL || 'info',
-});
+import { DateTime } from 'luxon';
+import { calcExposureFromOrders } from '../reports/exposureService.js';
+
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const chatId = process.env.TELEGRAM_CHAT_ID;
+
+const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton';
 
 if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN');
 if (!chatId) throw new Error('Missing TELEGRAM_CHAT_ID');
 
-import {getExchange, retrieveConfig, retrieveOrders, retrieveTradeProfit} from '../functions/functions.js';
+import {
+  getExchange,
+  retrieveConfig,
+  retrieveOrders,
+  retrieveTradeProfit,
+} from '../functions/functions.js';
 import { getInstanceId, getLastOperation } from '../functions/state.js';
 
 import {
@@ -55,64 +61,46 @@ function toNumberSafe(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-
-function parseRowDateTime(row, timezone) {
-  const raw =
-    row?.date_transaction ??
-    row?.date ??
-    row?.created_at ??
-    row?.updated_at ??
-    null;
-
+/**
+ * Bucket a row into a BOT_TZ local day.
+ * Prefers date_transaction if present.
+ */
+function rowLocalDay(row) {
+  const raw = row?.date_transaction;
   if (!raw) return null;
 
-  // JS Date object
+  // If it's already a Date, treat it as an instant and convert to BOT_TZ for bucketing
   if (raw instanceof Date) {
-    const dt = DateTime.fromJSDate(raw, { zone: timezone });
-    return dt.isValid ? dt : null;
-  }
-
-  // numeric timestamp (ms or seconds)
-  if (typeof raw === 'number') {
-    const ms = raw > 1e12 ? raw : raw * 1000;
-    const dt = DateTime.fromMillis(ms, { zone: timezone });
-    return dt.isValid ? dt : null;
+    const dt = DateTime.fromJSDate(raw, { zone: 'utc' }).setZone(BOT_TZ);
+    return dt.isValid ? dt.toFormat('yyyy-LL-dd') : null;
   }
 
   const s = String(raw).trim();
 
-  // MySQL timestamp(6): "2026-02-09 07:40:29.000000" -> strip microseconds
-  const noMicros = s.replace(/\.\d{1,6}$/, '');
-
-  // Parse as "yyyy-MM-dd HH:mm:ss"
-  let dt = DateTime.fromFormat(noMicros, 'yyyy-LL-dd HH:mm:ss', { zone: timezone });
-  if (dt.isValid) return dt;
-
-  // Fallbacks
-  dt = DateTime.fromSQL(noMicros, { zone: timezone });
-  if (dt.isValid) return dt;
-
-  dt = DateTime.fromISO(s, { zone: timezone });
-  if (dt.isValid) return dt;
-
-  const js = new Date(s);
-  if (!Number.isNaN(js.getTime())) {
-    dt = DateTime.fromJSDate(js, { zone: timezone });
-    return dt.isValid ? dt : null;
+  // ISO (with Z / offset)
+  if (s.includes('T') || /[zZ]$/.test(s) || /[+-]\d{2}:\d{2}$/.test(s)) {
+    let dt = DateTime.fromISO(s, { setZone: true });
+    if (!dt.isValid) dt = DateTime.fromSQL(s, { setZone: true });
+    if (!dt.isValid) return null;
+    return dt.setZone(BOT_TZ).toFormat('yyyy-LL-dd');
   }
 
-  return null;
+  // SQL-ish "YYYY-MM-DD HH:mm:ss(.sss...)" -> assume BOT_TZ local wall time
+  const noMicros = s.replace(/\.\d{1,6}$/, '');
+  let dt = DateTime.fromFormat(noMicros, 'yyyy-LL-dd HH:mm:ss', { zone: BOT_TZ });
+  if (!dt.isValid) dt = DateTime.fromSQL(noMicros, { zone: BOT_TZ });
+  if (!dt.isValid) return null;
+
+  return dt.toFormat('yyyy-LL-dd');
 }
 
-function groupProfitByDay(rows, timezone) {
+function groupProfitByDay(rows) {
   const list = Array.isArray(rows) ? rows : [];
   const map = new Map(); // ymd -> { total, count }
 
   for (const r of list) {
     const v = Number(r?.value || 0);
-    const dt = parseRowDateTime(r, timezone);
-
-    const day = dt ? dt.toFormat('yyyy-LL-dd') : 'unknown';
+    const day = rowLocalDay(r) ?? 'unknown';
 
     const cur = map.get(day) || { total: 0, count: 0 };
     cur.total += v;
@@ -121,8 +109,9 @@ function groupProfitByDay(rows, timezone) {
   }
 
   const days = Array.from(map.entries())
-    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-    .map(([date, v]) => ({ date, total: v.total, count: v.count }));
+      .filter(([date]) => date !== 'unknown')
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, x]) => ({ date, total: x.total, count: x.count }));
 
   const monthTotal = days.reduce((acc, d) => acc + d.total, 0);
   const monthCount = days.reduce((acc, d) => acc + d.count, 0);
@@ -137,11 +126,16 @@ function buildDailyProfitMessage({ period, days, monthTotal, monthCount }) {
     `${eM('Range')}: *${eM(period.from)}* ${eM('to')} *${eM(period.to)}*`,
     ``,
     `*${eM('Days')}*`,
-    ...days.map(d =>
-      `${eM('•')} *${eM(d.date)}*: *${eM(formatUSD(d.total))}* \\(${eM(String(d.count))} ${eM('trades')}\\)`,
+    ...days.map(
+        d =>
+            `${eM('•')} *${eM(d.date)}*: *${eM(formatUSD(d.total))}* \\(${eM(
+                String(d.count),
+            )} ${eM('trades')}\\)`,
     ),
     ``,
-    `*${eM('Month-to-date total')}*: *${eM(formatUSD(monthTotal))}* \\(${eM(String(monthCount))} ${eM('trades')}\\)`,
+    `*${eM('Month-to-date total')}*: *${eM(formatUSD(monthTotal))}* \\(${eM(
+        String(monthCount),
+    )} ${eM('trades')}\\)`,
   ];
 
   return lines.join('\n');
@@ -166,6 +160,7 @@ function pctOrZero(numerator, denominator) {
   return (numerator / denominator) * 100;
 }
 
+
 async function getAggregatedStatusSnapshot() {
   const instanceId = getInstanceId();
 
@@ -176,13 +171,16 @@ async function getAggregatedStatusSnapshot() {
 
   // price
   const exchangePrices = await getExchange().getPrices();
-  const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
+  const currentPrice = toNumberSafe(
+      exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')],
+  );
 
   // orders
-  const orders = (await retrieveOrders({
-    pair: cfg.pair,
-    trade_instance_id: instanceId,
-  })) || [];
+  const orders =
+      (await retrieveOrders({
+        pair: cfg.pair,
+        trade_instance_id: instanceId,
+      })) || [];
 
   const waitingCycles = orders.filter(o => o.last_operation == true).length;
 
@@ -208,7 +206,8 @@ async function getAggregatedStatusSnapshot() {
 
   let gridPositionPct = null;
   if (rangeMax > rangeMin) {
-    gridPositionPct = ((currentPrice - rangeMin) / (rangeMax - rangeMin)) * 100;
+    gridPositionPct =
+        ((currentPrice - rangeMin) / (rangeMax - rangeMin)) * 100;
     gridPositionPct = Math.max(0, Math.min(100, gridPositionPct));
   }
 
@@ -221,8 +220,8 @@ async function getAggregatedStatusSnapshot() {
   const daysElapsed = Number(mtd.period?.meta?.dayOfMonth || 0);
   const daysInMonth = Number(mtd.period?.meta?.daysInMonth || 0);
 
-  const avgPerDay = daysElapsed > 0 ? (mtd.total / daysElapsed) : 0;
-  const estMonth = daysInMonth > 0 ? (avgPerDay * daysInMonth) : 0;
+  const avgPerDay = daysElapsed > 0 ? mtd.total / daysElapsed : 0;
+  const estMonth = daysInMonth > 0 ? avgPerDay * daysInMonth : 0;
 
   // pnl % based on exposure
   const pnlCurrentMonthPct = pctOrZero(month.total, exposure.totalExposureUsd);
@@ -241,71 +240,18 @@ async function getAggregatedStatusSnapshot() {
     waitingCycles,
     rebuyActive: cfg.rebuy_profit,
     rebuyPercent: cfg.rebuy_percent,
-    // expected
     expectedRange,
     buyPct,
     sellPct,
-
-    // last op
     lastOpAt,
-
-    // rebuy summary
     totalReboughtValueUsd: toNumberSafe(cfg.rebought_value),
     totalReboughtCoin: toNumberSafe(cfg.rebought_coin),
-
-    // summary
     profitTodayUsd: today.total,
     profitMonthUsd: month.total,
     estimateMonthUsd: estMonth,
     exposureTotalUsd: exposure.totalExposureUsd,
     pnlCurrentMonthPct,
     pnlEstimateMonthPct,
-  };
-}
-
-async function getGridBotStatusSnapshot() {
-  const instanceId = getInstanceId();
-
-  let cfg;
-  try {
-    cfg = await retrieveConfig({ trade_instance_id: instanceId });
-    cfg = cfg[0];
-  } catch (err) {
-    console.log(err);
-    throw new Error('Failed to load config for /status');
-  }
-
-  if (!cfg?.pair) {
-    throw new Error('Missing pair in config');
-  }
-
-  const exchangePrices = await getExchange().getPrices();
-  const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
-
-  let orders = [];
-  try {
-    orders = (await retrieveOrders({
-      pair: cfg.pair,
-      trade_instance_id: instanceId,
-    })) || [];
-  } catch (err) {
-    console.log(err);
-    orders = [];
-  }
-
-  const waitingCycles = orders.filter(o => o.last_operation == true).length;
-
-  return {
-    isRunning: true,
-    symbol: cfg.pair,
-    rangeMin: toNumberSafe(cfg.entry_price),
-    rangeMax: toNumberSafe(cfg.exit_price),
-    currentPrice,
-
-    waitingCycles,
-
-    totalReboughtValueUsd: toNumberSafe(cfg.rebought_value),
-    totalReboughtCoin: toNumberSafe(cfg.rebought_coin),
   };
 }
 
@@ -319,8 +265,8 @@ function formatDateTime(d) {
 function getExpectedRangeFromOrders(orders) {
   const list = Array.isArray(orders) ? orders : [];
 
-  const hasBuyOrder = (o) => !!o.buy_order;
-  const hasSellOrder = (o) => !!o.sell_order;
+  const hasBuyOrder = o => !!o.buy_order;
+  const hasSellOrder = o => !!o.sell_order;
 
   let highestBuy = null;
   let lowestSell = null;
@@ -332,7 +278,11 @@ function getExpectedRangeFromOrders(orders) {
     }
 
     const sell = toNumberSafe(o.sell_price);
-    if (hasSellOrder(o) && sell > 0 && (lowestSell === null || sell < lowestSell)) {
+    if (
+        hasSellOrder(o) &&
+        sell > 0 &&
+        (lowestSell === null || sell < lowestSell)
+    ) {
       lowestSell = sell;
     }
   }
@@ -623,11 +573,6 @@ function buildExposureMessage({ symbol, currentPrice, exposure }) {
   return lines.join('\n');
 }
 
-import { DateTime } from 'luxon';
-import {calcExposureFromOrders} from "../reports/exposureService.js";
-
-const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton';
-
 function msUntilNext2359() {
   const now = DateTime.now().setZone(BOT_TZ);
 
@@ -644,9 +589,9 @@ async function sendStatusToChat(bot, toChatId) {
     await bot.sendMessage(toChatId, message, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     await bot.sendMessage(
-      toChatId,
-      eM(`Failed to get status: ${err.message || err}`),
-      { parse_mode: 'MarkdownV2' },
+        toChatId,
+        eM(`Failed to get status: ${err.message || err}`),
+        { parse_mode: 'MarkdownV2' },
     );
   }
 }
@@ -665,22 +610,22 @@ function scheduleDailyStatus(bot) {
   }, delay);
 }
 
-
 function createTelegramBot({ polling = true } = {}) {
   const token = mustGetTelegramToken();
   const bot = new TelegramBot(token, { polling });
 
-  bot.onText(/\/help\b/, async (msg) => {
+  bot.onText(/\/help\b/, async msg => {
     if (!isAllowedChat(msg)) return;
     bot.sendMessage(msg.chat.id, buildHelpMessage(), { parse_mode: 'MarkdownV2' });
   });
+
   if (polling) {
-    bot.onText(/\/status\b/, async (msg) => {
+    bot.onText(/\/status\b/, async msg => {
       if (!isAllowedChat(msg)) return;
       await sendStatusToChat(bot, msg.chat.id);
     });
 
-    bot.onText(/\/day\b/, async (msg) => {
+    bot.onText(/\/day\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -691,14 +636,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /day: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /day: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/daily_profit\b/, async (msg) => {
+    bot.onText(/\/daily_profits\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -711,7 +656,7 @@ function createTelegramBot({ polling = true } = {}) {
           date_end: period.to,
         });
 
-        const { days, monthTotal, monthCount } = groupProfitByDay(rows, period.timezone);
+        const { days, monthTotal, monthCount } = groupProfitByDay(rows);
 
         const message = buildDailyProfitMessage({
           period,
@@ -723,14 +668,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /daily_profit: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /daily_profits: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/week\b/, async (msg) => {
+    bot.onText(/\/week\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -741,14 +686,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /week: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /week: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/month\b/, async (msg) => {
+    bot.onText(/\/month\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -759,14 +704,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /month: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /month: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/previous_day\b/, async (msg) => {
+    bot.onText(/\/previous_day\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -777,14 +722,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /previous_day: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /previous_day: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/previous_week\b/, async (msg) => {
+    bot.onText(/\/previous_week\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -795,14 +740,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /previous_week: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /previous_week: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/previous_month\b/, async (msg) => {
+    bot.onText(/\/previous_month\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -813,14 +758,14 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /previous_month: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /previous_month: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
 
-    bot.onText(/\/estimate\b/, async (msg) => {
+    bot.onText(/\/estimate\b/, async msg => {
       if (!isAllowedChat(msg)) return;
 
       try {
@@ -835,21 +780,20 @@ function createTelegramBot({ polling = true } = {}) {
 
         const { total, count } = sumProfit(rows);
 
-        const daysElapsed = Number(period?.meta?.dayOfMonth || 0);   // 1..31
-        const daysInMonth = Number(period?.meta?.daysInMonth || 0); // 28..31
+        const daysElapsed = Number(period?.meta?.dayOfMonth || 0);
+        const daysInMonth = Number(period?.meta?.daysInMonth || 0);
 
-        const avgPerDay = daysElapsed > 0 ? (total / daysElapsed) : 0;
+        const avgPerDay = daysElapsed > 0 ? total / daysElapsed : 0;
 
-        const estDay = avgPerDay;
         const estWeek = avgPerDay * 7;
-        const estMonth = daysInMonth > 0 ? (avgPerDay * daysInMonth) : 0;
+        const estMonth = daysInMonth > 0 ? avgPerDay * daysInMonth : 0;
 
         const message = buildEstimateMessage({
           period,
           total,
           count,
           avgPerDay,
-          estDay,
+          estDay: avgPerDay,
           estWeek,
           estMonth,
         });
@@ -857,9 +801,9 @@ function createTelegramBot({ polling = true } = {}) {
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(
-          msg.chat.id,
-          eM(`Failed to get /estimate: ${err.message || err}`),
-          { parse_mode: 'MarkdownV2' },
+            msg.chat.id,
+            eM(`Failed to get /estimate: ${err.message || err}`),
+            { parse_mode: 'MarkdownV2' },
         );
       }
     });
@@ -975,10 +919,9 @@ function createTelegramBot({ polling = true } = {}) {
 
 async function notifyTelegram(message) {
   const bot =
-    createTelegramBot._senderSingleton ||
-    (createTelegramBot._senderSingleton = createTelegramBot({ polling: false }));
+      createTelegramBot._senderSingleton ||
+      (createTelegramBot._senderSingleton = createTelegramBot({ polling: false }));
 
-  // Build timestamp inside notifyTelegram (timezone-aware, no fixed offsets)
   const ts = moment().tz(BOT_TZ).format('YYYY-MM-DD HH:mm:ss');
   const text = `${ts} - ${String(message)}`;
 
@@ -990,7 +933,4 @@ async function notifyTelegram(message) {
   }
 }
 
-export {
-  createTelegramBot,
-  notifyTelegram,
-};
+export { createTelegramBot, notifyTelegram };
