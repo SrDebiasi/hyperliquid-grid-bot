@@ -81,7 +81,9 @@ async function start() {
     const HOST = process.env.API_HOST ?? "127.0.0.1";
     await app.listen({ port: PORT, host: HOST });
 
-    app.log.info(`API listening on :${PORT}`);
+    app.log.info('Server started!');
+    app.log.info(`Dashboard: http://${HOST}:${PORT}/dashboard`);
+    app.log.info(`API:       http://${HOST}:${PORT}/api`);
 }
 
 start().catch((err) => {

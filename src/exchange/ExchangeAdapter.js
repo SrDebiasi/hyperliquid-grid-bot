@@ -43,6 +43,15 @@ export class ExchangeAdapter {
   }
 
   /**
+   * Cancel a single order.
+   * @param {{symbol:string, orderId:string|number}} param
+   * @returns {Promise<any>}
+   */
+  async cancelOrders(param) {
+    throw new Error('Not implemented');
+  }
+
+  /**
    * Cancel all open orders for a symbol.
    * @param {{symbol:string}} param
    * @returns {Promise<any>}

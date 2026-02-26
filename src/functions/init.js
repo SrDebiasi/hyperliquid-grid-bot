@@ -34,6 +34,9 @@ const ORDER_STATUS_OPEN = 'OPEN';
 const QUOTE_ASSET = process.env.QUOTE_ASSET || 'USDC';
 const BLOCK_USD_BUFFER = Number(process.env.BLOCK_USD_BUFFER ?? 50);
 
+let pairToIndex = {};
+let nextTimers = {};
+
 /**
  * Simple async delay helper.
  * @param {number} ms - Milliseconds to wait.
@@ -483,16 +486,11 @@ async function getBalance(params = {}) {
  * @returns {Promise<Array<object>>} Filtered and sorted grid rows.
  */
 async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 100, cleanup = true) {
-  const above = []; // Orders above current price (SELL side)
-  const below = []; // Orders below current price (BUY side)
+  const above = [];
+  const below = [];
 
-  const execMin = coinData.execution_price_min
-    ? parseFloat(coinData.execution_price_min)
-    : null;
-
-  const execMax = coinData.execution_price_max
-    ? parseFloat(coinData.execution_price_max)
-    : null;
+  const execMin = coinData.execution_price_min ? parseFloat(coinData.execution_price_min) : null;
+  const execMax = coinData.execution_price_max ? parseFloat(coinData.execution_price_max) : null;
 
   for (const o of orders) {
     const buy = parseFloat(o.buy_price);
@@ -501,80 +499,87 @@ async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 10
     const buyAllowed = !execMin || buy >= execMin;
     const sellAllowed = !execMax || sell <= execMax;
 
-    // below price
-    if (buy <= currentPrice && buyAllowed) {
-      below.push(o);
-    }
-
-    // above price
-    if (sell >= currentPrice && sellAllowed) {
-      above.push(o);
-    }
+    if (buy <= currentPrice && buyAllowed) below.push(o);
+    if (sell >= currentPrice && sellAllowed) above.push(o);
   }
 
-  below.sort((a, b) => b.buy_price - a.buy_price);   // maior BUY mais perto
-  above.sort((a, b) => a.sell_price - b.sell_price); // menor SELL mais perto
+  below.sort((a, b) => b.buy_price - a.buy_price);
+  above.sort((a, b) => a.sell_price - b.sell_price);
 
-  const selectedBelow = below.slice(0, limit);
-  const selectedAbove = above.slice(0, limit);
-
-  const selected = [...selectedBelow, ...selectedAbove];
+  const selected = [...below.slice(0, limit), ...above.slice(0, limit)];
   const selectedIds = new Set(selected.map(o => o.id));
 
   if (cleanup) {
-    for (const o of orders) {
-      if (selectedIds.has(o.id)) continue;
+    // 1) collect out-of-range orders that have orderIds
+    const toCleanup = orders.filter(o => !selectedIds.has(o.id) && (o.buy_order || o.sell_order));
 
-      try {
-        if (o.buy_order) {
-          consoleLog(`Cancel BUY order ${o.buy_order}`);
-          const orderInfo = await getExchange().getOrder({ orderId: o.buy_order });
+    // 2) build list of all orderIds to query once
+    const orderIds = toCleanup.flatMap(o => [o.buy_order, o.sell_order]).filter(Boolean);
 
-          if (orderInfo.status === ORDER_STATUS_OPEN) {
-            await getExchange().cancelOrder({
-              orderId: o.buy_order,
-              symbol: coinData.pair,
-            });
-            await new Promise(r => setTimeout(r, 120));
-          }
+    let statuses = new Map();
+    try {
+      statuses = await getExchange().getOrdersStatusMap({ orderIds });
+    } catch (e) {
+      console.log('StatusMap error:', e);
+      // if we cannot fetch statuses, better to avoid blind cancelling
+      statuses = new Map();
+    }
+
+    // 3) build cancel payloads only for OPEN orders
+    const cancels = [];
+    const toDbClear = [];
+
+    for (const o of toCleanup) {
+      let cleared = false;
+
+      if (o.buy_order) {
+        const st = statuses.get(Number(o.buy_order))?.status;
+        if (st === ORDER_STATUS_OPEN) {
+          cancels.push({ orderId: o.buy_order, symbol: coinData.pair });
         }
-        if (o.sell_order) {
-          consoleLog(`Cancel SELL order ${o.sell_order}`);
-          const orderInfo = await getExchange().getOrder({ orderId: o.sell_order });
-
-          if (orderInfo.status === ORDER_STATUS_OPEN) {
-            await getExchange().cancelOrder({
-              orderId: o.sell_order,
-              symbol: coinData.pair,
-            });
-            await new Promise(r => setTimeout(r, 120));
-          }
-        }
-      } catch (e) {
-        console.log('Cancel error:', e);
+        cleared = true;
       }
 
+      if (o.sell_order) {
+        const st = statuses.get(Number(o.sell_order))?.status;
+        if (st === ORDER_STATUS_OPEN) {
+          cancels.push({ orderId: o.sell_order, symbol: coinData.pair });
+        }
+        cleared = true;
+      }
+
+      if (cleared) toDbClear.push(o);
+    }
+
+    // 4) cancel in batch
+    if (cancels.length) {
+      consoleLog(`Batch cancelling ${cancels.length} order(s)`, 'yellow');
       try {
-        await updateTradeOrder({
-          id: o.id,
-          buy_order: null,
-          sell_order: null,
-        });
+        await getExchange().cancelOrders({ cancels });
       } catch (e) {
-        console.log('DB cleanup error:', e);
+        console.log('Batch cancel error:', e);
       }
     }
+
+    // 5) clear DB for those rows (parallel)
+    // TODO optimize further with a single SQL UPDATE ... WHERE id IN (...)
+    await Promise.allSettled(
+        toDbClear.map(o =>
+            updateTradeOrder({ id: o.id, buy_order: null, sell_order: null })
+        )
+    );
   }
 
+  // de-dupe selected
   const uniqueSelected = [];
   const seen = new Set();
-
   for (const o of selected) {
     if (!seen.has(o.id)) {
       seen.add(o.id);
       uniqueSelected.push(o);
     }
   }
+
   uniqueSelected.sort((a, b) => b.sell_price - a.sell_price);
   return uniqueSelected;
 }
@@ -996,31 +1001,44 @@ const createOrderLimit = async (param) => {
  */
 const socketPrices = () => {
   const allPairs = Array.from(new Set(data.map((o) => o.pair)));
-
   consoleLog(`Socket listening on ${allPairs.length} markets`, 'green');
 
   getExchange().subscribeAggTrades(allPairs, ({ symbol, price }) => {
-    const { minPrice, maxPrice } = rangePrices[symbol] ?? {};
-    if (minPrice == null || maxPrice == null) return;
+    const sym = normalizePairKey(symbol);
+    const p = Number(price);
 
-    const priceKey = String(symbol).replace(/[\/\-_]/g, '');
-    prices[priceKey] = price;
-    setPrice(symbol, price);
+    const range = rangePrices[sym];
+    const minPrice = range?.minPrice;
+    const maxPrice = range?.maxPrice;
 
-    try {
-      if (!checking[symbol] && (price >= maxPrice || price <= minPrice)) {
-        consoleLog(
-          `Triggering check: price=${price} outside range [${minPrice}, ${maxPrice}]`,
-        );
-        checking[symbol] = true;
+    if (!Number.isFinite(p)) return;
+    if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) return;
+
+    // keep caches updated
+    const priceKey = String(sym).replace(/[\/\-_]/g, '');
+    prices[priceKey] = p;
+    setPrice(sym, p);
+
+    if (p >= maxPrice || p <= minPrice) {
+      // if it's currently "cooldown false", trigger an immediate run
+      if (!checking[sym]) {
+        consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
+        checking[sym] = true;
+
+        const idx = pairToIndex[sym];
+        if (idx != null) {
+          // debounce: avoid spamming if WS fires many times
+          if (nextTimers[sym]) clearTimeout(nextTimers[sym]);
+          nextTimers[sym] = setTimeout(() => startMarket(idx), 50);
+        }
       }
-    } catch (e) {
-      const details = e?.message ?? String(e);
-      consoleLog(`Error evaluating price trigger for ${symbol}: ${details}`);
     }
   });
 };
 
+function normalizePairKey(s) {
+  return String(s).trim();
+}
 
 /**
  * Accumulates realized profit into a "rebuy wallet" and optionally executes a market rebuy.
@@ -1252,7 +1270,7 @@ async function startCoinsStaggered() {
 
   for (let idx = 0; idx < data.length; idx++) {
     const coin = data[idx];
-
+    pairToIndex[coin.pair] = idx;
     if (checking[coin.pair] == null) checking[coin.pair] = true;
 
     // Trigger once when bot is started

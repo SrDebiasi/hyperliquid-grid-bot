@@ -364,6 +364,21 @@ After the configured grace time, Healthchecks sends an alert.
 This feature is optional. If HEALTHCHECKS_PING_URL is not set, no monitoring is performed.
 ------------------------------------------------------------------------
 
+### Windows quick start (shorcuts)
+
+Just double-click these files in the project root:
+
+- `start-api.bat` → installs dependencies (if needed) and starts the API  
+  Dashboard: `http://127.0.0.1:3000/dashboard`
+- `logs.bat` → shows the PM2 logs (`gridbot-1`) in a terminal window  
+  Press `Ctrl + C` to stop
+
+If double-clicking doesn’t work, open a terminal in the project folder and run:
+- `npm run api`
+- `npx pm2 logs gridbot-1`
+
+------------------------------------------------------------------------
+
 ## Final Notes
 
 This bot:

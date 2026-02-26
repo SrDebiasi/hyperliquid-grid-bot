@@ -9,8 +9,6 @@ import WebSocket from 'ws';
 import { privateKeyToAccount } from 'viem/accounts';
 
 /**
- * npm i  (SPOT ONLY)
- *
  * Symbols are expected in Hyperliquid spot format, e.g. "BTC/USDC".
  * This adapter intentionally does NOT support perps/futures.
  *
@@ -291,6 +289,26 @@ export default class HyperliquidAdapter {
     if (!Number.isFinite(o)) throw new Error(`Invalid orderId: ${orderId}`);
     const { asset } = await this.resolveSpotAssetFromSymbol(symbol);
     return await this.exchange.cancel({ cancels: [{ a: asset, o }] });
+  }
+
+  /**
+   * Cancel multiple orders in one call (same symbol).
+   * @param {{ cancels: Array<{ orderId: number|string, symbol: string }> }} params
+   */
+  async cancelOrders({ cancels }) {
+    if (!Array.isArray(cancels) || cancels.length === 0) return { cancelled: 0 };
+
+    const symbol = cancels[0].symbol;
+    const { asset } = await this.resolveSpotAssetFromSymbol(symbol);
+
+    const payload = cancels.map(({ orderId }) => {
+      const o = Number(orderId);
+      if (!Number.isFinite(o)) throw new Error(`Invalid orderId: ${orderId}`);
+      return { a: asset, o };
+    });
+
+    await this.exchange.cancel({ cancels: payload });
+    return { cancelled: payload.length };
   }
 
 
