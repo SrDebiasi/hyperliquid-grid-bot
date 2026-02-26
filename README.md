@@ -1,10 +1,13 @@
 # Grid Trading Bot
 
 Hyperliquid view:
+
 ![Grid bot](docs/bot.png)
+
 
 Dashboard view:
 ![Dashboard](docs/dashboard.png)
+
 ## Overview
 
 This Grid Trading Bot is designed to generate passive income from market volatility while operating strictly within a defined price range.
@@ -26,38 +29,37 @@ The idea is simple but powerful: **volatility becomes income**.
 
 To demonstrate the effectiveness of this strategy, here is a real backtest using BTC:
 
-**Period:** 2025-11-01 → 2026-02-02 (93 days)  
-**Grid Levels:** 614  
-**Base USD per level:** $100  
-**Total Value Locked (BTC + USD):** $61,400
+**Period:** 2025-12-01 → 2026-02-26 (86.71 days)
+**Grid Levels:** 614
+**Base USD per level:** $100.00
+**Total allocated notional (BTC + USD):** $61,400.00
 
 ### Results
 
-- Total Cycles Completed: 1,254
-- Total Profit: **$2,121.83**
-- Return on Total Capital: **3.46%**
-- Average Profit per Cycle: $1.69
-- Fee rate per side: 0.0384%
+- Total Cycles Completed: 2,419
+- Total Profit: $4,131.77
+- Return on Total Capital: 6.73%
+- Average Profit per Cycle: $1.7080
 
-### Performance Breakdown
+### Fee rate per side: 0.0384%
 
-- Per day:   **$22.81** (0.04%)
-- Per week:  **$159.64** (0.26%)
-- Per month: **$684.16** (1.11%)
-- Per year:  **$8,323.96** (13.56%)
-
----
+- Performance Breakdown
+- Per day: $47.65 (0.08%)
+- Per week: $333.55 (0.54%)
+- Per month: $1,429.48 (2.33%)
+- Per year: $17,392.04 (28.33%)
 
 ### Why This Is Powerful
 
-- 13.56% yearly return without leverage
+28.33% projected yearly return without leverage (based on this period)
+
 - No liquidation risk
 - Capital always inside a controlled price range
 - Profit generated purely from volatility
 - Scales linearly with capital
 - Does not require allocating 100% of your USD to active buy orders — unused capital can stay in yield strategies (like lending or liquidity pools), generating ~5% APY in parallel
 
-The bot does not need trend prediction.  
+The bot does not need trend prediction.
 It simply monetizes market movement.
 
 ------------------------------------------------------------------------
@@ -229,40 +231,6 @@ This compounds volatility into long-term asset growth.
 
 ------------------------------------------------------------------------
 
-## Exchange Adapter
-
-The bot is exchange-agnostic.
-
-Current supported:
-
-- Hyperliquid
-
-Adapter responsibilities:
-
-- placeOrder()
-- cancelOrder()
-- getOrder()
-- getOpenOrders()
-- getPrices()
-- subscribeAggTrades()
-- getAccountInfo()
-
-The engine does not depend on exchange-specific logic.
-
-------------------------------------------------------------------------
-
-## Websocket Logic
-
-subscribeAggTrades()
-
-- Updates price cache
-- Monitors min/max active range
-- Triggers fast execution when price exits boundary
-
-This allows reactive execution without constant polling.
-
-------------------------------------------------------------------------
-
 ## Environment Variables
 
 Check .env.example
@@ -271,49 +239,9 @@ Check .env.example
 
 ## Quick Start (Local)
 
-1) Setup Postgres + env + db + seed:
 - See `README_HOW_TO_SETUP.md`
 
-2) Start the API:
-```bash
-npm run api
-```
-
-3) Open the Dashboard:
-- http://127.0.0.1:3000/dashboard
-
-4) Create your grid:
-- Config → **Simulate** → **Generate Grid**
-
-5) Start/Stop the bot:
-- Use the **Start bot / Stop bot** buttons in the Dashboard (PM2-managed)
-
----
-
-## Optional: CLI Commands
-
-Start the bot in foreground:
-```bash
-npm run start -- 1
-```
-
-List open orders:
-```bash
-npm run openOrders -- 1 BTC/USDC
-```
-
-Cancel open orders:
-```bash
-npm run cancelOrders -- 1 BTC/USDC
-```
-
-PM2 (used by Dashboard):
-```bash
-npx pm2 status
-npx pm2 logs gridbot-1 --lines 200
-npx pm2 logs gridbot-1 --err --lines 200
-```
-
+------------------------------------------------------------------------
 
 ## Hyperliquid Setup (API Wallet + Keys)
 
@@ -404,7 +332,7 @@ Notes:
 
 ------------------------------------------------------------------------
 
-Health Monitoring (Healthchecks.io)
+## Health Monitoring (Healthchecks.io)
 
 This bot supports optional uptime monitoring using Healthchecks.io.
 It will periodically ping a Healthchecks endpoint.
