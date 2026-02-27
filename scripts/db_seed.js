@@ -71,33 +71,39 @@ async function seedDefaultTradeConfig(client, tradeInstanceId) {
 
     const inserted = await client.query(
         `INSERT INTO trade_config (
-      pair,
-      entry_price,
-      exit_price,
-      target_percent,
-      margin_percent,
-      usd_transaction,
-      decimal_quantity,
-      decimal_price,
-      trade_instance_id,
-      name,
-      rebuy_profit,
-      order_block_price,
-      order_block_id,
-      rebuy_percent,
-      rebuy_value,
-      rebought_value,
-      rebought_coin,
-      execution_price_min,
-      execution_price_max
-    ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
-    )
-    RETURNING id`,
+            pair,
+            entry_price,
+            exit_price,
+            target_percent,
+            margin_percent,
+            usd_transaction,
+            decimal_quantity,
+            decimal_price,
+            trade_instance_id,
+            name,
+            rebuy_profit,
+
+            reserve_quote_offset_percent,
+            reserve_quote_order_id,
+            reserve_base_offset_percent,
+            reserve_base_order_id,
+
+            rebuy_percent,
+            rebuy_value,
+            rebought_value,
+            rebought_coin,
+            execution_price_min,
+            execution_price_max
+        ) VALUES (
+                     $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
+                     $12,$13,$14,$15,
+                     $16,$17,$18,$19,$20,$21
+                 )
+             RETURNING id`,
         [
             'BTC/USDC',      // pair
             60000,           // entry_price
-            100000,           // exit_price
+            100000,          // exit_price
             1.8,             // target_percent
             0.1,             // margin_percent
             11,              // usd_transaction
@@ -106,15 +112,19 @@ async function seedDefaultTradeConfig(client, tradeInstanceId) {
             tradeInstanceId, // trade_instance_id
             'BTC',           // name
             true,            // rebuy_profit
-            30000,           // order_block_price
-            null,            // order_block_id (varchar(20))
+
+            30,              // reserve_quote_offset_percent
+            null,            // reserve_quote_order_id
+            30,              // reserve_base_offset_percent
+            null,            // reserve_base_order_id
+
             50,              // rebuy_percent
             0,               // rebuy_value
             null,            // rebought_value
             null,            // rebought_coin
             63000,           // execution_price_min
-            102000,           // execution_price_max
-        ]
+            102000,          // execution_price_max
+        ],
     );
 
     console.log(

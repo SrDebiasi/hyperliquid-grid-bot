@@ -33,6 +33,9 @@ const ORDER_STATUS_OPEN = 'OPEN';
 
 const QUOTE_ASSET = process.env.QUOTE_ASSET || 'USDC';
 const BLOCK_USD_BUFFER = Number(process.env.BLOCK_USD_BUFFER ?? 50);
+const BLOCK_BASE_BUFFER = Number(process.env.BLOCK_BASE_BUFFER ?? 0.0001);
+const DEFAULT_RESERVE_QUOTE_OFFSET_PERCENT = Number(process.env.DEFAULT_RESERVE_QUOTE_OFFSET_PERCENT ?? 30);
+const DEFAULT_RESERVE_BASE_OFFSET_PERCENT  = Number(process.env.DEFAULT_RESERVE_BASE_OFFSET_PERCENT ?? 30);
 
 let pairToIndex = {};
 let nextTimers = {};
@@ -226,132 +229,234 @@ function calculateFirstProfit(order) {
 }
 
 /**
- * Cancels the current "order block" (USDT-blocking BUY limit order) for a market, if present.
+ * Cancels the current QUOTE reserve order (BUY limit far below market), if present.
+ * This is the order that locks/freezes quote balance (e.g., USDC) so the bot doesn’t
+ * allocate all free quote into grid orders.
  *
- * The order block is used to reserve free USDT (by placing a BUY limit) so the bot does not
- * accidentally use that capital for grid orders. When the bot needs liquidity for a new grid
- * order, it cancels the block and clears `order_block_id` both in the database and in memory.
- *
- * @param {number} coinIndex - Index of the market configuration inside `data`.
+ * @param {number} coinIndex
  * @returns {Promise<void>}
  */
-async function cancelOrderBlock(coinIndex) {
-  if (!data[coinIndex].order_block_id) return;
+async function cancelReserveQuoteOrder(coinIndex) {
+  const cfg = data[coinIndex];
+  if (!cfg?.reserve_quote_order_id) return;
 
-  consoleLog(`Cancelling block order ${data[coinIndex].order_block_id}`);
+  consoleLog(`Cancelling reserve quote order ${cfg.reserve_quote_order_id}`);
+
   try {
     await getExchange().cancelOrder({
-      orderId: data[coinIndex].order_block_id,
-      symbol: data[coinIndex].pair,
+      orderId: cfg.reserve_quote_order_id,
+      symbol: cfg.pair,
     });
   } catch (e) {
     const details = e?.message ?? String(e);
-    console.log(`Error cancelling block order: ${details}`);
+    console.log(`Error cancelling reserve quote order: ${details}`);
   }
 
   try {
     await updateTradeConfig({
-      trade_instance_id: data[coinIndex].trade_instance_id,
-      pair: data[coinIndex].pair,
-      order_block_id: null,
+      trade_instance_id: cfg.trade_instance_id,
+      pair: cfg.pair,
+      reserve_quote_order_id: null,
     });
 
     // Keep local cache consistent with the database
-    data[coinIndex].order_block_id = null;
+    cfg.reserve_quote_order_id = null;
   } catch (e) {
     const details = e?.message ?? String(e);
-    console.log(`Error clearing block order in DB: ${details}`);
+    console.log(`Error clearing reserve quote order in DB: ${details}`);
   }
 }
 
+/**
+ * Cancels the current BASE reserve order (SELL limit far above market), if present.
+ * This is the order that locks/freezes base balance (e.g., BTC) so the bot doesn’t
+ * allocate all free base into grid orders.
+ *
+ * @param {number} coinIndex
+ * @returns {Promise<void>}
+ */
+async function cancelReserveBaseOrder(coinIndex) {
+  const cfg = data[coinIndex];
+  if (!cfg?.reserve_base_order_id) return;
+
+  consoleLog(`Cancelling reserve base order ${cfg.reserve_base_order_id}`);
+
+  try {
+    await getExchange().cancelOrder({
+      orderId: cfg.reserve_base_order_id,
+      symbol: cfg.pair,
+    });
+  } catch (e) {
+    const details = e?.message ?? String(e);
+    console.log(`Error cancelling reserve base order: ${details}`);
+  }
+
+  try {
+    await updateTradeConfig({
+      trade_instance_id: cfg.trade_instance_id,
+      pair: cfg.pair,
+      reserve_base_order_id: null,
+    });
+
+    // Keep local cache consistent with the database
+    cfg.reserve_base_order_id = null;
+  } catch (e) {
+    const details = e?.message ?? String(e);
+    console.log(`Error clearing reserve base order in DB: ${details}`);
+  }
+}
 
 function getQuoteBalance() {
   return wallet?.find((o) => o.asset === QUOTE_ASSET) ?? null;
 }
 
+// Hyperliquid uses "U"-prefixed spot symbols for some assets (e.g., BTC -> UBTC).
+// We map the most common ones explicitly (BTC/ETH/SOL), otherwise we fallback to `U${symbol}`.
+// If nothing matches, we also try the raw symbol as-is.
+function getBaseBalance(cfg) {
+  const a = String(cfg?.name ?? '').trim().toUpperCase();
+  if (!a) return null;
+
+  const b = (a === 'BTC' ? 'UBTC' : a === 'ETH' ? 'UETH' : a === 'SOL' ? 'USOL' : `U${a}`);
+  return wallet?.find(o => o.asset === b) ?? wallet?.find(o => o.asset === a) ?? null;
+}
+
+
 /**
- * Creates a "quote block" BUY LIMIT order to reserve free quote balance (e.g., USDC).
+ * Creates reserve orders to lock funds away from the grid:
+ * - QUOTE reserve: BUY LIMIT far below market to lock quote (e.g., USDC)
+ * - BASE  reserve: SELL LIMIT far above market to lock base  (e.g., BTC)
  *
- * This helps prevent the bot from allocating all free quote balance to grid orders.
- * It cancels any previous block order, optionally runs rebuy, refreshes balances,
- * then places a BUY LIMIT at `order_block_price` using available funds minus a buffer.
+ * The offsets are percent-based, so these orders are very unlikely to fill.
  *
  * @param {number} coinIndex
+ * @param {number|string} currentPrice
  * @returns {Promise<void>}
  */
-async function createOrderBlock(coinIndex) {
+async function createReserveOrders(coinIndex, currentPrice) {
   await balanceCheck();
 
   const cfg = data[coinIndex];
-  const quote = getQuoteBalance();
-  if (!quote) return;
 
-  const freeQuote = Number(quote.free);
-  const spendable = freeQuote - BLOCK_USD_BUFFER;
-
-  if (spendable <= 0) {
-    consoleLog(`Not enough ${QUOTE_ASSET} to block. free=${freeQuote.toFixed(2)}`);
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+    consoleLog(`Invalid last price for ${cfg.pair}: ${currentPrice}`, 'red');
     return;
   }
 
-  await cancelOrderBlock(coinIndex);
+  const quoteOffsetPct = Number(cfg.reserve_quote_offset_percent ?? DEFAULT_RESERVE_QUOTE_OFFSET_PERCENT);
+  const baseOffsetPct  = Number(cfg.reserve_base_offset_percent ?? DEFAULT_RESERVE_BASE_OFFSET_PERCENT);
 
-  await balanceCheck();
-
-  const quoteAfter = getQuoteBalance();
-  if (!quoteAfter) return;
-
-  const freeAfter = Number(quoteAfter.free);
-  const spendableAfter = freeAfter - BLOCK_USD_BUFFER;
-
-  if (spendableAfter <= 0) {
-    consoleLog(`Not enough ${QUOTE_ASSET} to block after rebuy. free=${freeAfter.toFixed(2)}`);
+  if (!Number.isFinite(quoteOffsetPct) || quoteOffsetPct <= 0) {
+    consoleLog(`Invalid reserve_quote_offset_percent: ${cfg.reserve_quote_offset_percent}`, 'red');
+    return;
+  }
+  if (!Number.isFinite(baseOffsetPct) || baseOffsetPct <= 0) {
+    consoleLog(`Invalid reserve_base_offset_percent: ${cfg.reserve_base_offset_percent}`, 'red');
     return;
   }
 
-  const blockPrice = Number(cfg.order_block_price);
-  if (!Number.isFinite(blockPrice) || blockPrice <= 0) {
-    consoleLog(`Invalid order_block_price: ${cfg.order_block_price}`, 'red');
-    return;
-  }
-
-  const quantity = truncate(spendableAfter / blockPrice, cfg.decimal_quantity);
-  if (!Number.isFinite(quantity) || quantity <= 0) {
-    consoleLog(`Invalid block quantity calculated: ${quantity}`, 'red');
-    return;
-  }
-
-  consoleLog(
-    `Placing ${QUOTE_ASSET} reserve order at ${blockPrice} for ${quantity} units (available balance: ${spendableAfter.toFixed(2)})`,
+  // Prices far from market so they likely won't fill
+  const reserveBuyPrice = truncate(
+      currentPrice * (1 - quoteOffsetPct / 100),
+      cfg.decimal_price
   );
 
-  let newOrder;
-  try {
-    newOrder = await createOrderLimit({
-      side: 'BUY',
-      quantity,
-      price: blockPrice,
-      symbol: cfg.pair,
-    });
-  } catch (e) {
-    const details = e?.message ?? String(e);
-    console.log(`Error creating block order: ${details}`);
+  const reserveSellPrice = truncate(
+      currentPrice * (1 + baseOffsetPct / 100),
+      cfg.decimal_price
+  );
+
+  if (!Number.isFinite(reserveBuyPrice) || reserveBuyPrice <= 0) {
+    consoleLog(`Invalid reserve BUY price calculated: ${reserveBuyPrice}`, 'red');
+    return;
+  }
+  if (!Number.isFinite(reserveSellPrice) || reserveSellPrice <= 0) {
+    consoleLog(`Invalid reserve SELL price calculated: ${reserveSellPrice}`, 'red');
     return;
   }
 
-  const blockOrderId = newOrder?.orderId;
-  if (!blockOrderId) return;
+  // Cancel old reserve orders first
+  await cancelReserveQuoteOrder(coinIndex);
+  await cancelReserveBaseOrder(coinIndex);
+  await sleep(1000);
 
-  try {
-    await updateTradeConfig({ id: cfg.id, order_block_id: blockOrderId });
-    cfg.order_block_id = blockOrderId; // keep local cache consistent
-    consoleLog(`Updated order_block_id to ${blockOrderId}`);
-  } catch (e) {
-    const details = e?.message ?? String(e);
-    console.log(`Error saving block order in DB: ${details}`);
+  // Refresh balances after cancels
+  await balanceCheck();
+
+  // ---- QUOTE RESERVE (locks quote by placing a BUY LIMIT) ----
+  const quote = getQuoteBalance();
+  if (quote) {
+    const freeQuote = Number(quote.free);
+    const spendableQuote = freeQuote - BLOCK_USD_BUFFER;
+
+    if (spendableQuote > 0) {
+      const buyQty = truncate(spendableQuote / reserveBuyPrice, cfg.decimal_quantity);
+
+      if (Number.isFinite(buyQty) && buyQty > 0) {
+        consoleLog(
+            `Reserve QUOTE: BUY ${cfg.pair} @ ${reserveBuyPrice} qty=${buyQty} (locks ~${spendableQuote.toFixed(2)} ${QUOTE_ASSET})`
+        );
+
+        try {
+          const o = await createOrderLimit({
+            side: 'BUY',
+            quantity: buyQty,
+            price: reserveBuyPrice,
+            symbol: cfg.pair,
+          });
+
+          const id = o?.orderId;
+          if (id) {
+            await updateTradeConfig({ id: cfg.id, reserve_quote_order_id: id });
+            cfg.reserve_quote_order_id = id;
+            consoleLog(`Updated reserve_quote_order_id to ${id}`);
+          }
+        } catch (e) {
+          consoleLog(`Error creating reserve QUOTE order: ${e?.message ?? String(e)}`, 'red');
+        }
+      }
+    } else {
+      consoleLog(`Not enough ${QUOTE_ASSET} to reserve. free=${freeQuote.toFixed(2)}`);
+    }
+  }
+
+  // ---- BASE RESERVE (locks base by placing a SELL LIMIT) ----
+  const base = getBaseBalance(cfg);
+  if (base) {
+    const freeBase = Number(base.free);
+    const sellableBase = freeBase - BLOCK_BASE_BUFFER;
+
+    if (sellableBase > 0) {
+      const sellQty = truncate(sellableBase, cfg.decimal_quantity);
+
+      if (Number.isFinite(sellQty) && sellQty > 0) {
+        consoleLog(
+            `Reserve BASE: SELL ${cfg.pair} @ ${reserveSellPrice} qty=${sellQty} (locks ~${sellQty} base units)`
+        );
+
+        try {
+          const o = await createOrderLimit({
+            side: 'SELL',
+            quantity: sellQty,
+            price: reserveSellPrice,
+            symbol: cfg.pair,
+          });
+
+          const id = o?.orderId;
+          if (id) {
+            await updateTradeConfig({ id: cfg.id, reserve_base_order_id: id });
+            cfg.reserve_base_order_id = id;
+            consoleLog(`Updated reserve_base_order_id to ${id}`);
+          }
+        } catch (e) {
+          consoleLog(`Error creating reserve BASE order: ${e?.message ?? String(e)}`, 'red');
+        }
+      }
+    } else {
+      consoleLog(`Not enough base asset to reserve. free=${freeBase}`);
+    }
   }
 }
-
 
 /**
  * Creates a LIMIT order and updates:
@@ -723,7 +828,8 @@ const runCoins = async function(coinIndex) {
             `${order.last_side ? `Last side ${order.last_side}` : 'No last side'}, creating ${side} at ${price}`,
           );
 
-          await cancelOrderBlock(coinIndex);
+          await cancelReserveBaseOrder(coinIndex);
+          await cancelReserveQuoteOrder(coinIndex);
 
           await createOrderAndUpdate(
             order,
@@ -753,7 +859,7 @@ const runCoins = async function(coinIndex) {
           const quantityToBuy = parseFloat(order.quantity);
 
           consoleLog(`Creating BUY limit order at ${order.buy_price}`);
-          await cancelOrderBlock(coinIndex);
+          await cancelReserveQuoteOrder(coinIndex);
 
           const newOrder = await createOrderLimit({
             side: 'BUY',
@@ -821,7 +927,7 @@ const runCoins = async function(coinIndex) {
           consoleLog(buyMsg, 'yellow');
 
           consoleLog(`Creating SELL limit order at ${order.sell_price}`);
-          await cancelOrderBlock(coinIndex);
+          await cancelReserveBaseOrder(coinIndex);
 
           const newOrder = await createOrderLimit({
             side: 'SELL',
@@ -879,7 +985,7 @@ const runCoins = async function(coinIndex) {
     const { minPrice, maxPrice } = computeRange(pair, orders, cfg);
     consoleLog(`New price check between ${minPrice} and ${maxPrice}`);
 
-    await createOrderBlock(coinIndex);
+    await createReserveOrders(coinIndex, currentPrice)
     if (orderFilled) {
       timeToExecute = 3000; // fast call after a fill
     } else {

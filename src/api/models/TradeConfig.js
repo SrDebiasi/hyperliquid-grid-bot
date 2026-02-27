@@ -24,8 +24,10 @@ export function defineTradeConfig(sequelize) {
             execution_price_min: { type: DataTypes.INTEGER, allowNull: true },
             execution_price_max: { type: DataTypes.INTEGER, allowNull: true },
 
-            order_block_id: { type: DataTypes.STRING(64), allowNull: true },
-            order_block_price: { type: DataTypes.DECIMAL(24, 12), allowNull: true },
+            reserve_quote_order_id: { type: DataTypes.STRING(64), allowNull: true },
+            reserve_base_order_id: { type: DataTypes.STRING(64), allowNull: true },
+            reserve_quote_offset_percent: { type: DataTypes.DECIMAL(24, 12), allowNull: false, defaultValue: 30 },
+            reserve_base_offset_percent: { type: DataTypes.DECIMAL(24, 12), allowNull: false, defaultValue: 30 },
 
             rebuy_profit: { type: DataTypes.BOOLEAN, allowNull: true },
             rebuy_percent: { type: DataTypes.DECIMAL(24, 12), allowNull: true },

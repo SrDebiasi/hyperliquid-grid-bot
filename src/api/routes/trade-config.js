@@ -81,8 +81,13 @@ export async function tradeConfigRoutes(app, { models }) {
             "decimal_price",
             "name",
             "rebuy_profit",
-            "order_block_price",
-            "order_block_id",
+
+            // reserves (new)
+            "reserve_quote_offset_percent",
+            "reserve_quote_order_id",
+            "reserve_base_offset_percent",
+            "reserve_base_order_id",
+
             "rebuy_percent",
             "rebuy_value",
             "execution_price_min",
@@ -95,7 +100,11 @@ export async function tradeConfigRoutes(app, { models }) {
             "target_percent",
             "margin_percent",
             "usd_transaction",
-            "order_block_price",
+
+            // reserves (new)
+            "reserve_quote_offset_percent",
+            "reserve_base_offset_percent",
+
             "rebuy_value",
             "execution_price_min",
             "execution_price_max",
@@ -128,17 +137,22 @@ export async function tradeConfigRoutes(app, { models }) {
                 continue;
             }
 
+            // allow clearing order ids by sending empty string
+            if (key === "reserve_quote_order_id" || key === "reserve_base_order_id") {
+                const v = String(raw).trim();
+                row[key] = v === "" ? null : v;
+                continue;
+            }
+
             row[key] = String(raw).trim();
         }
 
         await row.save();
 
-        return reply
-            .type("application/json; charset=utf-8")
-            .send({
-                success: true,
-                data: row.toJSON ? row.toJSON() : row,
-            });
+        return reply.type("application/json; charset=utf-8").send({
+            success: true,
+            data: row.toJSON ? row.toJSON() : row,
+        });
     });
 }
 
