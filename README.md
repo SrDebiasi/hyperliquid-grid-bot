@@ -8,6 +8,9 @@ Hyperliquid view:
 Dashboard view:
 ![Dashboard](docs/dashboard.png)
 
+Please read this README first. If you run into any issues, join the Telegram group for setup help:
+https://t.me/hyperliquidbotgrid
+
 ## Overview
 
 This Grid Trading Bot is designed to generate passive income from market volatility while operating strictly within a defined price range.

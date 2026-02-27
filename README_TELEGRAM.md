@@ -1,7 +1,8 @@
 
-------------------------------------------------------------------------
-
 ## Telegram Integration
+
+Please read this README first. If you run into any issues, join our Telegram group for setup help:
+https://t.me/hyperliquidbotgrid
 
 The bot sends:
 
