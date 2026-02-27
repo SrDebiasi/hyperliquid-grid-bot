@@ -17,203 +17,293 @@
                             hx-put="/api/trade-config/<%= config.id %>"
                             hx-swap="none"
                     >
-                        <div class="row g-3">
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Token</label>
-                                    <input name="name" class="form-control" value="<%= config.name ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Pair</label>
-                                    <input name="pair" class="form-control" value="<%= config.pair ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Entry Price</label>
-                                    <input name="entry_price" class="form-control" value="<%= config.entry_price ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Exit Price</label>
-                                    <input name="exit_price" class="form-control" value="<%= config.exit_price ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Target Profit %</label>
-                                    <input name="target_percent" class="form-control" value="<%= config.target_percent ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Distance Grid %</label>
-                                    <input name="margin_percent" class="form-control" value="<%= config.margin_percent ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">USD/level per order</label>
-                                    <input name="usd_transaction" class="form-control" value="<%= config.usd_transaction ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Qty decimal places</label>
-                                    <input name="decimal_quantity" class="form-control" value="<%= config.decimal_quantity ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Price decimal places</label>
-                                    <input name="decimal_price" class="form-control" value="<%= config.decimal_price ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Exec min</label>
-                                    <input name="execution_price_min" class="form-control" value="<%= config.execution_price_min ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">Exec max</label>
-                                    <input name="execution_price_max" class="form-control" value="<%= config.execution_price_max ?? '' %>" />
-                                </div>
-
-                                <div class="col-12 col-sm-6 col-lg-2">
-                                    <label class="form-label mb-1">&nbsp;</label>
-                                    <input class="form-control" value="" disabled />
-                                </div>
-
-                            <!-- Reserves -->
-                            <div class="col-12 mt-2">
-                                <div class="border rounded p-3">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <div class="fw-semibold">Reserves</div>
-                                        <div class="text-muted small">Locks balances using far-away limit orders</div>
-                                    </div>
-
-                                    <div class="row g-3 align-items-end">
-                                        <!-- QUOTE -->
-                                        <div class="col-12 col-md-2">
-                                            <label class="form-label mb-1">QUOTE offset</label>
-                                            <div class="input-group">
-                                                <input
-                                                        name="reserve_quote_offset_percent"
-                                                        class="form-control"
-                                                        value="<%= config.reserve_quote_offset_percent ?? '' %>"
-                                                        placeholder="30"
-                                                />
-                                                <span class="input-group-text">%</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label mb-1">QUOTE order id</label>
-                                            <input
-                                                    name="reserve_quote_order_id"
-                                                    class="form-control font-monospace"
-                                                    value="<%= config.reserve_quote_order_id ?? '' %>"
-                                                    readonly
-                                            />
-                                        </div>
-
-                                        <!-- BASE -->
-                                        <div class="col-12 col-md-2">
-                                            <label class="form-label mb-1">BASE offset</label>
-                                            <div class="input-group">
-                                                <input
-                                                        name="reserve_base_offset_percent"
-                                                        class="form-control"
-                                                        value="<%= config.reserve_base_offset_percent ?? '' %>"
-                                                        placeholder="30"
-                                                />
-                                                <span class="input-group-text">%</span>
-                                            </div>
-                                        </div>
-
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label mb-1">BASE order id</label>
-                                            <input
-                                                    name="reserve_base_order_id"
-                                                    class="form-control font-monospace"
-                                                    value="<%= config.reserve_base_order_id ?? '' %>"
-                                                    readonly
-                                            />
-                                        </div>
-
-                                        <div class="col-12">
-                                            <div class="small text-muted">
-                                                QUOTE (USD) = places a <span class="fw-semibold">BUY</span> far below market. BASE (BTC) = places a <span class="fw-semibold">SELL</span> far above market.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                        <!-- Header (read-only labels) -->
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="fw-semibold">
+                                <%= config.name ?? '-' %>
+                                <span class="text-muted small ms-1">(<%= config.pair ?? '-' %>)</span>
                             </div>
-
-                            <div class="col-12 mt-2">
-                                <div class="border rounded p-3">
-                                    <div class="d-flex align-items-center justify-content-between mb-2">
-                                        <div class="fw-semibold">Rebuy</div>
-
-                                        <div class="form-check m-0">
-                                            <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    id="rebuyProfit"
-                                                    name="rebuy_profit"
-                                                    <%= config.rebuy_profit ? 'checked' : '' %>
-                                            />
-                                            <label class="form-check-label" for="rebuyProfit">
-                                                Rebuy profit
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div class="row g-3">
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">Rebuy %</label>
-                                            <input name="rebuy_percent" class="form-control" value="<%= config.rebuy_percent ?? '' %>" />
-                                        </div>
-
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">Rebuy value</label>
-                                            <input
-                                                    name="rebuy_value"
-                                                    class="form-control"
-                                                    value="<%= config.rebuy_value ?? '' %>"
-                                                    disabled
-                                            />
-                                            <div class="form-text">Currently locked (read-only).</div>
-                                        </div>
-
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">Rebought value</label>
-                                            <input class="form-control" value="<%= config.rebought_value ?? '' %>" disabled />
-                                        </div>
-
-                                        <div class="col-12 col-md-3">
-                                            <label class="form-label">Rebought coin</label>
-                                            <input class="form-control" value="<%= config.rebought_coin ?? '' %>" disabled />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="d-flex justify-content-end gap-2 mt-4">
-                                <button
-                                        type="button"
-                                        class="btn btn-outline-primary"
-                                        data-grid-simulate="true"
-                                        data-config-id="<%= config.id %>"
-                                >
-                                    Simulate grid
-                                </button>
-
-                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                                    Cancel
-                                </button>
-                                <button type="submit" class="btn btn-primary">
-                                    Save
-                                </button>
-                            </div>
-
-                            <div id="gridSimResult" class="mb-3"></div>
+                            <% if (config.trade_instance_id != null) { %>
+                                <div class="text-muted small">Instance #<%= config.trade_instance_id %></div>
+                            <% } %>
                         </div>
+
+                        <div class="text-muted small mb-2">Tip: hover any label to see details.</div>
+
+                        <style>
+                            .tip-label { cursor: help; }
+                        </style>
+
+                        <!-- Editable fields (4 / 4) -->
+                        <div class="row g-3">
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Lower boundary of the grid. Orders will be created within the [Entry, Exit] range."
+                                >Entry Price</label>
+                                <input name="entry_price" class="form-control" value="<%= config.entry_price ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Upper boundary of the grid. Orders will be created within the [Entry, Exit] range."
+                                >Exit Price</label>
+                                <input name="exit_price" class="form-control" value="<%= config.exit_price ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Take profit for each completed buy->sell cycle (in %). Example: 1.8 means +1.8% between buy and sell."
+                                >Target Profit %</label>
+                                <input name="target_percent" class="form-control" value="<%= config.target_percent ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Distance between each grid level (in %). Example: 0.1 means each level is 0.1% apart."
+                                >Distance Grid %</label>
+                                <input name="margin_percent" class="form-control" value="<%= config.margin_percent ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Quote amount allocated to each grid level (used to calculate order quantity from price)."
+                                >USD/level per order</label>
+                                <input name="usd_transaction" class="form-control" value="<%= config.usd_transaction ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Quantity precision used when placing orders. The bot truncates quantities to this number of decimals."
+                                >Qty decimal places</label>
+                                <input name="decimal_quantity" class="form-control" value="<%= config.decimal_quantity ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Price precision used when placing orders. The bot truncates prices to this number of decimals."
+                                >Price decimal places</label>
+                                <input name="decimal_price" class="form-control" value="<%= config.decimal_price ?? '' %>" />
+                            </div>
+
+                            <div class="col-12 col-md-3">
+                                <label
+                                        class="form-label mb-1 tip-label"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Optional execution guardrails. BUY levels below Exec min or SELL levels above Exec max are ignored."
+                                >Exec min / max</label>
+                                <div class="input-group">
+                                    <input name="execution_price_min" class="form-control" value="<%= config.execution_price_min ?? '' %>" placeholder="min" />
+                                    <input name="execution_price_max" class="form-control" value="<%= config.execution_price_max ?? '' %>" placeholder="max" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-2">
+                            <div class="border rounded p-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div
+                                            class="fw-semibold tip-label"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Creates far-away limit orders to lock balances, so the grid does not use all available funds."
+                                    >Reserves</div>
+                                    <div class="text-muted small">Locks balances using far-away limit orders</div>
+                                </div>
+
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-12 col-md-2">
+                                        <label
+                                                class="form-label mb-1 tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Percent below market used for the QUOTE reserve BUY order. Higher = further away (less likely to fill)."
+                                        >QUOTE offset</label>
+                                        <div class="input-group">
+                                            <input
+                                                    name="reserve_quote_offset_percent"
+                                                    class="form-control"
+                                                    value="<%= config.reserve_quote_offset_percent ?? '' %>"
+                                                    placeholder="30"
+                                            />
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label
+                                                class="form-label mb-1 tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Current QUOTE reserve order id (read-only). This order locks quote balance."
+                                        >QUOTE order id</label>
+                                        <input
+                                                name="reserve_quote_order_id"
+                                                class="form-control font-monospace"
+                                                value="<%= config.reserve_quote_order_id ?? '' %>"
+                                                readonly
+                                        />
+                                    </div>
+
+                                    <div class="col-12 col-md-2">
+                                        <label
+                                                class="form-label mb-1 tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Percent above market used for the BASE reserve SELL order. Higher = further away (less likely to fill)."
+                                        >BASE offset</label>
+                                        <div class="input-group">
+                                            <input
+                                                    name="reserve_base_offset_percent"
+                                                    class="form-control"
+                                                    value="<%= config.reserve_base_offset_percent ?? '' %>"
+                                                    placeholder="30"
+                                            />
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-12 col-md-4">
+                                        <label
+                                                class="form-label mb-1 tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Current BASE reserve order id (read-only). This order locks base balance."
+                                        >BASE order id</label>
+                                        <input
+                                                name="reserve_base_order_id"
+                                                class="form-control font-monospace"
+                                                value="<%= config.reserve_base_order_id ?? '' %>"
+                                                readonly
+                                        />
+                                    </div>
+
+                                    <div class="col-12">
+                                        <div class="small text-muted">
+                                            QUOTE (USD) = places a <span class="fw-semibold">BUY</span> far below market. BASE (BTC) = places a <span class="fw-semibold">SELL</span> far above market.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mt-2">
+                            <div class="border rounded p-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div
+                                            class="fw-semibold tip-label"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Accumulates profit and periodically buys the base token to grow holdings over time."
+                                    >Rebuy</div>
+
+                                    <div class="form-check m-0">
+                                        <input
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                id="rebuyProfit"
+                                                name="rebuy_profit"
+                                                <%= config.rebuy_profit ? 'checked' : '' %>
+                                        />
+                                        <label
+                                                class="form-check-label tip-label"
+                                                for="rebuyProfit"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="When enabled, completed-cycle profit is added to the rebuy wallet."
+                                        >Rebuy profit</label>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-3">
+                                        <label
+                                                class="form-label tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="How much of each cycle profit is allocated to the rebuy wallet (in %)."
+                                        >Rebuy %</label>
+                                        <input name="rebuy_percent" class="form-control" value="<%= config.rebuy_percent ?? '' %>" />
+                                    </div>
+
+                                    <div class="col-12 col-md-3">
+                                        <label
+                                                class="form-label tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Current accumulated quote amount reserved for rebuys (read-only)."
+                                        >Rebuy value</label>
+                                        <input
+                                                name="rebuy_value"
+                                                class="form-control"
+                                                value="<%= config.rebuy_value ?? '' %>"
+                                                disabled
+                                        />
+                                    </div>
+
+                                    <div class="col-12 col-md-3">
+                                        <label
+                                                class="form-label tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Total quote spent on rebuys so far (read-only)."
+                                        >Rebought value</label>
+                                        <input class="form-control" value="<%= config.rebought_value ?? '' %>" disabled />
+                                    </div>
+
+                                    <div class="col-12 col-md-3">
+                                        <label
+                                                class="form-label tip-label"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Total base token purchased via rebuy so far (read-only)."
+                                        >Rebought coin</label>
+                                        <input class="form-control" value="<%= config.rebought_coin ?? '' %>" disabled />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button
+                                    type="button"
+                                    class="btn btn-outline-primary"
+                                    data-grid-simulate="true"
+                                    data-config-id="<%= config.id %>"
+                            >
+                                Simulate grid
+                            </button>
+
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                Save
+                            </button>
+                        </div>
+
+                        <div id="gridSimResult" class="mb-3"></div>
                     </form>
                 </div>
             </div>
@@ -229,6 +319,11 @@
       </div>
     `;
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const els = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        els.forEach((el) => new bootstrap.Tooltip(el));
+    });
 
     document.body.addEventListener("htmx:afterRequest", (e) => {
         const form = e.target;
