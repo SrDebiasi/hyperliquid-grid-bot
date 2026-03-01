@@ -352,4 +352,148 @@
             renderAlert(target, "danger", msg);
         }
     });
+
+    function renderAlert(targetEl, type, message) {
+        targetEl.innerHTML = `
+      <div class="alert alert-${type} d-flex align-items-center gap-2 mb-0 py-2" role="alert">
+        <span class="fw-semibold">${message}</span>
+      </div>
+    `;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const els = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        els.forEach((el) => new bootstrap.Tooltip(el));
+
+        const form = document.getElementById("tradeConfigForm");
+        if (!form) return;
+
+        const simBtn = form.querySelector('[data-grid-simulate="true"]');
+        const saveBtn = form.querySelector('button[type="submit"]');
+        const configTarget = document.getElementById("configResult");
+        const simTarget = document.getElementById("gridSimResult");
+
+        let baseline = null;
+        let dirty = false;
+
+        function stableSerializeForm(f) {
+            const fd = new FormData(f);
+
+            // ensure unchecked checkboxes are represented too (FormData omits them)
+            f.querySelectorAll('input[type="checkbox"][name]').forEach((cb) => {
+                if (!fd.has(cb.name)) fd.set(cb.name, "0");
+            });
+
+            const pairs = [];
+            for (const [k, v] of fd.entries()) {
+                pairs.push([k, String(v)]);
+            }
+            pairs.sort((a, b) => (a[0] + "=" + a[1]).localeCompare(b[0] + "=" + b[1]));
+            return pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+        }
+
+        function setDirty(nextDirty) {
+            dirty = nextDirty;
+
+            if (simBtn) simBtn.disabled = dirty;
+
+            // optional: small hint while dirty
+            if (dirty && configTarget) {
+                renderAlert(configTarget, "warning", "You have unsaved changes. Please save before simulating.");
+            } else if (!dirty && configTarget) {
+                // don’t clear a success message immediately; just leave as-is
+                // (you already clear success after 2.5s)
+            }
+        }
+
+        function refreshBaseline() {
+            baseline = stableSerializeForm(form);
+            setDirty(false);
+        }
+
+        function checkDirty() {
+            if (baseline == null) {
+                baseline = stableSerializeForm(form);
+                return;
+            }
+            const now = stableSerializeForm(form);
+            setDirty(now !== baseline);
+        }
+
+        // Mark dirty on any edit
+        form.addEventListener("input", checkDirty, true);
+        form.addEventListener("change", checkDirty, true);
+
+        // When modal opens, reset baseline (so we compare from “current loaded values”)
+        const modalEl = document.getElementById("configModal");
+        if (modalEl) {
+            modalEl.addEventListener("shown.bs.modal", () => {
+                // clear simulate result when opening, optional
+                if (simTarget) simTarget.innerHTML = "";
+                refreshBaseline();
+            });
+        } else {
+            // if modal event isn’t available for some reason, set baseline once on load
+            refreshBaseline();
+        }
+
+        // Block simulate if dirty (extra guard even though we disable button)
+        if (simBtn) {
+            simBtn.addEventListener("click", (e) => {
+                if (!dirty) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (simTarget) {
+                    renderAlert(simTarget, "warning", "Please save your changes before simulating.");
+                } else if (configTarget) {
+                    renderAlert(configTarget, "warning", "Please save your changes before simulating.");
+                }
+
+                // optional: nudge user to save
+                if (saveBtn) saveBtn.focus();
+            });
+        }
+
+        // expose helper for save handler below
+        window.__tradeConfigDirty = {
+            refreshBaseline,
+            setDirty,
+        };
+    });
+
+    document.body.addEventListener("htmx:afterRequest", (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (form.id !== "tradeConfigForm") return;
+
+        const target = document.getElementById("configResult");
+        if (!target) return;
+
+        let payload = null;
+        try {
+            payload = JSON.parse(e.detail.xhr.responseText || "{}");
+        } catch {
+            renderAlert(target, "danger", "Unexpected response from server.");
+            return;
+        }
+
+        if (e.detail.successful && payload && payload.success) {
+            renderAlert(target, "success", "Config saved.");
+
+            // IMPORTANT: after save, reset dirty + baseline
+            if (window.__tradeConfigDirty?.refreshBaseline) {
+                window.__tradeConfigDirty.refreshBaseline();
+            }
+
+            setTimeout(() => { target.innerHTML = ""; }, 2500);
+        } else {
+            const msg =
+                payload?.message ||
+                payload?.error ||
+                "Could not save config. Please try again.";
+            renderAlert(target, "danger", msg);
+        }
+    });
 </script>
