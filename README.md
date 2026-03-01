@@ -260,17 +260,19 @@ Important:
 
 1) Log in to Hyperliquid.
    https://app.hyperliquid.xyz/join/BOTGRID
-2) Use BOTGRID refferal to earn 4% discounts in fees.
+
+2) Use BOTGRID referral to earn 4% discounts in fees.
 
 3) Open the API page:
    https://app.hyperliquid.xyz/API
-4) Create a new API Wallet:
 
-- Enter a name
-- Click Generate
-- Click "Authorize API Wallet" (do not skip authorization)
+4) Create a new API Wallet:
+    - Enter a name
+    - Click Generate
+    - Click "Authorize API Wallet" (do not skip authorization)
 
 5) Copy the Private Key shown (this is what you store as `private_key` in the bot).
+
 6) Copy your MAIN account address (top-right account dropdown / wallet shown in UI). That is what you store as `wallet_address` in the bot.
 
 Notes:
@@ -283,10 +285,40 @@ Notes:
 
 If you believe your private key has been exposed:
 
-1. Go to the Hyperliquid API page.
-2. Revoke the compromised API wallet.
-3. Generate a new API wallet.
-4. Update your database immediately.
+1) Go to the Hyperliquid API page.
+2) Revoke the compromised API wallet.
+3) Generate a new API wallet.
+4) Update your database immediately.
+
+---
+
+## Deposit Funds (Recommended: USDC on Arbitrum One)
+
+Hyperliquid deposits are designed for **USDC on Arbitrum One**. This is usually the cheapest + simplest path.
+
+### Important notes
+
+- **Only USDC on Arbitrum One is supported for deposits.** If you send other tokens (ETH/ARB/USDT/etc) your funds may not be credited.
+- You’ll also want a tiny amount of **ETH on Arbitrum** to pay gas for the USDC approval/deposit transaction.
+
+### Option A) Deposit from a centralized exchange (easiest)
+
+1) On Hyperliquid, open the **Trade** page and click **Deposit**.
+2) Copy your **USDC deposit address**.
+3) In your exchange, withdraw **USDC**:
+    - Network / chain: **Arbitrum One**
+    - Address: paste the Hyperliquid deposit address
+4) Wait for confirmations, then refresh Hyperliquid.
+
+### Option B) Bridge USDC to Arbitrum first (if your USDC is on another chain)
+
+1) Bridge/move your funds so you end up with **USDC on Arbitrum One** (and a little ETH on Arbitrum for gas).
+2) On Hyperliquid, click **Deposit** and deposit the Arbitrum USDC.
+
+### Avoid: sending BTC on the Bitcoin network “just to fund the account”
+
+Bitcoin network fees can be high, and it’s easy to do the “wrong chain / wrong asset” mistake.
+For most users, **USDC on Arbitrum One** is the recommended funding method.
 
 ------------------------------------------------------------------------
 
@@ -295,19 +327,8 @@ If you believe your private key has been exposed:
 We strongly recommend running this bot locally (your own PC / private server you fully control).
 
 Reason:
-
 - This bot uses sensitive credentials (exchange private key + Telegram token).
 - The safest setup is keeping everything on a machine you control.
-
-If you decide to run it in the cloud (AWS, etc.):
-
-- DO NOT store private keys or tokens inside .env files committed to disk.
-- Use a secrets manager (example: AWS Secrets Manager / Parameter Store).
-- Load secrets at runtime from the secrets manager.
-- Lock down access:
-    - restrict IAM permissions to minimum required
-    - restrict server/network access (firewalls, allowed IPs, etc.)
-- Never log secrets to console or to files.
 
 ------------------------------------------------------------------------
 
@@ -349,7 +370,6 @@ Copy your Ping URL (example):
 
     https://hc-ping.com/your-uuid-here
 
-
 Add the following to your .env:
 
     HEALTHCHECKS_PING_URL=https://hc-ping.com/your-uuid-here
@@ -365,6 +385,7 @@ If the process crashes or stops, the pings stop.
 
 After the configured grace time, Healthchecks sends an alert.
 This feature is optional. If HEALTHCHECKS_PING_URL is not set, no monitoring is performed.
+
 ------------------------------------------------------------------------
 
 ### Windows quick start (shorcuts)
