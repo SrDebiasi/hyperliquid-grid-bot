@@ -490,7 +490,11 @@ function sumProfit(rows) {
   return { total, count: list.length };
 }
 
-function buildProfitSummaryMessage({ title, period, total, count }) {
+function formatPct(n) {
+  return `${n.toFixed(2)}%`;
+}
+
+function buildProfitSummaryMessage({ title, period, total, count, exposure, pnlPct }) {
   const lines = [
     `*${eM(title)}*`,
     `${eM(period.label)}`,
@@ -499,6 +503,16 @@ function buildProfitSummaryMessage({ title, period, total, count }) {
     `${eM('•')} ${eM('Profit total')}: *${eM(formatUSD(total))}*`,
     `${eM('•')} ${eM('Trades count')}: *${eM(String(count))}*`,
   ];
+
+  const totalExposureUsd = toNumberSafe(exposure?.totalExposureUsd);
+  if (totalExposureUsd > 0) {
+    lines.push(`${eM('•')} ${eM('Exposure')}: *${eM(formatUSD(totalExposureUsd))}*`);
+  }
+
+  if (Number.isFinite(pnlPct)) {
+    lines.push(`${eM('•')} ${eM('PnL')}: *${eM(formatPct(pnlPct))}*`);
+  }
+
   return lines.join('\n');
 }
 
@@ -514,11 +528,30 @@ async function handleProfitSummaryCommand(msg, { title, periodFn }) {
 
   const { total, count } = sumProfit(rows);
 
+  // Exposure snapshot (now) to compute PnL %
+  let exposure = null;
+  let pnlPct = null;
+
+  try {
+    const res = await getCurrentExposure(); // returns { exposure, currentPrice } like /exposure
+    exposure = res?.exposure ?? null;
+
+    const denom = toNumberSafe(exposure?.totalExposureUsd);
+    if (denom > 0) {
+      pnlPct = Math.max(0, (total / denom) * 100);
+    }
+  } catch (_) {
+    exposure = null;
+    pnlPct = null;
+  }
+
   return buildProfitSummaryMessage({
     title,
     period,
     total,
     count,
+    exposure,
+    pnlPct,
   });
 }
 
@@ -556,10 +589,10 @@ function buildPnlMessage({ symbol, currentPrice, exposure, periods }) {
   return lines.join('\n');
 }
 
-function buildExposureMessage({ symbol, currentPrice, exposure }) {
+function buildExposureMessage({ currentPrice, exposure }) {
   const lines = [
     `*${eM('Grid exposure')}*`,
-    `${eM('Symbol')}: *${eM(symbol)}*`,
+    `${eM('Symbol')}: *${eM(getCurrentSymbol())}*`,
     `${eM('Current price')}: *${eM(String(currentPrice))}*`,
     ``,
     `*${eM('Open capital')}*`,
@@ -608,6 +641,39 @@ function scheduleDailyStatus(bot) {
       scheduleDailyStatus(bot);
     }
   }, delay);
+}
+
+async function getCurrentSymbol() {
+  const instanceId = getInstanceId();
+
+  let cfg = await retrieveConfig({ trade_instance_id: instanceId });
+  if (!cfg?.pair) throw new Error('Missing pair in config');
+  return cfg.pair;
+}
+
+async function getCurrentExposure() {
+  let cfg = await retrieveConfig({ trade_instance_id: getInstanceId() });
+  cfg = cfg?.[0];
+  if (!cfg?.pair) throw new Error('Missing pair in config');
+
+  const prices = await getExchange().getPrices();
+
+  const pair = cfg.pair;
+  const currentPrice = toNumberSafe(prices[pair] ?? prices[pair.replace('/', '')]);
+
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+    throw new Error(`Invalid current price for ${pair}`);
+  }
+
+  const orders =
+      (await retrieveOrders({
+        pair,
+        trade_instance_id: getInstanceId(),
+      })) || [];
+
+  const exposure = calcExposureFromOrders(orders, currentPrice);
+
+  return { exposure, currentPrice, orders };
 }
 
 function createTelegramBot({ polling = true } = {}) {
@@ -812,23 +878,8 @@ function createTelegramBot({ polling = true } = {}) {
       if (!isAllowedChat(msg)) return;
 
       try {
-        const instanceId = getInstanceId();
-
-        let cfg = await retrieveConfig({ trade_instance_id: instanceId });
-        cfg = cfg?.[0];
-
-        if (!cfg?.pair) throw new Error('Missing pair in config');
-
-        const exchangePrices = await getExchange().getPrices();
-        const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
-
-        const orders = (await retrieveOrders({
-          pair: cfg.pair,
-          trade_instance_id: instanceId,
-        })) || [];
-
-        const exposure = calcExposureFromOrders(orders, currentPrice);
-        const message = buildExposureMessage({ symbol: cfg.pair, currentPrice, exposure });
+        const { exposure, currentPrice } = getCurrentExposure();
+        const message = buildExposureMessage({ currentPrice, exposure });
 
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
@@ -839,7 +890,6 @@ function createTelegramBot({ polling = true } = {}) {
         );
       }
     });
-
 
     bot.onText(/\/pnl\b/, async (msg) => {
       if (!isAllowedChat(msg)) return;
