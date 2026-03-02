@@ -1,6 +1,6 @@
 import { Op, Sequelize } from "sequelize";
 import {DateTime} from "luxon";
-
+import { literal } from 'sequelize';
 const BOT_TZ = process.env.BOT_TZ || "America/Edmonton";
 
 export async function tradeProfitRoutes(app, { models }) {
@@ -40,13 +40,29 @@ export async function tradeProfitRoutes(app, { models }) {
         return rows;
     });
 
+
     app.post("/trade-profit", async (request, reply) => {
         const body = request.body ?? {};
-        if (!body.date_transaction_utc) body.date_transaction_utc = new Date();
-        if (!body.date_transaction)
-            body.date_transaction = DateTime.fromJSDate(body.date_transaction_utc, { zone: "utc" }).setZone(BOT_TZ).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
 
-        const row = await TradeProfit.create(body);
+        // Normalize UTC instant
+        const utc =
+            body.date_transaction_utc
+                ? DateTime.fromISO(body.date_transaction_utc, { zone: "utc" })
+                : DateTime.now().toUTC();
+
+        // Always store UTC as instant-like value (fine)
+        body.date_transaction_utc = utc.toISO({ suppressMilliseconds: false });
+
+        // Compute Alberta wall time string (no offset!)
+        const localWall = utc.setZone(BOT_TZ).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
+
+        const row = await TradeProfit.create({
+            ...body,
+
+            // IMPORTANT: this bypasses Sequelize date parsing
+            date_transaction: literal(`TIMESTAMP '${localWall}'`),
+        });
+
         return reply.code(201).send(row);
     });
 }

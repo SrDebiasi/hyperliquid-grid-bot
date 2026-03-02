@@ -122,8 +122,8 @@ async function seedDefaultTradeConfig(client, tradeInstanceId) {
             0,               // rebuy_value
             null,            // rebought_value
             null,            // rebought_coin
-            63000,           // execution_price_min
-            102000,          // execution_price_max
+            60000,           // execution_price_min
+            100000,          // execution_price_max
         ],
     );
 

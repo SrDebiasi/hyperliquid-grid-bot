@@ -10,6 +10,7 @@ https://t.me/hyperliquidbotgrid
 ## 1) Install PostgreSQL
 
 Install PostgreSQL (**v13+ recommended**) and make sure the service is running.
+Set the user and password `postgres` if you want to set another password, adjust `.env` file
 
 - **Windows:** ensure the **PostgreSQL** service is started
 - **macOS:**
@@ -27,8 +28,9 @@ Copy `.env.example` to `.env` in the project root.
 ### Wallet + Secret Key (Important)
 
 Create your Hyperliquid account (referral):
+To more info read README.md
 - https://app.hyperliquid.xyz/join/BOTGRID  
-Use the **BOTGRID** referral to get fee discounts.
+  Use the **BOTGRID** referral to get fee discounts.
 
 #### Local (single account) setup
 For local usage, you can keep credentials in `.env`:
@@ -47,7 +49,23 @@ For multi-account setups, use the `trade_instance` table to store:
 
 ---
 
-## 3) Install dependencies
+## Windows quick start (2 shortcuts)
+
+If you’re on **Windows**, you can use the batch files to speed up setup:
+
+1) Install dependencies + setup DB (schema + seed)
+- Run: `setup-db.bat`
+
+2) Start the API + open the dashboard
+- Run: `start-api.bat`
+
+Open the Dashboard:
+- http://127.0.0.1:3000/dashboard
+
+---
+
+#### For other OS users, or if you are on windows and want to follow without the bat's do:
+## 3) Install dependencies (terminal)
 
 ```bash
 npm install
@@ -55,9 +73,14 @@ npm install
 
 ---
 
-## 4) Create Db and seed
+## 4) Create DB and seed
 
 Creates the schema using `db/db.sql`.
+
+#### Windows shortcut
+Run: `setup-db.bat`
+
+#### Terminal (all OS)
 
 ```bash
 npm run db:setup
