@@ -24,6 +24,10 @@ import { privateKeyToAccount } from 'viem/accounts';
  * - Spot order asset id = 10000 + pairIndex
  * - Spot subscription coin id (activeSpotAssetCtx) = "@<pairIndex>"
  */
+export const ORDER_STATUS_NOT_OPEN = 'NOT_OPEN_NO_FILL';
+export const ORDER_STATUS_FILLED = 'FILLED';
+export const ORDER_STATUS_OPEN = 'OPEN';
+
 export default class HyperliquidAdapter {
   /**
    * @param {{
@@ -322,16 +326,31 @@ export default class HyperliquidAdapter {
   async getOpenOrders() {
     const rows = await this.info.openOrders({ user: this._userAddress, dex: '' });
 
-    return (rows ?? []).map((o) => ({
-      symbol: o.symbol ?? o.coin ?? o.market,
-      orderId: o.orderId ?? o.oid,
-      clientOrderId: o.clientOrderId ?? o.cloid ?? null,
-      price: String(o.price ?? o.limitPx ?? o.px ?? 0),
-      origQty: String(o.origQty ?? o.sz ?? o.qty ?? 0),
-      executedQty: String(o.executedQty ?? o.filledSz ?? o.filledQty ?? 0),
-      side: (o.side ?? o.dir ?? '').toUpperCase(),
-      time: o.time ?? o.timestamp ?? o.createdAt ?? Date.now(),
-    }));
+    return (rows ?? []).map((o) => {
+      // HL: side "A" (ask/sell), "B" (bid/buy)
+      const side = o.side === 'A' ? 'SELL' : o.side === 'B' ? 'BUY' : String(o.side ?? '').toUpperCase();
+
+      // HL: prices/sizes come as strings
+      const price = Number(o.limitPx);
+      const origQty = Number(o.origSz ?? o.sz);
+      const openQty = Number(o.sz);
+
+      // if you want executed: orig - remaining (best effort)
+      const executedQty = Number.isFinite(origQty) && Number.isFinite(openQty) ? Math.max(0, origQty - openQty) : 0;
+
+      return {
+        // coin id as symbol for now; you can map "@142" -> "BTC" elsewhere if needed
+        symbol: String(o.coin),
+        orderId: Number(o.oid),
+
+        price: String(Number.isFinite(price) ? price : 0),
+        origQty: String(Number.isFinite(origQty) ? origQty : 0),
+        executedQty: String(Number.isFinite(executedQty) ? executedQty : 0),
+
+        side,
+        time: Number(o.timestamp ?? Date.now()),
+      };
+    });
   }
 
   async getOrder(data) {
@@ -341,16 +360,17 @@ export default class HyperliquidAdapter {
     const user = this._userAddress;
     const open = await this.info.openOrders({ user, dex: '' });
     if (Array.isArray(open) && open.some(o => Number(o.oid) === oid)) {
-      return { status: 'OPEN' };
+      return { status: ORDER_STATUS_OPEN  };
     }
 
     const fills = await this.info.userFills({ user });
     if (Array.isArray(fills) && fills.some(f => Number(f.oid) === oid)) {
-      return { status: 'FILLED' };
+      return { status: ORDER_STATUS_FILLED };
     }
 
-    return { status: 'NOT_OPEN_NO_FILL' };
+    return { status: ORDER_STATUS_NOT_OPEN };
   }
+
 
   async getOrdersStatusMap({ orderIds }) {
     const user = this._userAddress;
@@ -369,9 +389,9 @@ export default class HyperliquidAdapter {
       const oid = Number(raw);
       if (!Number.isFinite(oid)) continue;
 
-      if (openSet.has(oid)) out.set(oid, { status: 'OPEN' });
-      else if (filledSet.has(oid)) out.set(oid, { status: 'FILLED' });
-      else out.set(oid, { status: 'NOT_OPEN_NO_FILL' });
+      if (openSet.has(oid)) out.set(oid, { status: ORDER_STATUS_OPEN });
+      else if (filledSet.has(oid)) out.set(oid, { status: ORDER_STATUS_FILLED });
+      else out.set(oid, { status: ORDER_STATUS_NOT_OPEN });
     }
 
     return out;

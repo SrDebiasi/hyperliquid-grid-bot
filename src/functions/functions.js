@@ -167,7 +167,7 @@ const addProfit = (data) => {
     date_transaction_utc: moment.utc().toISOString(),
     date_transaction: moment().tz(BOT_TZ).toISOString(true),
   };
-  console.log(payload);
+
   const profitStr = Number.parseFloat(data.value).toFixed(2);
   const priceStr = Number.parseFloat(data.price_final).toFixed(2);
 
