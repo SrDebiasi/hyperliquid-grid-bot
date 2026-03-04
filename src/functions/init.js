@@ -320,6 +320,111 @@ function getBaseBalance(cfg) {
   return wallet?.find(o => o.asset === b) ?? wallet?.find(o => o.asset === a) ?? null;
 }
 
+async function detectReserveOrdersByExtremes(cfg) {
+  // 1) Exchange open orders first
+  const open = await getExchange().getOpenOrders({});
+
+  if (!open.length) return { action: 'none', reason: 'no_open_orders' };
+
+  const list = open
+      .map(o => {
+        const priceNum = Number(o.price);
+        const origNum = Number(o.origQty);
+
+        return {
+          orderId: Number(o.orderId),
+          price: priceNum,
+          qty: origNum,
+          side: o.side,
+          symbol: o.symbol,
+        };
+      })
+      .filter(o =>
+          Number.isFinite(o.orderId) &&
+          Number.isFinite(o.price) &&
+          Number.isFinite(o.qty) &&
+          o.qty > 0
+      )
+      .sort((a, b) => a.price - b.price);
+
+  if (!list.length) return { action: 'none', reason: 'no_valid_open_orders' };
+
+  const openIds = new Set(list.map(o => o.orderId));
+
+  const reserveBaseId = cfg.reserve_base_order_id ? Number(cfg.reserve_base_order_id) : null;
+  const reserveQuoteId = cfg.reserve_quote_order_id ? Number(cfg.reserve_quote_order_id) : null;
+
+  // 2) If the saved reserve IDs exist in open orders, skip verification for that side
+  const baseIdIsPresent = reserveBaseId != null && openIds.has(reserveBaseId);
+  const quoteIdIsPresent = reserveQuoteId != null && openIds.has(reserveQuoteId);
+
+  // If both are present, we can skip everything
+  if (baseIdIsPresent && quoteIdIsPresent) {
+    return { action: 'skip', reason: 'reserve_ids_present_in_open_orders' };
+  }
+
+  // 3) Need DB orders to get baseline qty (only if we need to verify at least one side)
+  const dbOrders = await retrieveOrders({
+    pair: cfg.pair,
+    trade_instance_id: cfg.trade_instance_id,
+  });
+
+  const maxDbQty = Math.max(0, ...dbOrders.map(o => Number(o.quantity) || 0));
+
+  const lowest = list[0];
+  const highest = list[list.length - 1];
+
+  const cancels = [];
+  const updates = {};
+
+  // 4) BASE reserve check (highest price)
+  if (!baseIdIsPresent) {
+    const highestIsReserve = highest.qty > maxDbQty;
+
+    if (highestIsReserve && reserveBaseId != null && highest.orderId !== reserveBaseId) {
+      cancels.push({ orderId: highest.orderId, symbol: cfg.pair });
+      updates.reserve_base_order_id = null;
+      cfg.reserve_base_order_id = null;
+    }
+  }
+
+  // 5) QUOTE reserve check (lowest price)
+  if (!quoteIdIsPresent) {
+    const lowestIsReserve = lowest.qty > maxDbQty;
+
+    if (lowestIsReserve && reserveQuoteId != null && lowest.orderId !== reserveQuoteId) {
+      cancels.push({ orderId: lowest.orderId, symbol: cfg.pair });
+      updates.reserve_quote_order_id = null;
+      cfg.reserve_quote_order_id = null;
+    }
+  }
+
+  // 6) Apply cancels + DB updates
+  if (cancels.length) {
+    consoleLog(`Reserve mismatch ${cfg.pair}. Cancelling ${cancels.length} candidate(s).`, 'yellow');
+    await getExchange().cancelOrders({ cancels });
+  }
+
+  if (Object.keys(updates).length) {
+    await updateTradeConfig({
+      trade_instance_id: cfg.trade_instance_id,
+      pair: cfg.pair,
+      ...updates,
+    });
+  }
+
+  return {
+    action: cancels.length || Object.keys(updates).length ? 'fixed' : 'none',
+    baseIdIsPresent,
+    quoteIdIsPresent,
+    maxDbQty,
+    lowest,
+    highest,
+    cancels,
+    updates,
+  };
+}
+
 async function dedupeOpenOrdersForPair(cfg) {
   let dbOrders = await retrieveOrders({ pair: cfg.pair, trade_instance_id: cfg.trade_instance_id })
   // 1) expected ids from DB
@@ -837,6 +942,7 @@ const runCoins = async function(coinIndex) {
   lastPrices[priceKey] = currentPrice;
 
   await dedupeOpenOrdersForPair(cfg)
+  await detectReserveOrdersByExtremes(cfg)
 
   const orders = await loadAndFilterOrders({
     pair,
@@ -1302,7 +1408,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     cfg.rebought_value = updatedReboughtValue;
     cfg.rebought_coin = updatedReboughtCoin;
 
-    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${cfg.name} @ IOC ${iocPrice}`;
+    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${cfg.name} at ${iocPrice}`;
     consoleLog(rebuyMsg);
     void notifyTelegram(rebuyMsg);
 
