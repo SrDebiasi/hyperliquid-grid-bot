@@ -153,7 +153,6 @@ const addMessage = (message, color = null) => {
 };
 
 const addProfit = (data) => {
-  console.log(BOT_TZ);
   const payload = {
     pair: data.pair,
     profit: data.profit,
