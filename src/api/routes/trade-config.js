@@ -88,6 +88,9 @@ export async function tradeConfigRoutes(app, { models }) {
             "reserve_base_offset_percent",
             "reserve_base_order_id",
 
+            "rebought_value",
+            "rebought_coin",
+
             "rebuy_percent",
             "rebuy_value",
             "execution_price_min",
@@ -115,7 +118,6 @@ export async function tradeConfigRoutes(app, { models }) {
 
         for (const key of allowed) {
             if (body[key] === undefined) continue;
-            if (String(key).startsWith("rebought_")) continue;
 
             const raw = body[key];
 

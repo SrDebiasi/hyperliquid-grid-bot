@@ -833,7 +833,7 @@ const runCoins = async function(coinIndex) {
   const priceKey = String(pair).replace(/[\/\-_]/g, '');
   const currentPrice = prices[priceKey];
 
-  consoleLog(`Current price: ${Number(currentPrice).toFixed(dp)}`);
+  consoleLog(`${timesExecuted}) Current price: ${Number(currentPrice).toFixed(dp)}`);
   lastPrices[priceKey] = currentPrice;
 
   await dedupeOpenOrdersForPair(cfg)
@@ -915,8 +915,8 @@ const runCoins = async function(coinIndex) {
           orderFilled = true;
           setLastOperation(pair);
 
-          const sellMsg = `${timesExecuted}) Sell order filled ${order.sell_order} at ${order.sell_price}`;
-          consoleLog(sellMsg, 'yellow');
+          const sellMsg = `Sell order filled ${order.sell_order} at ${order.sell_price}`;
+          consoleLog(`${timesExecuted}) ${sellMsg}`, 'yellow');
 
           const quantityToBuy = parseFloat(order.quantity);
 
@@ -983,10 +983,10 @@ const runCoins = async function(coinIndex) {
           orderFilled = true;
           setLastOperation(pair);
 
-          const buyMsg = `${timesExecuted}) Buy order filled ${order.buy_order} at ${order.buy_price}`;
+          const buyMsg = `Buy order filled ${order.buy_order} at ${order.buy_price}`;
           const quantityToSell = parseFloat(order.quantity);
 
-          consoleLog(buyMsg, 'yellow');
+          consoleLog(`${timesExecuted}) ${buyMsg}`, 'yellow');
 
           consoleLog(`${timesExecuted}) Creating SELL limit order at ${order.sell_price}`);
           await cancelReserveBaseOrder(coinIndex);
@@ -1257,7 +1257,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     await updateTradeConfig({ id: cfg.id, rebuy_value: newRebuyValue });
     cfg.rebuy_value = newRebuyValue;
 
-    const amountToBuyQuote = 10; // quote currency per rebuy (e.g., USDC/USDT)
+    const amountToBuyQuote = 15; // quote currency per rebuy (e.g., USDC/USDT)
     if (cfg.rebuy_value + 1e-9 < amountToBuyQuote) return;
 
     // Get latest prices so we can convert quote -> base quantity
@@ -1302,9 +1302,9 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     cfg.rebought_value = updatedReboughtValue;
     cfg.rebought_coin = updatedReboughtCoin;
 
-    consoleLog(
-        `Rebuy triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${cfg.name} @ IOC ${iocPrice}`
-    );
+    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${cfg.name} @ IOC ${iocPrice}`;
+    consoleLog(rebuyMsg);
+    void notifyTelegram(rebuyMsg);
 
     // Place IOC order and do not wait for/parse fills.
     // If it errors, we revert the bookkeeping.
