@@ -50,7 +50,7 @@
                 <% if (!hasInstance) { %>
                     <span class="text-muted">-</span>
                 <% } else { %>
-                    <span class="badge <%= secretsConfigured ? 'text-bg-success' : 'text-bg-secondary' %> align-self-start align-self-sm-center">
+                    <span class="badge <%= secretsConfigured ? 'text-bg-success' : 'text-bg-secondary' %> align-self-start align-self-sm-center me-2">
                         <%= secretsConfigured ? 'Configured' : 'Not configured' %>
                     </span>
                     <% if (!secretsConfigured) { %>

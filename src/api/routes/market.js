@@ -1,5 +1,6 @@
 // src/api/routes/market.js
 import {fetchLastNDaysKlinesCached} from "../../services/binanceKlinesCacheServices.js";
+import {fetchHyperliquidMidFromPair} from "../../functions/functions.js";
 
 function toCandle(k) {
     // Binance kline array:
@@ -17,7 +18,46 @@ function toCandle(k) {
 export async function marketRoutes(app, opts) {
         const { models } = opts;
 
-        // GET /api/market/klines?symbol=BTCUSDT&interval=5m&days=5
+        app.get('/api/market/price', async (request, reply) => {
+            const { trade_instance_id, pair } = request.query ?? {};
+
+            if (trade_instance_id == null || trade_instance_id == "")
+                return { pair, price: 0, dp: 0, dq: 0 };
+
+            let effectivePair = pair ? String(pair) : null;
+
+            // Prefer instance id so we can also return dp reliably
+            const ti = Number(trade_instance_id);
+            if (!Number.isFinite(ti) || ti <= 0) {
+                return reply.code(400).send({error: 'invalid trade_instance_id'});
+            }
+
+            const configRow = await models.TradeConfig.findOne({
+                where: { trade_instance_id: ti },
+                order: [['id', 'ASC']],
+            });
+
+            const config = configRow ? configRow.toJSON() : null;
+            if (!config?.pair) return reply.code(404).send({ error: 'trade_config not found' });
+
+            effectivePair = String(config.pair);
+
+
+            if (!effectivePair) {
+                return reply.code(400).send({ error: 'Provide pair or trade_instance_id' });
+            }
+
+            const priceRaw = await fetchHyperliquidMidFromPair(effectivePair);
+            const price = Number(priceRaw);
+
+            if (!Number.isFinite(price) || price <= 0) {
+                return reply.code(502).send({ error: 'price not available', pair: effectivePair });
+            }
+
+            return { pair: effectivePair, price, dp: config?.decimal_price, dq: config?.decimal_quantity };
+        });
+
+        // GET /market/klines?symbol=BTCUSDT&interval=5m&days=5
         app.get("/api/market/klines", async (request, reply) => {
             const symbol = String(request.query.symbol ?? "BTCUSDT").toUpperCase().trim();
             const interval = String(request.query.interval ?? "5m").trim();

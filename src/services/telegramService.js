@@ -589,18 +589,18 @@ function buildPnlMessage({ symbol, currentPrice, exposure, periods }) {
   return lines.join('\n');
 }
 
-function buildExposureMessage({ currentPrice, exposure }) {
+async function buildExposureMessage({currentPrice, exposure}) {
   const lines = [
     `*${eM('Grid exposure')}*`,
-    `${eM('Symbol')}: *${eM(getCurrentSymbol())}*`,
+    `${eM('Symbol')}: *${eM(await getCurrentSymbol())}*`,
     `${eM('Current price')}: *${eM(String(currentPrice))}*`,
     ``,
     `*${eM('Open capital')}*`,
-    `${eM('•')} ${eM('Coin qty (sell above price)')}: *${eM(formatNumber(exposure.coinQty, 8))}*`,
-    `${eM('•')} ${eM('Coin value (at current)')}: *${eM(formatUSD(exposure.coinValueUsd))}*`,
-    `${eM('•')} ${eM('USDT reserved (buys)')}: *${eM(formatUSD(exposure.reservedUsd))}*`,
+    `${eM('•')} ${eM('Coin qty (sell above price)')}: *${eM(formatNumber(exposure?.coinQty, 8))}*`,
+    `${eM('•')} ${eM('Coin value (at current)')}: *${eM(formatUSD(exposure?.coinValueUsd))}*`,
+    `${eM('•')} ${eM('USDT reserved (buys)')}: *${eM(formatUSD(exposure?.reservedUsd))}*`,
     ``,
-    `${eM('•')} ${eM('Total exposure')}: *${eM(formatUSD(exposure.totalExposureUsd))}*`,
+    `${eM('•')} ${eM('Total exposure')}: *${eM(formatUSD(exposure?.totalExposureUsd))}*`,
   ];
 
   return lines.join('\n');
@@ -647,6 +647,7 @@ async function getCurrentSymbol() {
   const instanceId = getInstanceId();
 
   let cfg = await retrieveConfig({ trade_instance_id: instanceId });
+  cfg = cfg?.[0];
   if (!cfg?.pair) throw new Error('Missing pair in config');
   return cfg.pair;
 }
@@ -655,11 +656,12 @@ async function getCurrentExposure() {
   let cfg = await retrieveConfig({ trade_instance_id: getInstanceId() });
   cfg = cfg?.[0];
   if (!cfg?.pair) throw new Error('Missing pair in config');
-
-  const prices = await getExchange().getPrices();
-
   const pair = cfg.pair;
-  const currentPrice = toNumberSafe(prices[pair] ?? prices[pair.replace('/', '')]);
+  // price
+  const exchangePrices = await getExchange().getPrices();
+  const currentPrice = toNumberSafe(
+      exchangePrices[pair] ?? exchangePrices[pair.replace('/', '')],
+  );
 
   if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
     throw new Error(`Invalid current price for ${pair}`);
@@ -671,7 +673,7 @@ async function getCurrentExposure() {
         trade_instance_id: getInstanceId(),
       })) || [];
 
-  const exposure = calcExposureFromOrders(orders, currentPrice);
+  const exposure = calcExposureFromOrders(orders, currentPrice) || {};
 
   return { exposure, currentPrice, orders };
 }
@@ -878,8 +880,8 @@ function createTelegramBot({ polling = true } = {}) {
       if (!isAllowedChat(msg)) return;
 
       try {
-        const { exposure, currentPrice } = getCurrentExposure();
-        const message = buildExposureMessage({ currentPrice, exposure });
+        const { exposure, currentPrice } = await getCurrentExposure();
+        const message = await buildExposureMessage({ currentPrice, exposure });
 
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {

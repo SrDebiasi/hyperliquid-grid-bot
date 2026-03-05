@@ -2,14 +2,27 @@
     <h2 class="h5 m-0">Grid Config</h2>
 
     <% if (config) { %>
-        <button
-                type="button"
-                class="btn btn-primary btn-sm"
-                data-bs-toggle="modal"
-                data-bs-target="#configModal"
-        >
-            Edit config
-        </button>
+        <div class="d-flex align-items-center gap-2">
+            <button
+                    type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#manageOrdersModal"
+                    data-trade-instance-id="<%= instance?.id %>"
+                    data-pair="<%= config?.pair %>"
+            >
+                Manage Orders
+            </button>
+
+            <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#configModal"
+            >
+                Edit config
+            </button>
+        </div>
     <% } %>
 </div>
 
@@ -122,3 +135,170 @@
         </div>
     </div>
 <% } %>
+
+<!-- Change orders -->
+
+<div class="modal fade" id="manageOrdersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Top summary -->
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="row g-2 align-items-end mb-3">
+                        <div class="col-12 col-md-3">
+                            <div class="small text-muted">Current price</div>
+                            <div class="fw-semibold" id="moCurrentPrice">-</div>
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="small text-muted">BTC needed</div>
+                            <div class="fw-semibold">
+                                <span id="moBtcNeeded">-</span>
+                                <span id="moBtcDelta" class="ms-2 small"></span>
+                            </div>
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <div class="small text-muted">USD needed</div>
+                            <div class="fw-semibold">
+                                <span id="moUsdNeeded">-</span>
+                                <span id="moUsdDelta" class="ms-2 small"></span>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-3 text-md-end">
+                            <div class="small text-muted" id="moNetChangeLabel" style="display:none;">Change</div>
+                            <div class="fw-semibold">
+                                <span id="moNetChange" class="small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="d-flex flex-wrap gap-3 align-items-center mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="moSelectAll" checked>
+                        <label class="form-check-label" for="moSelectAll">Select all</label>
+                    </div>
+
+
+                    <div class="d-flex align-items-center gap-2 flex-grow-1">
+                        <span class="small text-muted">Set selected order value (USD)</span>
+                        <input
+                            type="range"
+                            class="form-range w-100"
+                            id="moValueSlider"
+                            min="11"
+                            max="500"
+                            step="1"
+                            value="100"
+                        />
+                        <span class="fw-semibold" id="moValueSliderLabel">$100</span>
+                    </div>
+
+                    <div class="ms-auto d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" id="moRollbackBtn" type="button" disabled>
+                            Rollback
+                        </button>
+
+                        <button class="btn btn-sm btn-outline-danger" id="moDeleteBtn" type="button">
+                            Delete
+                        </button>
+
+                        <button class="btn btn-sm btn-success" id="moSaveBtn" type="button" disabled>
+                            Save changes
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                        <tr>
+                            <th style="width: 36px;"></th>
+                            <th class="text-nowrap">Status</th>
+                            <th class="text-nowrap">Buy price</th>
+                            <th class="text-nowrap">Buy USD</th>
+                            <th class="text-nowrap">Sell price</th>
+                            <th class="text-nowrap">Sell USD</th>
+                            <th class="text-nowrap">Qty</th>
+                            <th class="text-nowrap">Entry price</th>
+                        </tr>
+                        </thead>
+                        <tbody id="moTbody">
+                        <tr><td colspan="11" class="text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small text-muted mt-2">
+                    Notes: slider changes only update the local view until you click “Save changes”.
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div class="me-auto small text-muted" id="moStatus"></div>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Save / Cancel on Exchange -->
+<div class="modal fade" id="moConfirmSaveModal" tabindex="-1" aria-labelledby="moConfirmSaveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moConfirmSaveModalLabel">Confirm save</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="fw-semibold mb-2">This will cancel orders on the exchange</div>
+                <div class="text-muted">
+                    If you proceed, <strong>ALL</strong> affected orders will be cancelled on Hyperliquid (buy and sell).
+                    Then your new quantities will be saved.
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="moConfirmSaveProceedBtn">Yes, cancel & save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete -->
+<div class="modal fade" id="moConfirmDeleteModal" tabindex="-1" aria-labelledby="moConfirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moConfirmDeleteModalLabel">Delete orders</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="fw-semibold mb-2">This will cancel orders on the exchange</div>
+                <div class="text-muted">
+                    You are about to delete <strong><span id="moDeleteCount">0</span></strong> selected orders from the database.
+                    If you proceed, their buy/sell orders will be cancelled on Hyperliquid (best effort) before deletion.
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="moConfirmDeleteProceedBtn">Yes, cancel & delete</button>
+            </div>
+        </div>
+    </div>
+</div>
