@@ -1175,8 +1175,9 @@ const runCoins = async function(coinIndex) {
         }
       }
     }
-    
-    await createReserveOrders(coinIndex, currentPrice)
+
+    // Since we have some limits in HL to place orders and this keep creating/canceling, I'll comment this for now
+    // await createReserveOrders(coinIndex, currentPrice)
 
     const { minPrice, maxPrice } = computeRange(pair, orders, cfg);
     consoleLog(`${timesExecuted}) New price check between ${minPrice} and ${maxPrice}`);
