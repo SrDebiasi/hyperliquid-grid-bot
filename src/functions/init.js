@@ -865,10 +865,12 @@ const ORDERS_WINDOW_DEFAULT = getIntEnv('GRID_ORDERS_WINDOW_DEFAULT', 70, { min:
 const ORDERS_WINDOW_CLEANUP  = getIntEnv('GRID_ORDERS_WINDOW_CLEANUP', 100, { min: 10, max: 2000 });
 
 /**
- * Loads grid orders from the database and optionally performs cleanup.
+ * Loads grid orders from the database and filters them around the current price.
  *
- * Cleanup is intentionally NOT executed on every loop iteration to avoid excessive
- * exchange/API calls. It runs only on the first execution and then every N cycles.
+ * Cleanup (canceling / pruning) is disabled by default to avoid excessive exchange/API calls
+ * and request-credit throttling. Cleanup is only allowed when we are close to Hyperliquid's
+ * open-order limit: if the DB has more than MAX_OPEN_ORDERS and the exchange also reports
+ * at least SAFE_OPEN_THRESHOLD open orders.
  *
  * @param {object} params
  * @param {string} params.pair
@@ -882,12 +884,36 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
   const orders = await retrieveOrders({ pair, trade_instance_id: tradeInstanceId });
   consoleLog(`${timesExecuted}) Loaded ${orders.length} total orders from DB`);
 
-  // const CLEANUP_EVERY = 100; // run cleanup on first loop and then every N cycles
-  // const shouldCleanup = timesExecuted === 1 || timesExecuted % CLEANUP_EVERY === 0;
-  // const limit = shouldCleanup ? ORDERS_WINDOW_CLEANUP : ORDERS_WINDOW_DEFAULT;
   const limit = ORDERS_WINDOW_DEFAULT;
 
-  const filtered = await filterAndCleanupOrders(orders, currentPrice, cfg, limit, true);
+  // Cleanup guards (avoid cancel/create spam)
+  const MAX_OPEN_ORDERS = 1000;       // official default cap
+  const SAFE_OPEN_THRESHOLD = 900;    // only cleanup if we're close-ish
+
+  let shouldCleanup = false;
+
+  // Only even consider cleanup if DB indicates we're beyond the cap.
+  // (DB can drift, so we confirm with exchange open orders before canceling anything.)
+  if (orders.length > MAX_OPEN_ORDERS) {
+    try {
+      const open = await getExchange().getOpenOrders({});
+      const openCount = Array.isArray(open) ? open.length : 0;
+
+      // If exchange also has a lot of open orders, cleanup is allowed.
+      // If exchange is already < threshold, don't cleanup (DB likely has stale records).
+      shouldCleanup = openCount >= SAFE_OPEN_THRESHOLD;
+
+      consoleLog(
+          `${timesExecuted}) Cleanup check: db=${orders.length} open=${openCount} -> shouldCleanup=${shouldCleanup}`
+      );
+    } catch (e) {
+      // If we can't confirm, do NOT cleanup. Safer to avoid accidental spam cancels.
+      consoleLog(`${timesExecuted}) Cleanup check failed, skipping cleanup: ${String(e?.message || e)}`, 'yellow');
+      shouldCleanup = false;
+    }
+  }
+
+  const filtered = await filterAndCleanupOrders(orders, currentPrice, cfg, limit, shouldCleanup);
   consoleLog(`${timesExecuted}) Filtered to ${filtered.length} orders around price`);
 
   return filtered;
