@@ -10,7 +10,7 @@ export class ExchangeAdapter {
    * Return a symbol->price map.
    * @returns {Promise<Record<string, string | number>>}
    */
-  async getPrices() {
+  async getPrices(pairs = []) {
     throw new Error('Not implemented');
   }
 

@@ -297,19 +297,15 @@
           <td>
             <input class="form-check-input mo-row-check" type="checkbox" ${checked} />
           </td>
-          <td class="text-nowrap">${r.status ?? '-'}</td>
 
           <td class="text-nowrap">${buyPx ? fmt(buyPx, 2) : '-'}</td>
-          <td class="text-nowrap">${r.buy_order_id ?? '-'}</td>
           <td class="text-nowrap">${buyUsd != null ? fmtUsd(buyUsd) : '-'}</td>
 
           <td class="text-nowrap">${sellPx ? fmt(sellPx, 2) : '-'}</td>
-          <td class="text-nowrap">${r.sell_order_id ?? '-'}</td>
           <td class="text-nowrap">${sellUsd != null ? fmtUsd(sellUsd) : '-'}</td>
 
           <td class="text-nowrap"><span class="mo-qty">${fmt(qty, 8)}</span></td>
 
-          <td class="text-nowrap">${lastPlaced ? String(lastPlaced) : '-'}</td>
           <td class="text-nowrap">${r.entry_price != null ? fmt(r.entry_price, 2) : '-'}</td>
         </tr>
       `;

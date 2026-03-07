@@ -25,7 +25,6 @@ let checking = {};
 let wsChecking = {};
 let timesExecuted = 0;
 let prices = {};
-let lastPrices = {};
 let data = [];
 let rangePrices = {};
 
@@ -253,9 +252,8 @@ async function cancelReserveQuoteOrder(coinIndex) {
 
   try {
     await updateTradeConfig({
-      trade_instance_id: cfg.trade_instance_id,
-      pair: cfg.pair,
-      reserve_quote_order_id: null,
+      id: cfg.id,
+      reserve_quote_order_id: '',
     });
 
     // Keep local cache consistent with the database
@@ -292,9 +290,8 @@ async function cancelReserveBaseOrder(coinIndex) {
 
   try {
     await updateTradeConfig({
-      trade_instance_id: cfg.trade_instance_id,
-      pair: cfg.pair,
-      reserve_base_order_id: null,
+      id: cfg.id,
+      reserve_base_order_id: '',
     });
 
     // Keep local cache consistent with the database
@@ -678,9 +675,9 @@ async function createOrderAndUpdate(order, quantity, side, price, updateField, n
  *
  * @returns {Promise<void>}
  */
-const updatePrices = async function() {
+const updatePrices = async function(pairs = []) {
   try {
-    const exchangePrices = await getExchange().getPrices();
+    const exchangePrices = await getExchange().getPrices(pairs);
     setPrices(exchangePrices);
     prices = exchangePrices;
   } catch (err) {
@@ -959,13 +956,11 @@ const runCoins = async function(coinIndex) {
   checking[pair] = true;
   timesExecuted++;
 
-  await updatePrices();
+  await updatePrices([pair]);
 
-  const priceKey = String(pair).replace(/[\/\-_]/g, '');
-  const currentPrice = prices[priceKey];
+  const currentPrice = prices[getExchange().normalizeSymbolForPrice(pair)];
 
   consoleLog(`${timesExecuted}) Current price: ${Number(currentPrice).toFixed(dp)}`);
-  lastPrices[priceKey] = currentPrice;
 
   await dedupeOpenOrdersForPair(cfg)
   await detectReserveOrdersByExtremes(cfg)
@@ -1182,11 +1177,13 @@ const runCoins = async function(coinIndex) {
     const { minPrice, maxPrice } = computeRange(pair, orders, cfg);
     consoleLog(`${timesExecuted}) New price check between ${minPrice} and ${maxPrice}`);
     if (orderFilled) {
+      consoleLog(`${timesExecuted}) Order filled fast call called`);
       timeToExecute = 3000; // fast call after a fill
     } else {
       timeToExecute = 1000 * 60 * 10; // slower call when idle - 10m
     }
   } catch (e) {
+    consoleLog(`${timesExecuted}) runCoins error (${pair ?? 'unknown'}): ${e?.message ?? e}`, 'red');
     consoleLog(`${timesExecuted}) runCoins error (${pair ?? 'unknown'}): ${e?.message ?? e}`, 'red');
     timeToExecute = 60000; // retry after error
   } finally {
@@ -1251,7 +1248,7 @@ function computeRange(pair, orders, cfg) {
     maxPrice: maxPrice ?? (Number.isFinite(fallbackMax) ? fallbackMax : null),
   };
 
-  rangePrices[pair] = result;
+  rangePrices[getExchange().normalizeSymbolForPrice(pair)] = result;
   return result;
 }
 
@@ -1294,6 +1291,48 @@ function enqueueWs(fn) {
   return wsQueue;
 }
 
+let socketUnsubscribe = null;
+let socketWatchdogInterval = null;
+let socketRestarting = false;
+let lastSocketTickAt = null;
+let socketDropAlertSent = false;
+
+function stopSocketPrices() {
+  try {
+    if (socketUnsubscribe) {
+      socketUnsubscribe();
+      socketUnsubscribe = null;
+    }
+  } catch (err) {
+    consoleLog(`Error stopping socket: ${err?.message ?? err}`, 'red');
+  }
+
+  if (socketWatchdogInterval) {
+    clearInterval(socketWatchdogInterval);
+    socketWatchdogInterval = null;
+  }
+}
+
+async function restartSocketPrices() {
+  if (socketRestarting) return;
+  socketRestarting = true;
+
+  try {
+    consoleLog('Restarting socket subscription...', 'yellow');
+    stopSocketPrices();
+
+    lastSocketTickAt = null;
+    socketDropAlertSent = false;
+
+    await sleep(1000);
+    socketPrices();
+  } catch (err) {
+    consoleLog(`Socket restart error: ${err?.message ?? err}`, 'red');
+  } finally {
+    socketRestarting = false;
+  }
+}
+
 /**
  * Subscribes to aggregated trade updates (price stream) for all configured pairs.
  *
@@ -1307,30 +1346,34 @@ function enqueueWs(fn) {
  * @returns {void}
  */
 const socketPrices = () => {
+  const allowedPairs = new Set(
+      data.map((o) => getExchange().normalizeSymbolForPrice(o.pair))
+  );
   const allPairs = Array.from(new Set(data.map((o) => o.pair)));
   consoleLog(`Socket listening on ${allPairs.length} markets`, 'green');
 
-  getExchange().subscribeAggTrades(allPairs, ({ symbol, price }) => {
-    // Global lock: serialize all WS events (no matter the pair)
-    enqueueWs(async () => {
-      const sym = normalizePairKey(symbol);
-      const p = Number(price);
+  socketUnsubscribe = getExchange().subscribeAggTrades(allPairs, ({ symbol, price }) => {
+    const sym = getExchange().normalizeSymbolForPrice(symbol);
 
+    if (!allowedPairs.has(sym)) return;
+
+    lastSocketTickAt = Date.now();
+    socketDropAlertSent = false;
+
+    const p = Number(price);
+    if (!Number.isFinite(p)) return;
+
+    prices[sym] = p;
+    setPrice(sym, p);
+
+    enqueueWs(async () => {
       const range = rangePrices[sym];
       const minPrice = range?.minPrice;
       const maxPrice = range?.maxPrice;
 
-      if (!Number.isFinite(p)) return;
       if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) return;
 
-      // keep caches updated
-      const priceKey = String(sym).replace(/[\/\-_]/g, '');
-      prices[priceKey] = p;
-      setPrice(sym, p);
-
-      // trigger only when outside range
       if (p >= maxPrice || p <= minPrice) {
-        // keep your existing per-symbol guard
         if (wsChecking[sym]) return;
 
         consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
@@ -1346,11 +1389,29 @@ const socketPrices = () => {
       }
     });
   });
-};
 
-function normalizePairKey(s) {
-  return String(s).trim();
-}
+  if (socketWatchdogInterval) clearInterval(socketWatchdogInterval);
+
+  socketWatchdogInterval = setInterval(async () => {
+    try {
+      if (!lastSocketTickAt) return;
+
+      const diffMs = Date.now() - lastSocketTickAt;
+      const diffMinutes = diffMs / 1000 / 60;
+
+      if (diffMinutes > 8 && !socketDropAlertSent) {
+        const msg = `Socket may be dropped. No price updates received for ${diffMinutes.toFixed(1)} minutes. Restarting socket.`;
+        consoleLog(msg, 'red');
+        socketDropAlertSent = true;
+        await notifyTelegram(msg);
+
+        await restartSocketPrices();
+      }
+    } catch (err) {
+      consoleLog(`Socket watchdog error: ${err?.message ?? err}`, 'red');
+    }
+  }, 60 * 1000);
+};
 
 /**
  * Accumulates realized profit into a "rebuy wallet" and optionally executes a market rebuy.
@@ -1394,7 +1455,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     if (cfg.rebuy_value + 1e-9 < amountToBuyQuote) return;
 
     // Get latest prices so we can convert quote -> base quantity
-    await updatePrices();
+    await updatePrices([cfg.pair]);
 
     const priceKey = String(cfg.pair).replace(/[\/\-_]/g, '');
     const currentPrice = toNum(prices?.[priceKey], 0);
@@ -1536,39 +1597,6 @@ function parseSaveFlag(save) {
 }
 
 /**
- * Boots the bot runtime for a given instance id (dev/CLI helper).
- *
- * This helper is mainly used to validate that:
- * - instance credentials can be loaded
- * - exchange client is reachable
- * - prices can be fetched
- * - Telegram notifications are working
- *
- * It intentionally does not start the full grid loop; it only initializes dependencies.
- *
- * @param {number|string} i - Trade instance id.
- * @returns {Promise<void>}
- */
-const startBot = async function(instance) {
-  setInstanceId(instance);
-  setApi();
-
-  // Allow the exchange client to finish initialization
-  await sleep(1000);
-
-  await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
-    consoleLog('Unable to load private_key');
-    console.log(ex);
-    process.exit();
-  });
-
-  await updatePrices();
-
-  createTelegramBot({ polling: true });
-  void notifyTelegram('Grid bot initialized telegram interface.');
-};
-
-/**
  * Starts all configured markets with a small delay between each one.
  * This reduces startup bursts and initializes the price socket once.
  *
@@ -1579,10 +1607,11 @@ async function startCoinsStaggered() {
 
   addMessage('Bot grid initiated.');
   socketPrices();
+  await sleep(1000)
 
   for (let idx = 0; idx < data.length; idx++) {
     const coin = data[idx];
-    pairToIndex[coin.pair] = idx;
+    pairToIndex[getExchange().normalizeSymbolForPrice(coin.pair)] = idx;
     if (checking[coin.pair] == null) checking[coin.pair] = false;
 
     // Trigger once when bot is started
@@ -1636,12 +1665,7 @@ const start = async function(instance) {
 
   consoleLog(`${data.length} coin(s) loaded.`);
 
-  await updatePrices();
-
-  for (const c of data) {
-    const priceKey = String(c.pair).replace(/[\/\-_]/g, '');
-    lastPrices[priceKey] = prices[priceKey];
-  }
+  await updatePrices(data.map(o=>o.pair));
 
   await startCoinsStaggered();
 };
@@ -1710,6 +1734,5 @@ const cancelOrders = async function( instance, pair) {
 export {
   start,
   openOrders,
-  cancelOrders,
-  startBot,
+  cancelOrders
 };

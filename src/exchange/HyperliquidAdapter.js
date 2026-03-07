@@ -35,7 +35,7 @@ export default class HyperliquidAdapter {
    *  isTestnet?: boolean
    * }} params
    */
-  constructor({ privateKey, userAddress, isTestnet = false } = {}) {
+  constructor({privateKey, userAddress, isTestnet = false} = {}) {
     if (!privateKey) throw new Error('HyperliquidAdapter requires privateKey');
     if (!userAddress) throw new Error('HyperliquidAdapter requires userAddress (main account)');
 
@@ -47,15 +47,15 @@ export default class HyperliquidAdapter {
     this._agentAddress = account.address;
     this._userAddress = String(userAddress).trim();
 
-    this.info = new InfoClient({ transport: new HttpTransport({ isTestnet }) });
+    this.info = new InfoClient({transport: new HttpTransport({isTestnet})});
 
     this.exchange = new ExchangeClient({
-      transport: new HttpTransport({ isTestnet }),
+      transport: new HttpTransport({isTestnet}),
       wallet: account, // agent signs
     });
 
     this.subs = new SubscriptionClient({
-      transport: new WebSocketTransport({ isTestnet }),
+      transport: new WebSocketTransport({isTestnet}),
     });
 
     this.pairs = new Map();
@@ -74,7 +74,7 @@ export default class HyperliquidAdapter {
       const spotCoinId = `@${pairIndex}`; // used by activeSpotAssetCtx
       const orderAssetId = 10000 + pairIndex; // used by Exchange order placement
 
-      this.pairs.set(u.name, { pairIndex, spotCoinId, orderAssetId });
+      this.pairs.set(u.name, {pairIndex, spotCoinId, orderAssetId});
     }
 
     // Seed cache by index if provided
@@ -95,23 +95,15 @@ export default class HyperliquidAdapter {
    * @param {string[]=} symbols
    */
   async getPrices(pairs = []) {
-    const mids = await this.info.allMids(); // { BTC: "67351", ... }
+    const mids = await this.info.allMids(); // returns all
     const out = {};
 
     const inputs = (pairs && pairs.length)
-      ? pairs
-      : Object.keys(mids).map((c) => `${c}USDC`);
+        ? pairs
+        : Object.keys(mids).map((c) => `${c}USDC`);
 
     for (const raw of inputs) {
       const s = String(raw).toUpperCase();
-
-      // normalize the input into a coin and a clean output key
-      // examples:
-      // "BTC/USDC" -> coin BTC, key BTCUSDC
-      // "BTC-USDC" -> coin BTC, key BTCUSDC
-      // "BTC_USDC" -> coin BTC, key BTCUSDC
-      // "BTCUSDC"  -> coin BTC, key BTCUSDC
-      // "BTC"      -> coin BTC, key BTCUSDC
       const clean = s.replace(/[\/\-_]/g, '');
       const coin = clean.endsWith('USDC') ? clean.slice(0, -4) : clean;
 
@@ -125,6 +117,40 @@ export default class HyperliquidAdapter {
     return out;
   }
 
+  normalizeSymbolForPrice(input) {
+    let symbol = String(input || '').trim().toUpperCase();
+
+    if (symbol.includes('/')) {
+      const [base, quote] = symbol.split('/');
+      const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
+      return `${baseMap[base] ?? base}${quote}`;
+    }
+
+    if (symbol.includes('-') || symbol.includes('_')) {
+      const parts = symbol.split(/[-_]/);
+      if (parts.length === 2) {
+        const [base, quote] = parts;
+        const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
+        return `${baseMap[base] ?? base}${quote}`;
+      }
+    }
+
+    const clean = symbol.replace(/[\/\-_]/g, '');
+    if (clean.endsWith('USDC')) {
+      const base = clean.slice(0, -4);
+      const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
+      return `${baseMap[base] ?? base}USDC`;
+    }
+
+    if (clean.endsWith('USDT')) {
+      const base = clean.slice(0, -4);
+      const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
+      return `${baseMap[base] ?? base}USDT`;
+    }
+
+    return clean;
+  }
+
   normalizeSymbol(input) {
     let symbol = String(input || '').trim();
     if (!symbol.includes('/') && symbol.length >= 6) {
@@ -133,7 +159,7 @@ export default class HyperliquidAdapter {
     const sUp = symbol.toUpperCase();
     if (sUp.endsWith('/USDC')) {
       const [base, quote] = sUp.split('/');
-      const baseMap = { BTC: 'UBTC', ETH: 'UETH', SOL: 'USOL' };
+      const baseMap = {BTC: 'UBTC', ETH: 'UETH', SOL: 'USOL'};
       const mappedBase = baseMap[base] ?? base;
       return `${mappedBase}/${quote}`;
     }
@@ -159,17 +185,17 @@ export default class HyperliquidAdapter {
       throw new Error(`Hyperliquid spot token not found: ${baseSym}/${quote}`);
     }
     const entry = universe.find(
-      (u) =>
-        Array.isArray(u.tokens) &&
-        u.tokens.length === 2 &&
-        u.tokens[0] === baseToken.index &&
-        u.tokens[1] === quoteToken.index,
+        (u) =>
+            Array.isArray(u.tokens) &&
+            u.tokens.length === 2 &&
+            u.tokens[0] === baseToken.index &&
+            u.tokens[1] === quoteToken.index,
     );
     if (!entry) {
       throw new Error(`Hyperliquid spot pair not found in spotMeta.universe: ${symbol}`);
     }
     const asset = 10000 + entry.index;
-    return { symbol, asset };
+    return {symbol, asset};
   }
 
 
@@ -213,7 +239,7 @@ export default class HyperliquidAdapter {
           p: String(price),
           s: String(quantity),
           r: false,
-          t: { limit: { tif } },
+          t: {limit: {tif}},
         },
       ],
       grouping: 'na',
@@ -229,7 +255,7 @@ export default class HyperliquidAdapter {
     const price = param.price !== undefined ? Number(param.price) : undefined;
     const postOnly = param.postOnly !== undefined ? !!param.postOnly : false;
 
-    const { symbol, asset } = await this.resolveSpotAssetFromSymbol(param.symbol);
+    const {symbol, asset} = await this.resolveSpotAssetFromSymbol(param.symbol);
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new Error(`Invalid quantity: ${param.quantity}`);
@@ -245,7 +271,7 @@ export default class HyperliquidAdapter {
         type === 'MARKET'
             ? 'Ioc'
             : (postOnly ? 'Alo' : 'Gtc');
-    
+
     const orderToSubmit = {
       symbol,
       side,
@@ -258,10 +284,10 @@ export default class HyperliquidAdapter {
     const res = await this.placeAnOrder(orderToSubmit);
     const st0 = res?.response?.data?.statuses?.[0] ?? {};
     const orderId =
-      st0?.resting?.oid ??
-      st0?.filled?.oid ??
-      st0?.canceled?.oid ??
-      null;
+        st0?.resting?.oid ??
+        st0?.filled?.oid ??
+        st0?.canceled?.oid ??
+        null;
     if (st0?.error) {
       throw new Error(`Hyperliquid order error: ${st0.error}`);
     }
@@ -288,31 +314,31 @@ export default class HyperliquidAdapter {
    * Cancel a single order by oid.
    * @param {{ orderId: number|string }} params
    */
-  async cancelOrder({ orderId, symbol }) {
+  async cancelOrder({orderId, symbol}) {
     const o = Number(orderId);
     if (!Number.isFinite(o)) throw new Error(`Invalid orderId: ${orderId}`);
-    const { asset } = await this.resolveSpotAssetFromSymbol(symbol);
-    return await this.exchange.cancel({ cancels: [{ a: asset, o }] });
+    const {asset} = await this.resolveSpotAssetFromSymbol(symbol);
+    return await this.exchange.cancel({cancels: [{a: asset, o}]});
   }
 
   /**
    * Cancel multiple orders in one call (same symbol).
    * @param {{ cancels: Array<{ orderId: number|string, symbol: string }> }} params
    */
-  async cancelOrders({ cancels }) {
-    if (!Array.isArray(cancels) || cancels.length === 0) return { cancelled: 0 };
+  async cancelOrders({cancels}) {
+    if (!Array.isArray(cancels) || cancels.length === 0) return {cancelled: 0};
 
     const symbol = cancels[0].symbol;
-    const { asset } = await this.resolveSpotAssetFromSymbol(symbol);
+    const {asset} = await this.resolveSpotAssetFromSymbol(symbol);
 
-    const payload = cancels.map(({ orderId }) => {
+    const payload = cancels.map(({orderId}) => {
       const o = Number(orderId);
       if (!Number.isFinite(o)) throw new Error(`Invalid orderId: ${orderId}`);
-      return { a: asset, o };
+      return {a: asset, o};
     });
 
-    await this.exchange.cancel({ cancels: payload });
-    return { cancelled: payload.length };
+    await this.exchange.cancel({cancels: payload});
+    return {cancelled: payload.length};
   }
 
 
@@ -320,11 +346,11 @@ export default class HyperliquidAdapter {
    * Spot balances / state.
    */
   async getBalances() {
-    return await this.info.spotClearinghouseState({ user: this._user() });
+    return await this.info.spotClearinghouseState({user: this._user()});
   }
 
   async getOpenOrders() {
-    const rows = await this.info.openOrders({ user: this._userAddress, dex: '' });
+    const rows = await this.info.openOrders({user: this._userAddress, dex: ''});
 
     return (rows ?? []).map((o) => {
       // HL: side "A" (ask/sell), "B" (bid/buy)
@@ -358,26 +384,26 @@ export default class HyperliquidAdapter {
     if (!Number.isFinite(oid)) throw new Error(`Invalid orderId: ${data.orderId}`);
 
     const user = this._userAddress;
-    const open = await this.info.openOrders({ user, dex: '' });
+    const open = await this.info.openOrders({user, dex: ''});
     if (Array.isArray(open) && open.some(o => Number(o.oid) === oid)) {
-      return { status: ORDER_STATUS_OPEN  };
+      return {status: ORDER_STATUS_OPEN};
     }
 
-    const fills = await this.info.userFills({ user });
+    const fills = await this.info.userFills({user});
     if (Array.isArray(fills) && fills.some(f => Number(f.oid) === oid)) {
-      return { status: ORDER_STATUS_FILLED };
+      return {status: ORDER_STATUS_FILLED};
     }
 
-    return { status: ORDER_STATUS_NOT_OPEN };
+    return {status: ORDER_STATUS_NOT_OPEN};
   }
 
 
-  async getOrdersStatusMap({ orderIds }) {
+  async getOrdersStatusMap({orderIds}) {
     const user = this._userAddress;
 
     // 1) fetch once
-    const open = await this.info.openOrders({ user, dex: '' });
-    const fills = await this.info.userFills({ user });
+    const open = await this.info.openOrders({user, dex: ''});
+    const fills = await this.info.userFills({user});
 
     // 2) build fast lookups
     const openSet = new Set((open || []).map(o => Number(o.oid)));
@@ -389,9 +415,9 @@ export default class HyperliquidAdapter {
       const oid = Number(raw);
       if (!Number.isFinite(oid)) continue;
 
-      if (openSet.has(oid)) out.set(oid, { status: ORDER_STATUS_OPEN });
-      else if (filledSet.has(oid)) out.set(oid, { status: ORDER_STATUS_FILLED });
-      else out.set(oid, { status: ORDER_STATUS_NOT_OPEN });
+      if (openSet.has(oid)) out.set(oid, {status: ORDER_STATUS_OPEN});
+      else if (filledSet.has(oid)) out.set(oid, {status: ORDER_STATUS_FILLED});
+      else out.set(oid, {status: ORDER_STATUS_NOT_OPEN});
     }
 
     return out;
@@ -406,14 +432,14 @@ export default class HyperliquidAdapter {
       locked: String(b.hold ?? 0),    // reserved/held
     }));
 
-    return { balances };
+    return {balances};
   }
 
   /**
    * Cancels open orders. If `symbol` is provided, only cancels orders for that market.
    * Otherwise cancels all open orders.
    */
-  async cancelOpenOrders({ symbol } = {}) {
+  async cancelOpenOrders({symbol} = {}) {
     const open = await this.getOpenOrders();
     const filtered = symbol ? open.filter((x) => x.symbol === symbol) : open;
 
@@ -421,41 +447,80 @@ export default class HyperliquidAdapter {
     for (const o of filtered) {
       const oid = Number(o.orderId);
       if (!Number.isFinite(oid)) continue;
-      const { asset } = await this.resolveSpotAssetFromSymbol(o.symbol);
-      cancels.push({ a: asset, o: oid });
+      const {asset} = await this.resolveSpotAssetFromSymbol(o.symbol);
+      cancels.push({a: asset, o: oid});
     }
 
-    if (cancels.length === 0) return { cancelled: 0 };
-    const res = await this.exchange.cancel({ cancels });
-    return { cancelled: cancels.length, raw: res };
+    if (cancels.length === 0) return {cancelled: 0};
+    const res = await this.exchange.cancel({cancels});
+    return {cancelled: cancels.length, raw: res};
   }
 
   subscribeAggTrades(symbols, handler) {
     const url = this.isTestnet
-      ? 'wss://api.hyperliquid-testnet.xyz/ws'
-      : 'wss://api.hyperliquid.xyz/ws'; // per HL docs :contentReference[oaicite:3]{index=3}
+        ? 'wss://api.hyperliquid-testnet.xyz/ws'
+        : 'wss://api.hyperliquid.xyz/ws';
 
     const ws = new WebSocket(url);
+    let pingInterval = null;
 
-    // keep map so we can emit the same "symbol" the rest of your bot expects
+    const coinToSyms = new Map();
     const symToCoin = new Map();
-    for (const s of symbols) {
-      const sym = String(s);
 
-      // DB pairs: "BTC/USDC", "BTC-USDC", "BTC_USDC" -> coin "BTC"
-      const coin = sym.split(/[\/\-_]/g)[0];
-      symToCoin.set(sym, coin);
-    }
+    const buildMappings = async () => {
+      for (const s of symbols) {
+        const symInput = String(s);
+        const { symbol: normalizedSym, asset } = await this.resolveSpotAssetFromSymbol(symInput);
+
+        const coinIndex = Number(asset) - 10000;
+        if (!Number.isFinite(coinIndex) || coinIndex < 0) {
+          throw new Error(`Invalid spot asset mapping for ${symInput}: asset=${asset}`);
+        }
+
+        const coin = `@${coinIndex}`;
+
+        symToCoin.set(normalizedSym, coin);
+
+        if (!coinToSyms.has(coin)) coinToSyms.set(coin, new Set());
+        coinToSyms.get(coin).add(normalizedSym);
+      }
+    };
+
+    let mappingsReady = false;
+    let mappingsError = null;
+
+    const mappingsPromise = buildMappings()
+        .then(() => {
+          mappingsReady = true;
+        })
+        .catch((e) => {
+          mappingsError = e;
+          console.log(`HL WS mapping error: ${e?.message ?? e}`);
+        });
 
     ws.on('open', () => {
-      for (const [sym, coin] of symToCoin.entries()) {
-        ws.send(
-          JSON.stringify({
+      void (async () => {
+        await mappingsPromise;
+
+        if (!mappingsReady) {
+          ws.close();
+          return;
+        }
+
+        for (const coin of coinToSyms.keys()) {
+          ws.send(JSON.stringify({
             method: 'subscribe',
-            subscription: { type: 'trades', coin }, // HL trades subscription :contentReference[oaicite:4]{index=4}
-          }),
-        );
-      }
+            subscription: { type: 'trades', coin },
+          }));
+        }
+
+        // keepalive ping before the 60s timeout
+        pingInterval = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ method: 'ping' }));
+          }
+        }, 30000);
+      })();
     });
 
     ws.on('message', (raw) => {
@@ -466,37 +531,51 @@ export default class HyperliquidAdapter {
         return;
       }
 
-      // trades messages: channel === "trades", data is WsTrade[] :contentReference[oaicite:5]{index=5}
+      if (msg.channel === 'pong') {
+        return;
+      }
+
       if (msg.channel !== 'trades' || !Array.isArray(msg.data)) return;
 
       for (const t of msg.data) {
         const coin = t.coin;
-        const price = Number(t.px); // WsTrade.px is string price :contentReference[oaicite:6]{index=6}
+        const price = Number(t.px);
         if (!Number.isFinite(price)) continue;
 
-        // Emit for every symbol that maps to this coin
-        for (const [sym, c] of symToCoin.entries()) {
-          if (c === coin) handler({ symbol: sym, price });
+        const syms = coinToSyms.get(coin);
+        if (!syms || syms.size === 0) continue;
+
+        for (const sym of syms) {
+          handler({ symbol: sym, price });
         }
       }
     });
 
     ws.on('error', (err) => {
-      // up to you how you log
       console.log(`HL WS error: ${err?.message ?? err}`);
     });
 
-    // return unsubscribe/cleanup function
+    ws.on('close', (code, reason) => {
+      console.log(`HL WS closed (will reconnect automatically): code=${code} reason=${reason?.toString?.() || ''}`);
+      if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+      }
+    });
+
     return () => {
       try {
-        if (ws.readyState === WebSocket.OPEN) {
-          for (const [, coin] of symToCoin.entries()) {
-            ws.send(
-              JSON.stringify({
-                method: 'unsubscribe',
-                subscription: { type: 'trades', coin }, // HL unsubscribe format :contentReference[oaicite:7]{index=7}
-              }),
-            );
+        if (pingInterval) {
+          clearInterval(pingInterval);
+          pingInterval = null;
+        }
+
+        if (ws.readyState === WebSocket.OPEN && !mappingsError) {
+          for (const coin of coinToSyms.keys()) {
+            ws.send(JSON.stringify({
+              method: 'unsubscribe',
+              subscription: { type: 'trades', coin },
+            }));
           }
         }
       } finally {
