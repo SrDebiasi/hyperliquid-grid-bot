@@ -8,7 +8,7 @@
                         Daily chart: <%= profitSummary.dailyProfitMtd?.period?.label ?? '-' %>
                     </div>
                 </div>
-                <% if (rebuy && (rebuy.reboughtCoin > 0 || rebuy.reboughtValueUsd > 0)) { %>
+                <% if (rebuy) { %>
                     <div class="text-end small" style="line-height: 1.5;">
                         <div class="fw-semibold">Rebuy <%= rebuy.active ? 'Active' : 'Disabled' %></div>
 
@@ -26,14 +26,17 @@
             </div>
 
             <%
-                // helpers
                 function n(v, d = 0) {
                     return (typeof v === 'number' && Number.isFinite(v)) ? v : d;
                 }
+
                 function pct(v) {
                     return n(v, 0).toFixed(2);
                 }
-                function fmtUsd(x) { return `$${n(Number(x), 0).toFixed(2)}`; }
+
+                function fmtUsd(x) {
+                    return `$${n(Number(x), 0).toFixed(2)}`;
+                }
 
                 const emptyBucket = () => ({ pnlPercent: 0, totalUsd: 0, trades: 0 });
 
@@ -46,6 +49,54 @@
                     allTime: totals.allTime || emptyBucket(),
                 };
             %>
+
+            <% if (portfolioOverview) { %>
+                <div class="row g-3 mt-2 mb-3">
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Portfolio value at entry</div>
+                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.valueAtEntry) %></div>
+                            <div class="text-muted small"> at average <%= portfolioOverview.symbol %> price of <%= fmtUsd(portfolioOverview.avgEntryPrice) %></div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Portfolio value at current price</div>
+                            <div class="fs-5 fw-semibold mt-1"><%= fmtUsd(portfolioOverview.valueAtCurrent) %></div>
+                            <div class="text-muted small"> at average <%= portfolioOverview.symbol %> price of <%= fmtUsd(portfolioOverview.currentPrice) %></div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="text-muted small">Realized profit</div>
+                                <div class="small fw-semibold text-success">
+                                    +<%= pct(t.allTime.pnlPercent) %>%
+                                </div>
+                            </div>
+                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.realizedProfit) %></div>
+                            <div class="text-muted small"><%= n(t.allTime.trades, 0) %> trades</div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-xl-3">
+                        <div class="border rounded p-3 h-100">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="text-muted small">Current portfolio</div>
+                                <div class="small fw-semibold <%= portfolioOverview.portfolioDeltaPercent >= 0 ? 'text-success' : 'text-danger' %>">
+                                    <%= portfolioOverview.portfolioDeltaPercent >= 0 ? '+' : '' %><%= pct(portfolioOverview.portfolioDeltaPercent) %>%
+                                </div>
+                            </div>
+                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.currentPortfolio) %></div>
+                            <div class="text-muted mt-1" style="font-size: 0.8rem; line-height: 1.2;">
+                                <%= portfolioOverview.portfolioDeltaUsd >= 0 ? '+' : '' %><%= fmtUsd(portfolioOverview.portfolioDeltaUsd) %> vs entry
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
 
             <div class="row g-3 mt-2">
                 <div class="col-12 col-md-4 col-xl">
@@ -97,19 +148,6 @@
                         </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.year.totalUsd) %></div>
                         <div class="text-muted small"><%= n(t.year.trades, 0) %> trades</div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-4 col-xl">
-                    <div class="border rounded p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-muted small">All-time</div>
-                            <div class="small fw-semibold text-success">
-                                +<%= pct(t.allTime.pnlPercent) %>%
-                            </div>
-                        </div>
-                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.allTime.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.allTime.trades, 0) %> trades</div>
                     </div>
                 </div>
             </div>

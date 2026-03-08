@@ -1350,7 +1350,11 @@ const socketPrices = () => {
       data.map((o) => getExchange().normalizeSymbolForPrice(o.pair))
   );
   const allPairs = Array.from(new Set(data.map((o) => o.pair)));
+
   consoleLog(`Socket listening on ${allPairs.length} markets`, 'green');
+
+  lastSocketTickAt = Date.now();
+  socketDropAlertSent = false;
 
   socketUnsubscribe = getExchange().subscribeAggTrades(allPairs, ({ symbol, price }) => {
     const sym = getExchange().normalizeSymbolForPrice(symbol);
@@ -1377,6 +1381,7 @@ const socketPrices = () => {
         if (wsChecking[sym]) return;
 
         consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
+
         const idx = pairToIndex[sym];
         if (idx == null) return;
 
@@ -1390,7 +1395,10 @@ const socketPrices = () => {
     });
   });
 
-  if (socketWatchdogInterval) clearInterval(socketWatchdogInterval);
+  if (socketWatchdogInterval) {
+    clearInterval(socketWatchdogInterval);
+    socketWatchdogInterval = null;
+  }
 
   socketWatchdogInterval = setInterval(async () => {
     try {
@@ -1399,11 +1407,10 @@ const socketPrices = () => {
       const diffMs = Date.now() - lastSocketTickAt;
       const diffMinutes = diffMs / 1000 / 60;
 
-      if (diffMinutes > 8 && !socketDropAlertSent) {
+      if (diffMinutes > 10 && !socketDropAlertSent) {
         const msg = `Socket may be dropped. No price updates received for ${diffMinutes.toFixed(1)} minutes. Restarting socket.`;
         consoleLog(msg, 'red');
         socketDropAlertSent = true;
-        await notifyTelegram(msg);
 
         await restartSocketPrices();
       }

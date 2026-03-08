@@ -461,13 +461,19 @@ export default class HyperliquidAdapter {
         ? 'wss://api.hyperliquid-testnet.xyz/ws'
         : 'wss://api.hyperliquid.xyz/ws';
 
-    const ws = new WebSocket(url);
+    let ws = null;
     let pingInterval = null;
+    let reconnectTimeout = null;
+    let isStopped = false;
+    let isConnecting = false;
 
     const coinToSyms = new Map();
     const symToCoin = new Map();
 
     const buildMappings = async () => {
+      coinToSyms.clear();
+      symToCoin.clear();
+
       for (const s of symbols) {
         const symInput = String(s);
         const { symbol: normalizedSym, asset } = await this.resolveSpotAssetFromSymbol(symInput);
@@ -481,7 +487,10 @@ export default class HyperliquidAdapter {
 
         symToCoin.set(normalizedSym, coin);
 
-        if (!coinToSyms.has(coin)) coinToSyms.set(coin, new Set());
+        if (!coinToSyms.has(coin)) {
+          coinToSyms.set(coin, new Set());
+        }
+
         coinToSyms.get(coin).add(normalizedSym);
       }
     };
@@ -498,79 +507,129 @@ export default class HyperliquidAdapter {
           console.log(`HL WS mapping error: ${e?.message ?? e}`);
         });
 
-    ws.on('open', () => {
-      void (async () => {
-        await mappingsPromise;
-
-        if (!mappingsReady) {
-          ws.close();
-          return;
-        }
-
-        for (const coin of coinToSyms.keys()) {
-          ws.send(JSON.stringify({
-            method: 'subscribe',
-            subscription: { type: 'trades', coin },
-          }));
-        }
-
-        // keepalive ping before the 60s timeout
-        pingInterval = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ method: 'ping' }));
-          }
-        }, 30000);
-      })();
-    });
-
-    ws.on('message', (raw) => {
-      let msg;
-      try {
-        msg = JSON.parse(raw.toString());
-      } catch {
-        return;
-      }
-
-      if (msg.channel === 'pong') {
-        return;
-      }
-
-      if (msg.channel !== 'trades' || !Array.isArray(msg.data)) return;
-
-      for (const t of msg.data) {
-        const coin = t.coin;
-        const price = Number(t.px);
-        if (!Number.isFinite(price)) continue;
-
-        const syms = coinToSyms.get(coin);
-        if (!syms || syms.size === 0) continue;
-
-        for (const sym of syms) {
-          handler({ symbol: sym, price });
-        }
-      }
-    });
-
-    ws.on('error', (err) => {
-      console.log(`HL WS error: ${err?.message ?? err}`);
-    });
-
-    ws.on('close', (code, reason) => {
-      console.log(`HL WS closed (will reconnect automatically): code=${code} reason=${reason?.toString?.() || ''}`);
+    const clearPingInterval = () => {
       if (pingInterval) {
         clearInterval(pingInterval);
         pingInterval = null;
       }
-    });
+    };
 
-    return () => {
+    const clearReconnectTimeout = () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+    };
+
+    const scheduleReconnect = () => {
+      if (isStopped) return;
+      if (reconnectTimeout) return;
+
+      console.log('HL WS reconnecting in 1s...');
+
+      reconnectTimeout = setTimeout(() => {
+        reconnectTimeout = null;
+        void connect();
+      }, 1000);
+    };
+
+    const connect = async () => {
+      if (isStopped || isConnecting) return;
+
+      isConnecting = true;
+
       try {
-        if (pingInterval) {
-          clearInterval(pingInterval);
-          pingInterval = null;
+        await mappingsPromise;
+
+        if (!mappingsReady) {
+          console.log(`HL WS not started because mappings failed: ${mappingsError?.message ?? mappingsError}`);
+          scheduleReconnect();
+          return;
         }
 
-        if (ws.readyState === WebSocket.OPEN && !mappingsError) {
+        ws = new WebSocket(url);
+
+        ws.on('open', () => {
+          console.log(`HL WS connected. Subscribing to ${coinToSyms.size} coins`);
+
+          for (const coin of coinToSyms.keys()) {
+            ws.send(JSON.stringify({
+              method: 'subscribe',
+              subscription: { type: 'trades', coin },
+            }));
+          }
+
+          clearPingInterval();
+
+          pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ method: 'ping' }));
+            }
+          }, 30000);
+        });
+
+        ws.on('message', (raw) => {
+          let msg;
+          try {
+            msg = JSON.parse(raw.toString());
+          } catch {
+            return;
+          }
+
+          if (msg.channel === 'pong') {
+            return;
+          }
+
+          if (msg.channel !== 'trades' || !Array.isArray(msg.data)) {
+            return;
+          }
+
+          for (const t of msg.data) {
+            const coin = t.coin;
+            const price = Number(t.px);
+            if (!Number.isFinite(price)) continue;
+
+            const syms = coinToSyms.get(coin);
+            if (!syms || syms.size === 0) continue;
+
+            for (const sym of syms) {
+              handler({ symbol: sym, price });
+            }
+          }
+        });
+
+        ws.on('error', (err) => {
+          console.log(`HL WS error: ${err?.message ?? err}`);
+        });
+
+        ws.on('close', (code, reason) => {
+          console.log(`HL WS closed: code=${code} reason=${reason?.toString?.() || ''}`);
+
+          clearPingInterval();
+          ws = null;
+
+          if (!isStopped) {
+            scheduleReconnect();
+          }
+        });
+      } catch (err) {
+        console.log(`HL WS connect error: ${err?.message ?? err}`);
+        scheduleReconnect();
+      } finally {
+        isConnecting = false;
+      }
+    };
+
+    void connect();
+
+    return () => {
+      isStopped = true;
+
+      clearReconnectTimeout();
+      clearPingInterval();
+
+      try {
+        if (ws && ws.readyState === WebSocket.OPEN && !mappingsError) {
           for (const coin of coinToSyms.keys()) {
             ws.send(JSON.stringify({
               method: 'unsubscribe',
@@ -578,8 +637,13 @@ export default class HyperliquidAdapter {
             }));
           }
         }
+      } catch (err) {
+        console.log(`HL WS unsubscribe error: ${err?.message ?? err}`);
       } finally {
-        ws.close();
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
       }
     };
   }

@@ -15,6 +15,7 @@ async function loadDashboardData({ models }) {
     let orders = [];
     let profitSummary = null;
     let rebuy = {};
+    let portfolioOverview = null;
 
     if (instance) {
         const configRow = await models.TradeConfig.findOne({
@@ -31,8 +32,10 @@ async function loadDashboardData({ models }) {
             .map((o) => o.get({ plain: true }))
             .sort((a, b) => Number(a.buy_price ?? 0) - Number(b.buy_price ?? 0));
 
+        profitSummary = await getProfitSummary({ models, tradeInstanceId: instance.id });
+
         if (config) {
-            const currentPrice = await fetchHyperliquidMidFromPair(config.pair);
+            const currentPrice = Number(await fetchHyperliquidMidFromPair(config.pair) ?? 0);
 
             const reboughtCoin = Number(config.rebought_coin ?? 0);
             const reboughtValueUsd = Number(config.rebought_value ?? 0);
@@ -48,23 +51,135 @@ async function loadDashboardData({ models }) {
                 avgPriceUsd,
                 name: config.name,
             };
-        }
 
-        profitSummary = await getProfitSummary({ models, tradeInstanceId: instance.id });
+            const getOrderEntryValue = (order) => {
+                const buyPrice = Number(order.buy_price ?? 0);
+                const sellPrice = Number(order.sell_price ?? 0);
+                const entryPrice = Number(order.entry_price ?? 0);
+                const quantity = Number(order.quantity ?? 0);
+
+                if (
+                    !Number.isFinite(buyPrice) ||
+                    !Number.isFinite(sellPrice) ||
+                    !Number.isFinite(entryPrice) ||
+                    !Number.isFinite(quantity) ||
+                    quantity <= 0
+                ) {
+                    return 0;
+                }
+
+                if (sellPrice > entryPrice) {
+                    return entryPrice * quantity;
+                }
+
+                return buyPrice * quantity;
+            };
+
+            const getOrderCurrentValue = (order, currentPrice) => {
+                const buyPrice = Number(order.buy_price ?? 0);
+                const sellPrice = Number(order.sell_price ?? 0);
+                const entryPrice = Number(order.entry_price ?? 0);
+                const quantity = Number(order.quantity ?? 0);
+
+                if (
+                    !Number.isFinite(buyPrice) ||
+                    !Number.isFinite(sellPrice) ||
+                    !Number.isFinite(entryPrice) ||
+                    !Number.isFinite(quantity) ||
+                    !Number.isFinite(currentPrice) ||
+                    quantity <= 0 ||
+                    currentPrice <= 0
+                ) {
+                    return 0;
+                }
+
+                if (sellPrice > currentPrice) {
+                    return currentPrice * quantity;
+                }
+
+                if (sellPrice > entryPrice) {
+                    return sellPrice * quantity;
+                }
+
+                return buyPrice * quantity;
+            };
+
+            const valueAtEntry = orders.reduce((sum, order) => {
+                return sum + getOrderEntryValue(order);
+            }, 0);
+
+            const valueAtCurrent = orders.reduce((sum, order) => {
+                return sum + getOrderCurrentValue(order, currentPrice);
+            }, 0);
+
+            const entryTotals = orders.reduce((acc, order) => {
+                const entryPrice = Number(order.entry_price ?? 0);
+                const quantity = Number(order.quantity ?? 0);
+
+                if (
+                    !Number.isFinite(entryPrice) ||
+                    entryPrice <= 0 ||
+                    !Number.isFinite(quantity) ||
+                    quantity <= 0
+                ) {
+                    return acc;
+                }
+
+                acc.weightedEntryValue += entryPrice * quantity;
+                acc.totalQuantity += quantity;
+                return acc;
+            }, {
+                weightedEntryValue: 0,
+                totalQuantity: 0,
+            });
+
+            const avgEntryPrice = entryTotals.totalQuantity > 0
+                ? entryTotals.weightedEntryValue / entryTotals.totalQuantity
+                : 0;
+
+            const realizedProfit = Number(profitSummary?.totals?.allTime?.totalUsd ?? 0);
+
+            const currentPortfolio = valueAtCurrent + realizedProfit;
+            const portfolioDeltaUsd = currentPortfolio - valueAtEntry;
+            const portfolioDeltaPercent = valueAtEntry > 0
+                ? (portfolioDeltaUsd / valueAtEntry) * 100
+                : 0;
+
+
+            portfolioOverview = {
+                symbol: config.name,
+                avgEntryPrice,
+                currentPrice,
+                valueAtEntry,
+                valueAtCurrent,
+                realizedProfit,
+                currentPortfolio,
+                portfolioDeltaUsd,
+                portfolioDeltaPercent,
+            };
+        }
     }
 
     const botStatus = instance
         ? await getBotStatus({ instanceId: instance.id })
         : { isRunning: false, statusText: "stopped" };
 
-    return { instance, config, orders, profitSummary, rebuy, botStatus };
+    return {
+        instance,
+        config,
+        orders,
+        profitSummary,
+        rebuy,
+        portfolioOverview,
+        botStatus,
+    };
 }
 
 export async function dashboardRoutes(app, opts) {
     const { models } = opts;
 
     app.get("/dashboard", async (request, reply) => {
-        const { instance, config, orders, profitSummary, rebuy, botStatus } =
+        const { instance, config, orders, profitSummary, rebuy, botStatus, portfolioOverview } =
             await loadDashboardData({ models });
 
         return reply.view("layout.ejs", {
@@ -76,8 +191,14 @@ export async function dashboardRoutes(app, opts) {
             config,
             orders,
             profitSummary,
+            portfolioOverview,
             rebuy,
         });
+    });
+
+    app.get("/dashboard/portfolio-overview", async (request, reply) => {
+        const { portfolioOverview } = await loadDashboardData({ models });
+        return reply.send({ portfolioOverview });
     });
 
     app.get("/dashboard/profits", async (request, reply) => {
