@@ -72,11 +72,8 @@ async function seedDefaultTradeConfig(client, tradeInstanceId) {
     const inserted = await client.query(
         `INSERT INTO trade_config (
             pair,
-            entry_price,
-            exit_price,
             target_percent,
             margin_percent,
-            usd_transaction,
             decimal_quantity,
             decimal_price,
             trade_instance_id,
@@ -102,11 +99,8 @@ async function seedDefaultTradeConfig(client, tradeInstanceId) {
              RETURNING id`,
         [
             'BTC/USDC',      // pair
-            60000,           // entry_price
-            100000,          // exit_price
             1.8,             // target_percent
             0.1,             // margin_percent
-            11,              // usd_transaction
             5,               // decimal_quantity
             0,               // decimal_price
             tradeInstanceId, // trade_instance_id

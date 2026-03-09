@@ -34,79 +34,64 @@
                             .tip-label { cursor: help; }
                         </style>
 
-                        <!-- Editable fields (4 / 4) -->
-                        <div class="row g-3">
-                            <div class="col-12 col-md-3">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12 col-md-2">
                                 <label
                                         class="form-label mb-1 tip-label"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
-                                        title="Lower boundary of the grid. Orders will be created within the [Entry, Exit] range."
-                                >Entry Price</label>
-                                <input name="entry_price" class="form-control" value="<%= config.entry_price ?? '' %>" />
-                            </div>
-
-                            <div class="col-12 col-md-3">
-                                <label
-                                        class="form-label mb-1 tip-label"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Upper boundary of the grid. Orders will be created within the [Entry, Exit] range."
-                                >Exit Price</label>
-                                <input name="exit_price" class="form-control" value="<%= config.exit_price ?? '' %>" />
-                            </div>
-
-                            <div class="col-12 col-md-3">
-                                <label
-                                        class="form-label mb-1 tip-label"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Take profit for each completed buy->sell cycle (in %). Example: 1.8 means +1.8% between buy and sell."
+                                        title="Take profit for each completed buy -> sell cycle (in %). Example: 1.8 means +1.8% between buy and sell."
                                 >Target Profit %</label>
-                                <input name="target_percent" class="form-control" value="<%= config.target_percent ?? '' %>" />
+                                <input
+                                        name="target_percent"
+                                        class="form-control"
+                                        value="<%= config.target_percent ?? '' %>"
+                                />
                             </div>
 
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-2">
                                 <label
                                         class="form-label mb-1 tip-label"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
                                         title="Distance between each grid level (in %). Example: 0.1 means each level is 0.1% apart."
                                 >Distance Grid %</label>
-                                <input name="margin_percent" class="form-control" value="<%= config.margin_percent ?? '' %>" />
+                                <input
+                                        name="margin_percent"
+                                        class="form-control"
+                                        value="<%= config.margin_percent ?? '' %>"
+                                />
                             </div>
 
-                            <div class="col-12 col-md-3">
-                                <label
-                                        class="form-label mb-1 tip-label"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Quote amount allocated to each grid level (used to calculate order quantity from price)."
-                                >USD/level per order</label>
-                                <input name="usd_transaction" class="form-control" value="<%= config.usd_transaction ?? '' %>" />
-                            </div>
-
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-2">
                                 <label
                                         class="form-label mb-1 tip-label"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
                                         title="Quantity precision used when placing orders. The bot truncates quantities to this number of decimals."
                                 >Qty decimal places</label>
-                                <input name="decimal_quantity" class="form-control" value="<%= config.decimal_quantity ?? '' %>" />
+                                <input
+                                        name="decimal_quantity"
+                                        class="form-control"
+                                        value="<%= config.decimal_quantity ?? '' %>"
+                                />
                             </div>
 
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-2">
                                 <label
                                         class="form-label mb-1 tip-label"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
                                         title="Price precision used when placing orders. The bot truncates prices to this number of decimals."
                                 >Price decimal places</label>
-                                <input name="decimal_price" class="form-control" value="<%= config.decimal_price ?? '' %>" />
+                                <input
+                                        name="decimal_price"
+                                        class="form-control"
+                                        value="<%= config.decimal_price ?? '' %>"
+                                />
                             </div>
 
-                            <div class="col-12 col-md-3">
+                            <div class="col-12 col-md-4">
                                 <label
                                         class="form-label mb-1 tip-label"
                                         data-bs-toggle="tooltip"
@@ -114,8 +99,18 @@
                                         title="Optional execution guardrails. BUY levels below Exec min or SELL levels above Exec max are ignored."
                                 >Exec min / max</label>
                                 <div class="input-group">
-                                    <input name="execution_price_min" class="form-control" value="<%= config.execution_price_min ?? '' %>" placeholder="min" />
-                                    <input name="execution_price_max" class="form-control" value="<%= config.execution_price_max ?? '' %>" placeholder="max" />
+                                    <input
+                                            name="execution_price_min"
+                                            class="form-control"
+                                            value="<%= config.execution_price_min ?? '' %>"
+                                            placeholder="min"
+                                    />
+                                    <input
+                                            name="execution_price_max"
+                                            class="form-control"
+                                            value="<%= config.execution_price_max ?? '' %>"
+                                            placeholder="max"
+                                    />
                                 </div>
                             </div>
                         </div>

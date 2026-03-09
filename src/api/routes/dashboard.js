@@ -196,15 +196,10 @@ export async function dashboardRoutes(app, opts) {
         });
     });
 
-    app.get("/dashboard/portfolio-overview", async (request, reply) => {
-        const { portfolioOverview } = await loadDashboardData({ models });
-        return reply.send({ portfolioOverview });
-    });
-
     app.get("/dashboard/profits", async (request, reply) => {
-        const { profitSummary, rebuy } = await loadDashboardData({ models });
+        const { profitSummary, portfolioOverview, rebuy } = await loadDashboardData({ models });
 
-        return reply.view("partials/profits.ejs", { profitSummary, rebuy });
+        return reply.view("partials/profits.ejs", { profitSummary, portfolioOverview, rebuy });
     });
 
     app.post("/dashboard/instances/:id/start", async (request, reply) => {

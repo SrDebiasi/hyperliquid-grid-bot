@@ -10,13 +10,8 @@ export function defineTradeConfig(sequelize) {
             pair: { type: DataTypes.STRING(32), allowNull: false },
             name: { type: DataTypes.STRING(64), allowNull: true },
 
-            entry_price: { type: DataTypes.DECIMAL(24, 12), allowNull: true },
-            exit_price: { type: DataTypes.DECIMAL(24, 12), allowNull: true },
-
             margin_percent: { type: DataTypes.DECIMAL(10, 4), allowNull: true },
             target_percent: { type: DataTypes.DECIMAL(10, 4), allowNull: true },
-
-            usd_transaction: { type: DataTypes.DECIMAL(24, 8), allowNull: true },
 
             decimal_price: { type: DataTypes.INTEGER, allowNull: true },
             decimal_quantity: { type: DataTypes.INTEGER, allowNull: true },

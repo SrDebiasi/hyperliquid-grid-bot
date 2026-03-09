@@ -84,54 +84,32 @@
 
     <hr class="my-2" />
 
-    <!-- Details in two balanced columns -->
-    <div class="row g-3">
-        <div class="col-12 col-md-6">
-            <div class="d-flex justify-content-between">
-                <span class="text-muted">Entry price</span>
-                <span class="fw-semibold"><%- fmtPrice(config.entry_price) !== null ? fmtPrice(config.entry_price) : dash %></span>
-            </div>
-            <div class="d-flex justify-content-between mt-1">
-                <span class="text-muted">Exit price</span>
-                <span class="fw-semibold"><%- fmtPrice(config.exit_price) !== null ? fmtPrice(config.exit_price) : dash %></span>
-            </div>
-            <div class="d-flex justify-content-between mt-1">
-                <span class="text-muted">USD per level</span>
-                <span class="fw-semibold"><%- fmtUsd(config.usd_transaction) !== null ? ('$' + fmtUsd(config.usd_transaction)) : dash %></span>
-            </div>
-        </div>
-        <%
-            const isBlank = (v) => v === null || v === undefined || v === '';
-            const execMinEffective = isBlank(config.execution_price_min) ? config.entry_price : config.execution_price_min;
-            const execMaxEffective = isBlank(config.execution_price_max) ? config.exit_price  : config.execution_price_max;
+    <%
+        const isBlank = (v) => v === null || v === undefined || v === '';
+        const hasExecRange = !isBlank(config.execution_price_min) || !isBlank(config.execution_price_max);
+    %>
 
-            const execMinIsDefault = isBlank(config.execution_price_min);
-            const execMaxIsDefault = isBlank(config.execution_price_max);
-        %>
-        <div class="col-12 col-md-6">
-            <div class="d-flex justify-content-between">
-                <span class="text-muted">Exec min</span>
-                <span class="fw-semibold">
-                    <%= fmtPrice(execMinEffective) %>
-                    <% if (execMinIsDefault) { %><span class="text-muted small ms-1">(auto)</span><% } %>
-                </span>
-            </div>
-
-            <div class="d-flex justify-content-between mt-1">
-                <span class="text-muted">Exec max</span>
-                <span class="fw-semibold">
-                    <%= fmtPrice(execMaxEffective) %>
-                    <% if (execMaxIsDefault) { %><span class="text-muted small ms-1">(auto)</span><% } %>
-                </span>
-            </div>
-
-            <!-- Optional: show config name if you want -->
-            <% if (config.name) { %>
-                <div class="d-flex justify-content-between mt-1">
-                    <span class="text-muted">Name</span>
-                    <span class="fw-semibold"><%= config.name %></span>
-                </div>
+    <div class="small">
+        <div class="mb-2">
+            <span class="text-muted">Execution range:</span>
+            <span class="fw-semibold">
+            <%= !isBlank(config.execution_price_min) ? fmtPrice(config.execution_price_min) : dash %>
+        </span>
+            <span class="text-muted mx-1">→</span>
+            <span class="fw-semibold">
+            <%= !isBlank(config.execution_price_max) ? fmtPrice(config.execution_price_max) : dash %>
+        </span>
+            <% if (!hasExecRange) { %>
+                <span class="text-muted ms-1">(not set)</span>
             <% } %>
+        </div>
+
+        <div>
+            <span class="text-muted">Decimals configuration<% if (config.name) { %> for <%= config.name %><% } %>:</span>
+            <span class="fw-semibold"><%= config.decimal_quantity ?? dash %></span>
+            <span class="text-muted">qty,</span>
+            <span class="fw-semibold"><%= config.decimal_price ?? dash %></span>
+            <span class="text-muted">price</span>
         </div>
     </div>
 <% } %>

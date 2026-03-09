@@ -1214,10 +1214,6 @@ function clearMissingOrder({ order, side, tradeOrderId, notify = false }) {
  * - minPrice: highest buy_price among rows with an active buy order
  * - maxPrice: lowest sell_price among rows with an active sell order
  *
- * Fallback:
- * - If minPrice is null, use cfg.entry_price
- * - If maxPrice is null, use cfg.exit_price
- *
  * @param {string} pair
  * @param {Array<object>} orders
  * @param {{ entry_price: number, exit_price: number }} cfg
@@ -1239,13 +1235,12 @@ function computeRange(pair, orders, cfg) {
     }
   }
 
-  // Fallback to configured range if no active boundaries exist
-  const fallbackMin = Number(cfg?.entry_price);
-  const fallbackMax = Number(cfg?.exit_price);
+  const execMin = Number(cfg?.execution_price_min);
+  const execMax = Number(cfg?.execution_price_max);
 
   const result = {
-    minPrice: minPrice ?? (Number.isFinite(fallbackMin) ? fallbackMin : null),
-    maxPrice: maxPrice ?? (Number.isFinite(fallbackMax) ? fallbackMax : null),
+    minPrice: minPrice ?? (Number.isFinite(execMin) ? execMin : null),
+    maxPrice: maxPrice ?? (Number.isFinite(execMax) ? execMax : null),
   };
 
   rangePrices[getExchange().normalizeSymbolForPrice(pair)] = result;

@@ -7,9 +7,67 @@
             </div>
 
             <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Use this generator to create the grid orders for this config. You choose the minimum price, maximum price, and USD amount per order.
+                    The system will create buy/sell levels between that range using the configured <strong>Distance Grid %</strong> as the spacing between levels.
+                    For each level, the related exit order is calculated using the configured <strong>Target Profit %</strong>, which defines how far the sell or buy-back price should be from the entry level.
+                </p>
+                <div class="border rounded p-3 mb-3">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-md-3">
+                            <label for="simEntryPrice" class="form-label mb-1">Entry Price</label>
+                            <input
+                                    type="number"
+                                    class="form-control"
+                                    id="simEntryPrice"
+                                    min="0"
+                                    step="any"
+                                    placeholder="60000"
+                                    value="60000"
+                            >
+                        </div>
+
+                        <div class="col-12 col-md-3">
+                            <label for="simExitPrice" class="form-label mb-1">Exit Price</label>
+                            <input
+                                    type="number"
+                                    class="form-control"
+                                    id="simExitPrice"
+                                    min="0"
+                                    step="any"
+                                    placeholder="100000"
+                                    value="100000"
+                            >
+                        </div>
+
+                        <div class="col-12 col-md-3">
+                            <label for="simUsdTransaction" class="form-label mb-1">USD amount per order</label>
+                            <input
+                                    type="number"
+                                    class="form-control"
+                                    id="simUsdTransaction"
+                                    min="0"
+                                    step="any"
+                                    placeholder="20"
+                                    value="20"
+                            >
+                        </div>
+
+                        <div class="col-12 col-md-3 d-grid">
+                            <button type="button" class="btn btn-primary" id="simRunBtn">
+                                Simulate
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div id="simError" class="mb-3"></div>
                 <div id="simStatus" class="mb-3"></div>
-                <pre id="simText" class="bg-light border rounded p-3 small mb-0"></pre>
+                <div
+                        id="simText"
+                        class="bg-light border rounded p-3 small mb-0"
+                        style="min-height: 320px; white-space: pre-wrap; font-family: monospace;"
+                ></div>
             </div>
 
             <div class="modal-footer d-flex justify-content-between">

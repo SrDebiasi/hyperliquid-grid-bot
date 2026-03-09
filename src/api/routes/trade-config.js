@@ -30,8 +30,13 @@ export async function tradeConfigRoutes(app, { models }) {
         if (!row) return reply.code(404).send({ error: "id not found" });
 
         const cfg = row.toJSON();
+        const runtimeInputs = extractGridRuntimeInputs(request.query ?? {});
 
-        const result = await buildGrid(cfg, { save: false });
+        const result = await buildGrid(cfg, {
+            save: false,
+            runtimeInputs,
+        });
+
         if (result.error) return reply.code(400).send({ error: result.error });
 
         return result;
@@ -46,13 +51,18 @@ export async function tradeConfigRoutes(app, { models }) {
         const row = await TradeConfig.findByPk(id);
         if (!row) return reply.code(404).send({ error: "id not found" });
 
-        const cfg = row.toJSON();
-
         if (!TradeOrder) {
             return reply.code(500).send({ error: "TradeOrder model not available" });
         }
 
-        const result = await buildGrid(cfg, { save: true ,  saveTradeOrder: async (o) => TradeOrder.create(o)});
+        const cfg = row.toJSON();
+        const runtimeInputs = extractGridRuntimeInputs(request.body ?? {});
+
+        const result = await buildGrid(cfg, {
+            save: true,
+            runtimeInputs,
+            saveTradeOrder: async (o) => TradeOrder.create(o),
+        });
 
         if (result.error) return reply.code(400).send({ error: result.error });
 
@@ -72,17 +82,13 @@ export async function tradeConfigRoutes(app, { models }) {
 
         const allowed = [
             "pair",
-            "entry_price",
-            "exit_price",
             "target_percent",
             "margin_percent",
-            "usd_transaction",
             "decimal_quantity",
             "decimal_price",
             "name",
             "rebuy_profit",
 
-            // reserves (new)
             "reserve_quote_offset_percent",
             "reserve_quote_order_id",
             "reserve_base_offset_percent",
@@ -98,22 +104,23 @@ export async function tradeConfigRoutes(app, { models }) {
         ];
 
         const floatFields = new Set([
-            "entry_price",
-            "exit_price",
             "target_percent",
             "margin_percent",
-            "usd_transaction",
-
-            // reserves (new)
             "reserve_quote_offset_percent",
             "reserve_base_offset_percent",
-
+            "rebought_value",
+            "rebought_coin",
             "rebuy_value",
             "execution_price_min",
             "execution_price_max",
         ]);
 
-        const intFields = new Set(["decimal_quantity", "decimal_price", "rebuy_percent"]);
+        const intFields = new Set([
+            "decimal_quantity",
+            "decimal_price",
+            "rebuy_percent",
+        ]);
+
         const boolFields = new Set(["rebuy_profit"]);
 
         for (const key of allowed) {
@@ -129,17 +136,38 @@ export async function tradeConfigRoutes(app, { models }) {
 
             if (intFields.has(key)) {
                 const v = String(raw).trim();
-                row[key] = v === "" ? null : Number.parseInt(v, 10);
+
+                if (v === "") {
+                    row[key] = null;
+                    continue;
+                }
+
+                const n = Number.parseInt(v, 10);
+                if (!Number.isFinite(n)) {
+                    return reply.code(400).send({ error: `${key} must be a valid integer` });
+                }
+
+                row[key] = n;
                 continue;
             }
 
             if (floatFields.has(key)) {
                 const v = String(raw).trim();
-                row[key] = v === "" ? null : Number(v);
+
+                if (v === "") {
+                    row[key] = null;
+                    continue;
+                }
+
+                const n = Number(v);
+                if (!Number.isFinite(n)) {
+                    return reply.code(400).send({ error: `${key} must be a valid number` });
+                }
+
+                row[key] = n;
                 continue;
             }
 
-            // allow clearing order ids by sending empty string
             if (key === "reserve_quote_order_id" || key === "reserve_base_order_id") {
                 const v = String(raw).trim();
                 row[key] = v === "" ? null : v;
@@ -147,6 +175,48 @@ export async function tradeConfigRoutes(app, { models }) {
             }
 
             row[key] = String(raw).trim();
+        }
+
+        const requiredNumberFields = [
+            "target_percent",
+            "margin_percent",
+            "decimal_quantity",
+            "decimal_price",
+            "execution_price_min",
+            "execution_price_max",
+        ];
+
+        for (const key of requiredNumberFields) {
+            const value = Number(row[key]);
+            if (!Number.isFinite(value)) {
+                return reply.code(400).send({ error: `${key} is required` });
+            }
+        }
+
+        if (Number(row.target_percent) <= 0) {
+            return reply.code(400).send({ error: "target_percent must be greater than 0" });
+        }
+
+        if (Number(row.margin_percent) <= 0) {
+            return reply.code(400).send({ error: "margin_percent must be greater than 0" });
+        }
+
+        if (Number(row.decimal_quantity) < 0) {
+            return reply.code(400).send({ error: "decimal_quantity must be 0 or greater" });
+        }
+
+        if (Number(row.decimal_price) < 0) {
+            return reply.code(400).send({ error: "decimal_price must be 0 or greater" });
+        }
+
+        if (Number(row.execution_price_min) <= 0) {
+            return reply.code(400).send({ error: "execution_price_min must be greater than 0" });
+        }
+
+        if (Number(row.execution_price_max) <= Number(row.execution_price_min)) {
+            return reply.code(400).send({
+                error: "execution_price_max must be greater than execution_price_min",
+            });
         }
 
         await row.save();
@@ -175,12 +245,20 @@ function roundTo(n, decimals) {
     return Number(n.toFixed(d));
 }
 
-async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
-    const entry = toNum(cfg.entry_price);
-    const exit = toNum(cfg.exit_price);
+function extractGridRuntimeInputs(input = {}) {
+    return {
+        entry_price: input.entry_price,
+        exit_price: input.exit_price,
+        usd_transaction: input.usd_transaction,
+    };
+}
+
+async function buildGrid(cfg, { save, saveTradeOrder, runtimeInputs = {} } = {}) {
+    const entry = toNum(runtimeInputs.entry_price);
+    const exit = toNum(runtimeInputs.exit_price);
     const targetPct = toNum(cfg.target_percent);
     const marginPct = toNum(cfg.margin_percent);
-    const usdPerLevel = toNum(cfg.usd_transaction);
+    const usdPerLevel = toNum(runtimeInputs.usd_transaction);
 
     const decQty = Number(cfg.decimal_quantity ?? 0);
     const decPrice = Number(cfg.decimal_price ?? 0);
@@ -194,6 +272,16 @@ async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
 
     if (errors.length) {
         return { error: `Missing/invalid fields: ${errors.join(", ")}` };
+    }
+
+    if (entry <= 0) errors.push("entry_price must be > 0");
+    if (exit <= entry) errors.push("exit_price must be greater than entry_price");
+    if (targetPct <= 0) errors.push("target_percent must be > 0");
+    if (marginPct <= 0) errors.push("margin_percent must be > 0");
+    if (usdPerLevel <= 0) errors.push("usd_transaction must be > 0");
+
+    if (errors.length) {
+        return { error: errors.join(", ") };
     }
 
     const currentPrice = await fetchHyperliquidMidFromPair(cfg.pair);
@@ -229,8 +317,8 @@ async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
         });
 
         if (save) {
-            if (typeof saveTradeOrder !== 'function') {
-                return { error: 'saveTradeOrder not provided' };
+            if (typeof saveTradeOrder !== "function") {
+                return { error: "saveTradeOrder not provided" };
             }
 
             await saveTradeOrder({
@@ -257,7 +345,7 @@ async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
     const totalCoinUsd = sumQuantityCoin * pxNow;
     const quoteNeededUsd = sumQuantityUsd * usdPerLevel;
 
-    const sellRowsAbove = rows.filter(r => r.sell_price > pxNow);
+    const sellRowsAbove = rows.filter((r) => r.sell_price > pxNow);
     const baseNeeded = sellRowsAbove.reduce((acc, r) => acc + r.quantity, 0);
 
     const proceedsIfSoldAlongTheWay = sellRowsAbove.reduce(
@@ -284,7 +372,9 @@ async function buildGrid(cfg, { save, saveTradeOrder  } = {}) {
             name: cfg.name,
             config_id: cfg.id,
             trade_instance_id: cfg.trade_instance_id,
-            source_price: Number.isFinite(currentPrice) ? "hyperliquid_allMids" : "fallback_entry_price",
+            source_price: Number.isFinite(currentPrice)
+                ? "hyperliquid_allMids"
+                : "fallback_entry_price",
         },
         summary: {
             levels: rows.length,
