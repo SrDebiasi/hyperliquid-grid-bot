@@ -201,8 +201,8 @@ async function getAggregatedStatusSnapshot() {
   }
 
   // position in total grid range
-  const rangeMin = toNumberSafe(cfg.entry_price);
-  const rangeMax = toNumberSafe(cfg.exit_price);
+  const rangeMin = toNumberSafe(cfg.execution_price_min);
+  const rangeMax = toNumberSafe(cfg.execution_price_max);
 
   let gridPositionPct = null;
   if (rangeMax > rangeMin) {
