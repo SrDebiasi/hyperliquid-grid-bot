@@ -939,47 +939,52 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
  * @returns {Promise<void>}
  */
 const runCoins = async function(coinIndex) {
-  data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => console.log(ex));
-
-  const cfg = data[coinIndex];
-  const pair = cfg.pair;
-  const tradeInstanceId = cfg.trade_instance_id;
-  const dp = cfg.decimal_price;
-  const dq = cfg.decimal_quantity;
-
-  // Skip execution if the bot is disabled or the market is not ready to be checked yet.
-  if (!enable) {
-    runWithTime(coinIndex, 5000);
-    return;
-  }
-  if (checking[pair]) {
-    return;
-  }
-
-  checking[pair] = true;
-  timesExecuted++;
-
-  await updatePrices([pair]);
-
-  const currentPrice = prices[getExchange().normalizeSymbolForPrice(pair)];
-
-  consoleLog(`${timesExecuted}) Current price: ${Number(currentPrice).toFixed(dp)}`);
-
-  await dedupeOpenOrdersForPair(cfg)
-  await detectReserveOrdersByExtremes(cfg)
-
-  const orders = await loadAndFilterOrders({
-    pair,
-    tradeInstanceId,
-    currentPrice,
-    cfg,
-    timesExecuted,
-  });
-
-  let orderFilled = false;
   let timeToExecute = 20000;
-
+  let pair = 'unknown';
   try {
+    data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => console.log(ex));
+
+    const cfg = data[coinIndex];
+    if (!cfg) {
+      timeToExecute = 60000;
+      return;
+    }
+    pair = cfg.pair;
+    const tradeInstanceId = cfg.trade_instance_id;
+    const dp = cfg.decimal_price;
+    const dq = cfg.decimal_quantity;
+
+    // Skip execution if the bot is disabled or the market is not ready to be checked yet.
+    if (!enable) {
+      runWithTime(coinIndex, 5000);
+      return;
+    }
+    if (checking[pair]) {
+      return;
+    }
+
+    checking[pair] = true;
+    timesExecuted++;
+
+    await updatePrices([pair]);
+
+    const currentPrice = prices[getExchange().normalizeSymbolForPrice(pair)];
+
+    consoleLog(`${timesExecuted}) Current price: ${Number(currentPrice).toFixed(dp)}`);
+
+    await dedupeOpenOrdersForPair(cfg)
+    await detectReserveOrdersByExtremes(cfg)
+
+    const orders = await loadAndFilterOrders({
+      pair,
+      tradeInstanceId,
+      currentPrice,
+      cfg,
+      timesExecuted,
+    });
+
+    let orderFilled = false;
+
     const orderIds = orders
         .flatMap(o => [o.buy_order, o.sell_order])
         .filter(Boolean);
@@ -1186,7 +1191,6 @@ const runCoins = async function(coinIndex) {
       timeToExecute = 1000 * 60 * 10; // slower call when idle - 10m
     }
   } catch (e) {
-    consoleLog(`${timesExecuted}) runCoins error (${pair ?? 'unknown'}): ${e?.message ?? e}`, 'red');
     consoleLog(`${timesExecuted}) runCoins error (${pair ?? 'unknown'}): ${e?.message ?? e}`, 'red');
     timeToExecute = 60000; // retry after error
   } finally {
