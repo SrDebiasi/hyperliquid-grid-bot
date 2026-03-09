@@ -1448,13 +1448,13 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     cfg.rebought_coin = toNum(cfg.rebought_coin, 0);
 
     if (!cfg.rebuy_profit) return;
-    const rebuyPercent = toNum(cfg.rebuy_percent, 0);
+    const rebuyPercent = Math.max(0, Math.min(100, toNum(cfg.rebuy_percent, 0)));
     const rebuyShare = rebuyPercent / 100;
 
     const profit = toNum(profitValue, 0);
     const rebuyProfitPortion = round(profit * rebuyShare, 8);
 
-    // Add profit to the rebuy wallet
+    // Add only the configured percent of profit to the rebuy wallet
     const newRebuyValue = round(cfg.rebuy_value + rebuyProfitPortion, 8);
     await updateTradeConfig({ id: cfg.id, rebuy_value: newRebuyValue });
     cfg.rebuy_value = newRebuyValue;
@@ -1476,7 +1476,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
         ? Number(cfg.decimal_quantity)
         : 8;
 
-    // Convert $10 into base qty using current price
+    // Convert the rebuy quote amount into base qty using current price
     const qtyToBuy = round(amountToBuyQuote / currentPrice, qtyDecimals);
     if (!qtyToBuy || qtyToBuy <= 0) {
       consoleLog(`Rebuy aborted: invalid qtyToBuy=${qtyToBuy} price=${currentPrice}`);
