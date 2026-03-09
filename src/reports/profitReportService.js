@@ -58,14 +58,15 @@ function parseRowDateTime(row, timezone) {
     return null;
 }
 
-function groupProfitByDay(rows, timezone) {
+function groupProfitByDay(rows, timezone, from, to) {
     const list = Array.isArray(rows) ? rows : [];
     const map = new Map(); // ymd -> { totalUsd, trades }
 
     for (const r of list) {
         const v = Number(r?.value || 0);
         const dt = parseRowDateTime(r, timezone);
-        const day = dt ? dt.toFormat('yyyy-LL-dd') : 'unknown';
+        const day = dt ? dt.toFormat('yyyy-LL-dd') : null;
+        if (!day) continue;
 
         const cur = map.get(day) || { totalUsd: 0, trades: 0 };
         cur.totalUsd += v;
@@ -73,10 +74,58 @@ function groupProfitByDay(rows, timezone) {
         map.set(day, cur);
     }
 
-    const days = Array.from(map.entries())
-        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
-        .map(([date, v]) => ({ date, totalUsd: v.totalUsd, trades: v.trades }))
-        .reverse();
+    // fallback to old behavior if range was not provided
+    if (!from || !to) {
+        const days = Array.from(map.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([date, v]) => ({
+                date,
+                totalUsd: v.totalUsd,
+                trades: v.trades,
+            }))
+            .reverse();
+
+        const totalUsd = days.reduce((acc, d) => acc + d.totalUsd, 0);
+        const trades = days.reduce((acc, d) => acc + d.trades, 0);
+
+        return { days, totalUsd, trades };
+    }
+
+    const start = DateTime.fromFormat(String(from), 'yyyy-LL-dd', { zone: timezone });
+    const end = DateTime.fromFormat(String(to), 'yyyy-LL-dd', { zone: timezone });
+
+    if (!start.isValid || !end.isValid) {
+        const days = Array.from(map.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([date, v]) => ({
+                date,
+                totalUsd: v.totalUsd,
+                trades: v.trades,
+            }))
+            .reverse();
+
+        const totalUsd = days.reduce((acc, d) => acc + d.totalUsd, 0);
+        const trades = days.reduce((acc, d) => acc + d.trades, 0);
+
+        return { days, totalUsd, trades };
+    }
+
+    const days = [];
+    const totalDays = Math.floor(end.diff(start, 'days').days);
+
+    for (let i = 0; i <= totalDays; i += 1) {
+        const current = start.plus({ days: i });
+        const key = current.toFormat('yyyy-LL-dd');
+        const value = map.get(key) || { totalUsd: 0, trades: 0 };
+
+        days.push({
+            date: key,
+            totalUsd: value.totalUsd,
+            trades: value.trades,
+        });
+    }
+
+    days.reverse();
 
     const totalUsd = days.reduce((acc, d) => acc + d.totalUsd, 0);
     const trades = days.reduce((acc, d) => acc + d.trades, 0);
@@ -137,10 +186,21 @@ async function buildDailyProfitMtd({ models, tradeInstanceId }) {
     });
     const plain = toPlainRows(rows);
 
-    const grouped = groupProfitByDay(plain, period.timezone);
+    const grouped = groupProfitByDay(
+        plain,
+        period.timezone,
+        period.from,
+        period.to,
+    );
 
     return {
-        period: { key: period.key, label: period.label, from: period.from, to: period.to, timezone: period.timezone },
+        period: {
+            key: period.key,
+            label: period.label,
+            from: period.from,
+            to: period.to,
+            timezone: period.timezone,
+        },
         days: grouped.days,
         totalUsd: grouped.totalUsd,
         trades: grouped.trades,

@@ -112,7 +112,10 @@ function round(n, dp = 8) {
  */
 function startMarket(coinIndex) {
   void runCoins(coinIndex)
-      .catch((ex) => consoleLog(ex?.toString?.() ?? String(ex), 'red'));
+      .catch((ex) => {
+            console.log(`Error on runCoins`)
+            console.log(ex)
+      });
 }
 
 /**
@@ -1445,11 +1448,14 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     cfg.rebought_coin = toNum(cfg.rebought_coin, 0);
 
     if (!cfg.rebuy_profit) return;
+    const rebuyPercent = toNum(cfg.rebuy_percent, 0);
+    const rebuyShare = rebuyPercent / 100;
 
     const profit = toNum(profitValue, 0);
+    const rebuyProfitPortion = round(profit * rebuyShare, 8);
 
     // Add profit to the rebuy wallet
-    const newRebuyValue = round(cfg.rebuy_value + profit, 8);
+    const newRebuyValue = round(cfg.rebuy_value + rebuyProfitPortion, 8);
     await updateTradeConfig({ id: cfg.id, rebuy_value: newRebuyValue });
     cfg.rebuy_value = newRebuyValue;
 
