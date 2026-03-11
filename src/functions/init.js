@@ -991,8 +991,9 @@ const runCoins = async function(coinIndex) {
 
     const statuses = await getExchange().getOrdersStatusMap({ orderIds });
 
-    for (const order of orders) {
+    for (let order of orders) {
       await sleep(100);
+      order = await retrieveOrders({ id: order.id });
 
       // Place the initial order for this grid row if none exists.
       if (!hasAnyOrder(order)) {
@@ -1282,7 +1283,6 @@ const createOrderLimit = async (param) => {
   return getExchange().placeOrder(payload);
 };
 
-let wsQueue = Promise.resolve();
 
 function enqueueWs(fn) {
   wsQueue = wsQueue
@@ -1335,6 +1335,10 @@ async function restartSocketPrices() {
   }
 }
 
+
+let wsQueue = Promise.resolve();
+const wsQueuedOrRunning = {};
+
 /**
  * Subscribes to aggregated trade updates (price stream) for all configured pairs.
  *
@@ -1372,29 +1376,29 @@ const socketPrices = () => {
     prices[sym] = p;
     setPrice(sym, p);
 
-    enqueueWs(async () => {
-      const range = rangePrices[sym];
-      const minPrice = range?.minPrice;
-      const maxPrice = range?.maxPrice;
+    const range = rangePrices[sym];
+    const minPrice = range?.minPrice;
+    const maxPrice = range?.maxPrice;
 
-      if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) return;
+    if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) return;
+    if (p < minPrice || p > maxPrice) {
+      if (wsQueuedOrRunning[sym]) return;
 
-      if (p >= maxPrice || p <= minPrice) {
-        if (wsChecking[sym]) return;
+      wsQueuedOrRunning[sym] = true;
 
-        consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
+      consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
 
+      enqueueWs(async () => {
         const idx = pairToIndex[sym];
         if (idx == null) return;
 
-        wsChecking[sym] = true;
         try {
           await runCoins(idx);
         } finally {
-          wsChecking[sym] = false;
+          wsQueuedOrRunning[sym] = false;
         }
-      }
-    });
+      });
+    }
   });
 
   if (socketWatchdogInterval) {

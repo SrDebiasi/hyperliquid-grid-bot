@@ -5,12 +5,24 @@ export async function tradeOrderRoutes(app, { models }) {
 
     // GET /api/trade-order?pair=&trade_instance_id=
     app.get("/trade-order", async (request) => {
-        const { pair, trade_instance_id } = request.query ?? {};
+        const { id, pair, trade_instance_id } = request.query ?? {};
 
         const where = {};
-        if (pair != null && pair !== "") where.pair = pair;
-        if (trade_instance_id != null && trade_instance_id !== "")
+
+        if (id != null && id !== "") {
+            where.id = Number(id);
+
+            const row = await TradeOrder.findOne({ where });
+            return row;
+        }
+
+        if (pair != null && pair !== "") {
+            where.pair = pair;
+        }
+
+        if (trade_instance_id != null && trade_instance_id !== "") {
             where.trade_instance_id = Number(trade_instance_id);
+        }
 
         const rows = await TradeOrder.findAll({
             where,
