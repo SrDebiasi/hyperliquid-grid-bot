@@ -22,7 +22,6 @@ import { FEE_RATE_MAKER_PER_SIDE } from "./fees.js";
 let wallet = null;
 let enable = true;
 let checking = {};
-let wsChecking = {};
 let timesExecuted = 0;
 let prices = {};
 let data = [];
@@ -35,7 +34,6 @@ const DEFAULT_RESERVE_QUOTE_OFFSET_PERCENT = Number(process.env.DEFAULT_RESERVE_
 const DEFAULT_RESERVE_BASE_OFFSET_PERCENT  = Number(process.env.DEFAULT_RESERVE_BASE_OFFSET_PERCENT ?? 30);
 
 let pairToIndex = {};
-let nextTimers = {};
 
 /**
  * Simple async delay helper.
