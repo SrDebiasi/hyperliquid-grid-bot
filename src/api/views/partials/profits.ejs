@@ -3,100 +3,104 @@
     from { clip-path: inset(0 100% 0 0); opacity: 0; }
     to   { clip-path: inset(0 0%   0 0); opacity: 1; }
 }
+.mtd-row { padding: 2px 4px; border-radius: 4px; transition: background 0.1s; }
+.mtd-row:hover { background: #f8f9fa; }
+.mtd-row.zero { opacity: 0.38; }
+.progress { border-radius: 6px !important; }
+.progress-bar { border-radius: 6px !important; }
+.profit-card { border-left: 3px solid #dee2e6; }
+.profit-card-success { border-left-color: #198754 !important; }
+.profit-card-danger  { border-left-color: #dc3545 !important; }
+.profit-card-neutral { border-left-color: #adb5bd !important; }
+.period-card { transition: box-shadow 0.15s; }
+.period-card:hover { box-shadow: 0 0 0 1px #dee2e6; }
 </style>
+
 <% if (profitSummary) { %>
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-end">
-                <div>
-                    <h2 class="h5 mb-1">Profits</h2>
-                    <div class="text-muted small">
-                        Daily chart: <%= profitSummary.dailyProfitMtd?.period?.label ?? '-' %>
-                    </div>
-                </div>
-                <% if (rebuy) { %>
-                    <div class="text-end small" style="line-height: 1.5;">
-                        <div class="fw-semibold">Rebuy <%= rebuy.active ? 'Active' : 'Disabled' %></div>
-
-                        <div class="text-muted">
-                            Bought <%= Number(rebuy.reboughtCoin || 0).toFixed(5) %> <%= rebuy.name %> for <%= fmtUsd(rebuy.reboughtValueUsd) %>
-                            → Now <%= fmtUsd(rebuy.currentValueUsd) %>
-                        </div>
-
-                        <div class="text-muted">
-                            Avg. buy price <%= fmtUsd(rebuy.avgPriceUsd) %> →
-                            <%= rebuy.name %> today: <%= fmtUsd(rebuy.currentPrice) %>
-                        </div>
-                    </div>
-                <% } %>
-            </div>
 
             <%
                 function n(v, d = 0) {
                     return (typeof v === 'number' && Number.isFinite(v)) ? v : d;
                 }
-
-                function pct(v) {
-                    return n(v, 0).toFixed(2);
+                function pct(v) { return n(v, 0).toFixed(2); }
+                function fmtUsd(x) { return '$' + n(Number(x), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+                function fmtDate(str) {
+                    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    const p = String(str).split('-');
+                    return p.length < 3 ? str : months[parseInt(p[1],10)-1] + ' ' + parseInt(p[2],10);
                 }
-
-                function fmtUsd(x) {
-                    return `$${n(Number(x), 0).toFixed(2)}`;
-                }
-
-                const emptyBucket = () => ({ pnlPercent: 0, totalUsd: 0, trades: 0 });
-
+                const emptyBucket = () => ({ pnlPercent: 0, totalUsd: 0, trades: 0, cycles: 0 });
                 const totals = profitSummary.totals || {};
                 const t = {
-                    today: totals.today || emptyBucket(),
-                    week: totals.week || emptyBucket(),
-                    month: totals.month || emptyBucket(),
-                    year: totals.year || emptyBucket(),
+                    today:   totals.today   || emptyBucket(),
+                    week:    totals.week    || emptyBucket(),
+                    month:   totals.month   || emptyBucket(),
+                    year:    totals.year    || emptyBucket(),
                     allTime: totals.allTime || emptyBucket(),
                 };
             %>
 
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <h2 class="h5 mb-0">Profits</h2>
+                <% if (rebuy) { %>
+                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                        <span class="badge <%= rebuy.active ? 'text-bg-success' : 'text-bg-secondary' %>">
+                            Rebuy <%= rebuy.active ? 'Active' : 'Off' %>
+                        </span>
+                        <span class="text-muted small">
+                            <%= Number(rebuy.reboughtCoin||0).toFixed(5) %> <%= rebuy.name %>
+                            · paid <%= fmtUsd(rebuy.reboughtValueUsd) %> → worth <%= fmtUsd(rebuy.currentValueUsd) %>
+                            · avg <%= fmtUsd(rebuy.avgPriceUsd) %> · price <%= fmtUsd(rebuy.currentPrice) %>
+                        </span>
+                    </div>
+                <% } %>
+            </div>
+
+            <!-- Portfolio cards -->
             <% if (portfolioOverview) { %>
-                <div class="row g-3 mt-2 mb-3">
+                <div class="row g-3 mb-4">
                     <div class="col-12 col-md-6 col-xl-3">
-                        <div class="border rounded p-3 h-100">
-                            <div class="text-muted small">Portfolio value at entry</div>
+                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
+                            <div class="text-muted small mb-1">Entry value</div>
                             <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.valueAtEntry) %></div>
-                            <div class="text-muted small"> at average <%= portfolioOverview.symbol %> price of <%= fmtUsd(portfolioOverview.avgEntryPrice) %></div>
+                            <div class="text-muted small">avg <%= portfolioOverview.symbol %> <%= fmtUsd(portfolioOverview.avgEntryPrice) %></div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-xl-3">
-                        <div class="border rounded p-3 h-100">
-                            <div class="text-muted small">Portfolio value at current price</div>
-                            <div class="fs-5 fw-semibold mt-1"><%= fmtUsd(portfolioOverview.valueAtCurrent) %></div>
-                            <div class="text-muted small"> at average <%= portfolioOverview.symbol %> price of <%= fmtUsd(portfolioOverview.currentPrice) %></div>
+                        <% const currentDelta = portfolioOverview.valueAtCurrent - portfolioOverview.valueAtEntry; %>
+                        <div class="border rounded p-3 h-100 profit-card <%= currentDelta >= 0 ? 'profit-card-success' : 'profit-card-danger' %>">
+                            <div class="text-muted small mb-1">Current value</div>
+                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.valueAtCurrent) %></div>
+                            <div class="text-muted small"><%= portfolioOverview.symbol %> today <%= fmtUsd(portfolioOverview.currentPrice) %></div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-xl-3">
-                        <div class="border rounded p-3 h-100">
-                            <div class="d-flex justify-content-between align-items-start">
+                        <div class="border rounded p-3 h-100 profit-card profit-card-success">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
                                 <div class="text-muted small">Realized profit</div>
-                                <div class="small fw-semibold text-success">
-                                    +<%= pct(t.allTime.pnlPercent) %>%
-                                </div>
+                                <div class="small fw-semibold text-success">+<%= pct(t.allTime.pnlPercent) %>%</div>
                             </div>
-                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.realizedProfit) %></div>
-                            <div class="text-muted small"><%= n(t.allTime.trades, 0) %> trades</div>
+                            <div class="fs-5 fw-semibold text-success"><%= fmtUsd(portfolioOverview.realizedProfit) %></div>
+                            <div class="text-muted small"><%= n(t.allTime.trades, 0).toLocaleString() %> trades</div>
                         </div>
                     </div>
 
                     <div class="col-12 col-md-6 col-xl-3">
-                        <div class="border rounded p-3 h-100">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="text-muted small">Current portfolio</div>
-                                <div class="small fw-semibold <%= portfolioOverview.portfolioDeltaPercent >= 0 ? 'text-success' : 'text-danger' %>">
-                                    <%= portfolioOverview.portfolioDeltaPercent >= 0 ? '+' : '' %><%= pct(portfolioOverview.portfolioDeltaPercent) %>%
+                        <% const isPos = portfolioOverview.portfolioDeltaPercent >= 0; %>
+                        <div class="border rounded p-3 h-100 profit-card <%= isPos ? 'profit-card-success' : 'profit-card-danger' %>">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <div class="text-muted small">Portfolio today</div>
+                                <div class="small fw-semibold <%= isPos ? 'text-success' : 'text-danger' %>">
+                                    <%= isPos ? '+' : '' %><%= pct(portfolioOverview.portfolioDeltaPercent) %>%
                                 </div>
                             </div>
                             <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.currentPortfolio) %></div>
-                            <div class="text-muted mt-1" style="font-size: 0.8rem; line-height: 1.2;">
+                            <div class="small <%= isPos ? 'text-success' : 'text-danger' %>">
                                 <%= portfolioOverview.portfolioDeltaUsd >= 0 ? '+' : '' %><%= fmtUsd(portfolioOverview.portfolioDeltaUsd) %> vs entry
                             </div>
                         </div>
@@ -104,64 +108,41 @@
                 </div>
             <% } %>
 
-            <div class="row g-3 mt-2">
+            <!-- Period widgets -->
+            <div class="row g-3">
+                <% [
+                    { label: 'Today', data: t.today },
+                    { label: 'Week',  data: t.week  },
+                    { label: 'Month', data: t.month },
+                    { label: 'Year',  data: t.year  },
+                ].forEach(({ label, data }) => {
+                    const isPos  = n(data.totalUsd, 0) > 0;
+                    const isNeg  = n(data.totalUsd, 0) < 0;
+                    const hasPct = n(data.pnlPercent, 0) !== 0;
+                %>
                 <div class="col-12 col-md-4 col-xl">
-                    <div class="border rounded p-3 h-100">
+                    <div class="border rounded p-3 h-100 period-card profit-card <%= isPos ? 'profit-card-success' : isNeg ? 'profit-card-danger' : 'profit-card-neutral' %>">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-muted small">Today</div>
-                            <div class="small fw-semibold text-success">
-                                +<%= pct(t.today.pnlPercent) %>%
-                            </div>
+                            <div class="text-muted small"><%= label %></div>
+                            <% if (hasPct) { %>
+                                <div class="small fw-semibold <%= isPos ? 'text-success' : 'text-danger' %>">
+                                    <%= isPos ? '+' : '' %><%= pct(data.pnlPercent) %>%
+                                </div>
+                            <% } %>
                         </div>
-                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.today.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.today.trades, 0) %> trades · <%= n(t.today.cycles, 0) %> cycles</div>
+                        <div class="fs-5 fw-semibold <%= isPos ? 'text-success' : isNeg ? 'text-danger' : '' %>">
+                            <%= fmtUsd(data.totalUsd) %>
+                        </div>
+                        <div class="text-muted small"><%= n(data.trades,0) %> trades · <%= n(data.cycles,0) %> cycles</div>
                     </div>
                 </div>
-
-                <div class="col-12 col-md-4 col-xl">
-                    <div class="border rounded p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-muted small">Week</div>
-                            <div class="small fw-semibold text-success">
-                                +<%= pct(t.week.pnlPercent) %>%
-                            </div>
-                        </div>
-                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.week.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.week.trades, 0) %> trades · <%= n(t.week.cycles, 0) %> cycles</div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-4 col-xl">
-                    <div class="border rounded p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-muted small">Month</div>
-                            <div class="small fw-semibold text-success">
-                                +<%= pct(t.month.pnlPercent) %>%
-                            </div>
-                        </div>
-                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.month.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.month.trades, 0) %> trades · <%= n(t.month.cycles, 0) %> cycles</div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-4 col-xl">
-                    <div class="border rounded p-3 h-100">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-muted small">Year</div>
-                            <div class="small fw-semibold text-success">
-                                +<%= pct(t.year.pnlPercent) %>%
-                            </div>
-                        </div>
-                        <div class="fs-5 fw-semibold"><%= fmtUsd(t.year.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.year.trades, 0) %> trades · <%= n(t.year.cycles, 0) %> cycles</div>
-                    </div>
-                </div>
+                <% }) %>
             </div>
 
             <%
-                const daily = profitSummary.dailyProfitMtd || {};
-                const days = daily.days || [];
-                const maxAbs = Math.max(1, ...days.map(d => Math.abs(Number(d.totalUsd || 0))));
+                const daily      = profitSummary.dailyProfitMtd || {};
+                const days       = daily.days || [];
+                const maxAbs     = Math.max(1, ...days.map(d => Math.abs(Number(d.totalUsd || 0))));
                 const allTimeDays = (profitSummary.allTimeDailyProfit || []).filter(d => d.totalUsd !== 0);
             %>
 
@@ -171,55 +152,44 @@
 
                 <!-- Left: MTD bar list -->
                 <div class="col-12 col-lg-6">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="fw-semibold">Daily profit (MTD)</div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="fw-semibold">Daily profit <span class="text-muted fw-normal small">(MTD)</span></div>
                         <div class="text-muted small">
-                            Total: <%= fmtUsd(daily.totalUsd) %>
-                            • Trades: <%= n(daily.trades, 0) %>
-                            • Cycles: <%= n(daily.cycles, 0) %>
+                            <%= fmtUsd(daily.totalUsd) %> · <%= n(daily.trades,0) %> trades · <%= n(daily.cycles,0) %> cycles
                         </div>
                     </div>
 
-                    <div class="small text-muted mb-2">Last <%= days.length %> days</div>
-
                     <div class="vstack gap-0">
                         <% days.forEach(d => {
-                            const v = Number(d.totalUsd || 0);
+                            const v      = Number(d.totalUsd || 0);
                             const pctBar = Math.round((Math.abs(v) / maxAbs) * 100);
-                            const isNeg = v < 0;
+                            const isNeg  = v < 0;
+                            const isZero = v === 0;
                         %>
-                        <div class="d-flex align-items-center gap-0 small">
-                            <div style="width:110px" class="text-muted"><%= d.date %></div>
+                        <div class="d-flex align-items-center gap-0 small mtd-row <%= isZero ? 'zero' : '' %>">
+                            <div style="width:52px" class="text-muted"><%= fmtDate(d.date) %></div>
 
-                            <div class="progress flex-grow-1" style="height: 10px;">
-                                <div
-                                        class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
-                                        role="progressbar"
-                                        style="width: <%= pctBar %>%"
-                                        aria-valuenow="<%= pctBar %>"
-                                        aria-valuemin="0"
-                                        aria-valuemax="100">
+                            <div class="progress flex-grow-1" style="height:8px; background:#f0f0f0;">
+                                <div class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
+                                     role="progressbar"
+                                     style="width:<%= pctBar %>%">
                                 </div>
                             </div>
 
-                            <div style="width:120px" class="text-end fw-semibold">
+                            <div style="width:90px" class="text-end fw-semibold <%= isNeg ? 'text-danger' : isZero ? 'text-muted' : 'text-success' %>">
                                 <%= fmtUsd(v) %>
                             </div>
-                            <div style="width:85px" class="text-end text-muted">
-                                <%= n(d.trades, 0) %> trades
-                            </div>
-                            <div style="width:85px" class="text-end text-muted">
-                                <%= n(d.cycles, 0) %> cycles
-                            </div>
+                            <div style="width:70px" class="text-end text-muted"><%= n(d.trades,0) %></div>
+                            <div style="width:70px" class="text-end text-muted"><%= n(d.cycles,0) %></div>
                         </div>
                         <% }) %>
                     </div>
                 </div>
 
-                <!-- Right: all-time spline chart -->
+                <!-- Right: all-time chart -->
                 <div class="col-12 col-lg-6 d-flex flex-column">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="fw-semibold">Daily profit (all-time)</div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="fw-semibold">Daily profit <span class="text-muted fw-normal small">(all-time)</span></div>
                         <div class="text-muted small"><%= allTimeDays.length %> days</div>
                     </div>
                     <div style="position:relative; width:100%; height:100%; min-height:200px;">
@@ -233,13 +203,16 @@
             setTimeout(function () {
                 const canvas = document.getElementById('allTimeProfitChart');
                 if (!canvas || typeof Chart === 'undefined') return;
-
-                // Destroy previous instance if HTMX re-swapped
                 if (canvas._chartInstance) canvas._chartInstance.destroy();
 
-                const raw = <%- JSON.stringify(allTimeDays.map(d => ({ x: d.date, y: Number(d.totalUsd || 0) }))) %>;
+                const raw    = <%- JSON.stringify(allTimeDays.map(d => ({ x: d.date, y: Number(d.totalUsd || 0) }))) %>;
                 const labels = raw.map(d => d.x);
                 const values = raw.map(d => d.y);
+
+                const ctx = canvas.getContext('2d');
+                const grad = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
+                grad.addColorStop(0, 'rgba(25,135,84,0.25)');
+                grad.addColorStop(1, 'rgba(25,135,84,0)');
 
                 canvas._chartInstance = new Chart(canvas, {
                     type: 'line',
@@ -251,37 +224,43 @@
                             borderWidth: 2,
                             tension: 0.4,
                             pointRadius: 0,
-                            pointHoverRadius: 4,
+                            pointHoverRadius: 5,
                             pointHoverBackgroundColor: '#198754',
-                            fill: false,
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2,
+                            fill: true,
+                            backgroundColor: grad,
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         animation: { duration: 0 },
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
-                        },
+                        interaction: { mode: 'index', intersect: false },
                         plugins: {
                             legend: { display: false },
                             tooltip: {
+                                backgroundColor: '#212529',
+                                titleColor: '#adb5bd',
+                                bodyColor: '#fff',
+                                padding: 10,
+                                cornerRadius: 6,
                                 callbacks: {
                                     title: (items) => labels[items[0]?.dataIndex] ?? '',
-                                    label: (item) => ' $' + Number(item.parsed.y).toFixed(2),
+                                    label: (item)  => '  $' + Number(item.parsed.y).toFixed(2),
                                 }
                             },
                         },
                         scales: {
                             x: { display: false },
                             y: {
-                                grid: { color: '#e9ecef' },
+                                grid: { color: '#f0f0f0' },
                                 border: { display: false },
                                 ticks: {
-                                color: '#6c757d',
-                                callback: (v) => '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
-                            },
+                                    color: '#adb5bd',
+                                    font: { size: 11 },
+                                    callback: (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }),
+                                },
                             },
                         },
                     }
