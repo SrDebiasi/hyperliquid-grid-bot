@@ -5,22 +5,22 @@
         <div class="d-flex align-items-center gap-2">
             <button
                     type="button"
-                    class="btn btn-outline-primary btn-sm"
+                    class="btn btn-outline-secondary btn-sm"
                     data-bs-toggle="modal"
                     data-bs-target="#manageOrdersModal"
                     data-trade-instance-id="<%= instance?.id %>"
                     data-pair="<%= config?.pair %>"
             >
-                Manage Orders
+                <i class="bi bi-sliders me-1"></i>Manage Orders
             </button>
 
             <button
                     type="button"
-                    class="btn btn-primary btn-sm"
+                    class="btn btn-outline-primary btn-sm"
                     data-bs-toggle="modal"
                     data-bs-target="#configModal"
             >
-                Edit config
+                <i class="bi bi-pencil me-1"></i>Edit
             </button>
         </div>
     <% } %>
@@ -43,73 +43,65 @@
 
         const fmtPrice = (v) => {
             const n = num(v);
-            return n === null ? null : n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+            return n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
         };
 
         const fmtPct = (v) => {
             const n = num(v);
-            return n === null ? null : n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+            return n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 4 }) + '%';
         };
 
-        const fmtUsd = (v) => {
-            const n = num(v);
-            return n === null ? null : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        };
-
-        const show = (v) => v ?? null;
-        const dash = '<span class="text-muted">-</span>';
+        const isBlank = (v) => v === null || v === undefined || v === '';
     %>
 
     <!-- Quick stats row -->
-    <div class="row g-3 mb-1">
+    <div class="row g-2 mb-3">
         <div class="col-12 col-md-4">
-            <div class="small text-muted">Spot pair</div>
-            <div class="fw-semibold"><%= config.pair ?? '-' %></div>
-        </div>
-
-        <div class="col-6 col-md-4">
-            <div class="small text-muted">Target profit</div>
-            <div class="fw-semibold">
-                <%- fmtPct(config.target_percent) !== null ? (fmtPct(config.target_percent) + '%') : dash %>
+            <div class="border rounded p-2 h-100 profit-card profit-card-neutral">
+                <div class="text-muted small mb-1">Spot pair</div>
+                <div class="fw-semibold"><%= config.pair ?? '—' %></div>
             </div>
         </div>
 
         <div class="col-6 col-md-4">
-            <div class="small text-muted">Grid distance</div>
-            <div class="fw-semibold">
-                <%- fmtPct(config.margin_percent) !== null ? (fmtPct(config.margin_percent) + '%') : dash %>
+            <div class="border rounded p-2 h-100 profit-card profit-card-neutral">
+                <div class="text-muted small mb-1">Target profit</div>
+                <div class="fw-semibold"><%= fmtPct(config.target_percent) %></div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-4">
+            <div class="border rounded p-2 h-100 profit-card profit-card-neutral">
+                <div class="text-muted small mb-1">Grid distance</div>
+                <div class="fw-semibold"><%= fmtPct(config.margin_percent) %></div>
             </div>
         </div>
     </div>
 
-    <hr class="my-2" />
-
-    <%
-        const isBlank = (v) => v === null || v === undefined || v === '';
-        const hasExecRange = !isBlank(config.execution_price_min) || !isBlank(config.execution_price_max);
-    %>
-
-    <div class="small">
-        <div class="mb-2">
-            <span class="text-muted">Execution range:</span>
-            <span class="fw-semibold">
-            <%= !isBlank(config.execution_price_min) ? fmtPrice(config.execution_price_min) : dash %>
-        </span>
-            <span class="text-muted mx-1">→</span>
-            <span class="fw-semibold">
-            <%= !isBlank(config.execution_price_max) ? fmtPrice(config.execution_price_max) : dash %>
-        </span>
-            <% if (!hasExecRange) { %>
-                <span class="text-muted ms-1">(not set)</span>
-            <% } %>
+    <!-- Secondary info -->
+    <div class="vstack gap-1 small">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-arrow-left-right text-muted" style="width:14px;"></i>
+            <span class="text-muted">Execution range</span>
+            <span class="ms-auto d-flex align-items-center gap-1">
+                <span class="fw-semibold"><%= fmtPrice(config.execution_price_min) %></span>
+                <span class="text-muted">→</span>
+                <span class="fw-semibold"><%= fmtPrice(config.execution_price_max) %></span>
+                <% if (isBlank(config.execution_price_min) && isBlank(config.execution_price_max)) { %>
+                    <span class="text-muted ms-1" style="opacity:0.5;">(not set)</span>
+                <% } %>
+            </span>
         </div>
 
-        <div>
-            <span class="text-muted">Decimals configuration<% if (config.name) { %> for <%= config.name %><% } %>:</span>
-            <span class="fw-semibold"><%= config.decimal_quantity ?? dash %></span>
-            <span class="text-muted">qty,</span>
-            <span class="fw-semibold"><%= config.decimal_price ?? dash %></span>
-            <span class="text-muted">price</span>
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-hash text-muted" style="width:14px;"></i>
+            <span class="text-muted">Decimals<% if (config.name) { %> · <%= config.name %><% } %></span>
+            <span class="ms-auto">
+                <span class="fw-semibold"><%= config.decimal_quantity ?? '—' %></span>
+                <span class="text-muted"> qty · </span>
+                <span class="fw-semibold"><%= config.decimal_price ?? '—' %></span>
+                <span class="text-muted"> price</span>
+            </span>
         </div>
     </div>
 <% } %>

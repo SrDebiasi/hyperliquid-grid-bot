@@ -1,3 +1,4 @@
 /.env
 /src/market/cache/
 /CLAUDE.md
+/agents/
