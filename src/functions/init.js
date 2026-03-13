@@ -1064,8 +1064,10 @@ const runCoins = async function(coinIndex) {
             symbol: order.pair,
           });
 
-          // Persist and update in-memory state
-          void updateTradeOrder({
+          // Persist and update in-memory state.
+          // Awaited so the DB reflects the new state before the checking lock is released,
+          // preventing a second runCoins cycle from reading stale data and double-processing.
+          await updateTradeOrder({
             id: order.id,
             buy_order: newOrder.orderId,
             sell_order: null,
@@ -1132,8 +1134,10 @@ const runCoins = async function(coinIndex) {
             symbol: order.pair,
           });
 
-          // Persist and update in-memory state
-          void updateTradeOrder({
+          // Persist and update in-memory state.
+          // Awaited so the DB reflects the new state before the checking lock is released,
+          // preventing a second runCoins cycle from reading stale data and double-processing.
+          await updateTradeOrder({
             id: order.id,
             sell_order: newOrder.orderId,
             buy_order: null,
@@ -1350,6 +1354,12 @@ const wsQueuedOrRunning = {};
  * @returns {void}
  */
 const socketPrices = () => {
+  // Always clean up any existing subscription before creating a new one.
+  // Prevents orphaned subscriptions if socketPrices() is ever called while one is active.
+  if (socketUnsubscribe) {
+    stopSocketPrices();
+  }
+
   const allowedPairs = new Set(
       data.map((o) => getExchange().normalizeSymbolForPrice(o.pair))
   );

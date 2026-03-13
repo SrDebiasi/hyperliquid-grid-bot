@@ -9,13 +9,13 @@ const pageData = {
   window.__GRID_UI__ = <%- JSON.stringify(pageData) %>;
 </script>
 
-<div class="card shadow-sm">
+<div id="section-account" class="card shadow-sm">
   <div class="card-body">
     <%- include('../partials/trade_instance', { instance , botStatus}) %>
   </div>
 </div>
 
-<div class="card shadow-sm mt-3">
+<div id="section-config" class="card shadow-sm mt-3">
   <div class="card-body">
     <%- include('../partials/trade_config', { instance, config }) %>
   </div>
@@ -24,25 +24,25 @@ const pageData = {
 </div>
 
 
-<div class="card shadow-sm mt-3">
+<div id="section-profits" class="card shadow-sm mt-3">
   <div class="card-body">
     <div
             hx-get="/dashboard/profits"
-            hx-trigger="load, every 10m"
-            hx-swap="outerHTML"
+            hx-trigger="load, every 1m"
+            hx-swap="innerHTML"
     >
       <%- include('../partials/profits.ejs', { profitSummary, portfolioOverview }) %>
     </div>
   </div>
 </div>
 
-<div class="card shadow-sm mt-3">
+<div id="section-orders" class="card shadow-sm mt-3">
   <div class="card-body">
     <%- include('../partials/trade_orders', { orders }) %>
   </div>
 </div>
 
-<div class="card shadow-sm mt-3">
+<div id="section-market" class="card shadow-sm mt-3">
   <div class="card-body">
       <%- include("../partials/market.ejs") %>
   </div>

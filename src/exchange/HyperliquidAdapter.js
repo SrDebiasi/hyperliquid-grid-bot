@@ -28,6 +28,9 @@ export const ORDER_STATUS_NOT_OPEN = 'NOT_OPEN_NO_FILL';
 export const ORDER_STATUS_FILLED = 'FILLED';
 export const ORDER_STATUS_OPEN = 'OPEN';
 
+const UTOKEN_TO_BASE = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
+const BASE_TO_UTOKEN = { BTC: 'UBTC', ETH: 'UETH', SOL: 'USOL' };
+
 export default class HyperliquidAdapter {
   /**
    * @param {{
@@ -122,30 +125,26 @@ export default class HyperliquidAdapter {
 
     if (symbol.includes('/')) {
       const [base, quote] = symbol.split('/');
-      const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
-      return `${baseMap[base] ?? base}${quote}`;
+      return `${UTOKEN_TO_BASE[base] ?? base}${quote}`;
     }
 
     if (symbol.includes('-') || symbol.includes('_')) {
       const parts = symbol.split(/[-_]/);
       if (parts.length === 2) {
         const [base, quote] = parts;
-        const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
-        return `${baseMap[base] ?? base}${quote}`;
+        return `${UTOKEN_TO_BASE[base] ?? base}${quote}`;
       }
     }
 
     const clean = symbol.replace(/[\/\-_]/g, '');
     if (clean.endsWith('USDC')) {
       const base = clean.slice(0, -4);
-      const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
-      return `${baseMap[base] ?? base}USDC`;
+      return `${UTOKEN_TO_BASE[base] ?? base}USDC`;
     }
 
     if (clean.endsWith('USDT')) {
       const base = clean.slice(0, -4);
-      const baseMap = { UBTC: 'BTC', UETH: 'ETH', USOL: 'SOL' };
-      return `${baseMap[base] ?? base}USDT`;
+      return `${UTOKEN_TO_BASE[base] ?? base}USDT`;
     }
 
     return clean;
@@ -159,9 +158,7 @@ export default class HyperliquidAdapter {
     const sUp = symbol.toUpperCase();
     if (sUp.endsWith('/USDC')) {
       const [base, quote] = sUp.split('/');
-      const baseMap = {BTC: 'UBTC', ETH: 'UETH', SOL: 'USOL'};
-      const mappedBase = baseMap[base] ?? base;
-      return `${mappedBase}/${quote}`;
+      return `${BASE_TO_UTOKEN[base] ?? base}/${quote}`;
     }
     return sUp;
   }

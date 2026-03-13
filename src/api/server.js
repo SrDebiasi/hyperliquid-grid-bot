@@ -71,6 +71,7 @@ export async function buildServer() {
     await app.register(openOrdersRoutes, { prefix: "/api", models });
     await app.register(orderHistoryRoutes, { prefix: "/api", models });
 
+
     return app;
 }
 

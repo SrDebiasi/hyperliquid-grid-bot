@@ -18,13 +18,17 @@ export async function tradeProfitRoutes(app, { models }) {
         if (date_start || date_end) {
             where.date_transaction = {};
 
+            const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+
             if (date_start) {
                 const d0 = String(date_start).slice(0, 10);
+                if (!dateRe.test(d0)) return reply.code(400).send({ error: "Invalid date_start format, expected YYYY-MM-DD" });
                 where.date_transaction[Op.gte] = Sequelize.cast(`${d0} 00:00:00`, "timestamp");
             }
 
             if (date_end) {
                 const d1 = String(date_end).slice(0, 10);
+                if (!dateRe.test(d1)) return reply.code(400).send({ error: "Invalid date_end format, expected YYYY-MM-DD" });
                 where.date_transaction[Op.lte] = Sequelize.cast(`${d1} 23:59:59`, "timestamp");
             }
         }
@@ -33,8 +37,6 @@ export async function tradeProfitRoutes(app, { models }) {
         const rows = await TradeProfit.findAll({
             where,
             order: [["id", "DESC"]],
-            limit: 5000,
-            logging: console.log,
         });
 
         return rows;
@@ -53,13 +55,20 @@ export async function tradeProfitRoutes(app, { models }) {
         // Always store UTC as instant-like value (fine)
         body.date_transaction_utc = utc.toISO({ suppressMilliseconds: false });
 
-        // Compute Alberta wall time string (no offset!)
+        // Compute wall-clock string in bot timezone (no offset, stored as-is)
         const localWall = utc.setZone(BOT_TZ).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
+
+        // Guard: Luxon should always produce this format, but validate before
+        // interpolating into a SQL literal to prevent any unexpected injection.
+        if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/.test(localWall)) {
+            return reply.code(500).send({ error: "Unexpected timestamp format" });
+        }
 
         const row = await TradeProfit.create({
             ...body,
 
-            // IMPORTANT: this bypasses Sequelize date parsing
+            // IMPORTANT: this bypasses Sequelize date parsing so the wall-clock
+            // string is stored verbatim without UTC conversion.
             date_transaction: literal(`TIMESTAMP '${localWall}'`),
         });
 
