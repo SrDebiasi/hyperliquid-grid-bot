@@ -108,7 +108,7 @@
                             </div>
                         </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.today.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.today.trades, 0) %> trades</div>
+                        <div class="text-muted small"><%= n(t.today.trades, 0) %> trades · <%= n(t.today.cycles, 0) %> cycles</div>
                     </div>
                 </div>
 
@@ -121,7 +121,7 @@
                             </div>
                         </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.week.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.week.trades, 0) %> trades</div>
+                        <div class="text-muted small"><%= n(t.week.trades, 0) %> trades · <%= n(t.week.cycles, 0) %> cycles</div>
                     </div>
                 </div>
 
@@ -134,7 +134,7 @@
                             </div>
                         </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.month.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.month.trades, 0) %> trades</div>
+                        <div class="text-muted small"><%= n(t.month.trades, 0) %> trades · <%= n(t.month.cycles, 0) %> cycles</div>
                     </div>
                 </div>
 
@@ -147,7 +147,7 @@
                             </div>
                         </div>
                         <div class="fs-5 fw-semibold"><%= fmtUsd(t.year.totalUsd) %></div>
-                        <div class="text-muted small"><%= n(t.year.trades, 0) %> trades</div>
+                        <div class="text-muted small"><%= n(t.year.trades, 0) %> trades · <%= n(t.year.cycles, 0) %> cycles</div>
                     </div>
                 </div>
             </div>

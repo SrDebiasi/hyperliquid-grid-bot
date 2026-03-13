@@ -134,6 +134,19 @@ function groupProfitByDay(rows, timezone, from, to) {
     return { days, totalUsd, trades };
 }
 
+async function countCyclesForPeriod({ models, tradeInstanceId, from, to }) {
+    const count = await models.TradeCycle.count({
+        where: {
+            trade_instance_id: tradeInstanceId,
+            date_transaction: {
+                [Op.gte]: `${from} 00:00:00`,
+                [Op.lte]: `${to} 23:59:59`,
+            },
+        },
+    });
+    return Number(count || 0);
+}
+
 async function buildTotalsForPeriod({ tradeInstanceId, periodFn }) {
     const period = periodFn();
     const rows = await retrieveTradeProfit({
@@ -266,7 +279,13 @@ async function buildExposureNow({ tradeInstanceId }) {
 }
 
 async function getProfitSummary({ models, tradeInstanceId }) {
-    const [today, week, month, year, allTime, dailyProfitMtd, exposure] = await Promise.all([
+    const pDay   = periodDay();
+    const pWeek  = periodWeek();
+    const pMonth = periodMonth();
+    const pYear  = periodYear();
+
+    const [today, week, month, year, allTime, dailyProfitMtd, exposure,
+        cyclesToday, cyclesWeek, cyclesMonth, cyclesYear] = await Promise.all([
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodDay }),
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodWeek }),
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodMonth }),
@@ -274,7 +293,16 @@ async function getProfitSummary({ models, tradeInstanceId }) {
         buildAllTimeTotals({  tradeInstanceId }),
         buildDailyProfitMtd({ models, tradeInstanceId }),
         buildExposureNow({ tradeInstanceId }),
+        countCyclesForPeriod({ models, tradeInstanceId, from: pDay.from,   to: pDay.to }),
+        countCyclesForPeriod({ models, tradeInstanceId, from: pWeek.from,  to: pWeek.to }),
+        countCyclesForPeriod({ models, tradeInstanceId, from: pMonth.from, to: pMonth.to }),
+        countCyclesForPeriod({ models, tradeInstanceId, from: pYear.from,  to: pYear.to }),
     ]);
+
+    today.cycles = cyclesToday;
+    week.cycles  = cyclesWeek;
+    month.cycles = cyclesMonth;
+    year.cycles  = cyclesYear;
 
     const exposureUsd = exposure?.totalExposureUsd ?? null;
 
