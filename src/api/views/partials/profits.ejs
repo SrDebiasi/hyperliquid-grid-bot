@@ -1,3 +1,9 @@
+<style>
+@keyframes revealChart {
+    from { clip-path: inset(0 100% 0 0); opacity: 0; }
+    to   { clip-path: inset(0 0%   0 0); opacity: 1; }
+}
+</style>
 <% if (profitSummary) { %>
     <div class="card shadow-sm mb-4">
         <div class="card-body">
@@ -211,90 +217,78 @@
                 </div>
 
                 <!-- Right: all-time spline chart -->
-                <div class="col-12 col-lg-6">
+                <div class="col-12 col-lg-6 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="fw-semibold">Daily profit (all-time)</div>
                         <div class="text-muted small"><%= allTimeDays.length %> days</div>
                     </div>
-                    <div style="position:relative;">
-                        <div id="allTimeProfitChart" style="height: 280px;"></div>
-                        <div id="allTimeProfitTooltip" style="
-                            display:none;
-                            position:absolute;
-                            top:8px; left:8px;
-                            background:rgba(255,255,255,0.92);
-                            border:1px solid #dee2e6;
-                            border-radius:4px;
-                            padding:4px 8px;
-                            font-size:0.75rem;
-                            pointer-events:none;
-                            white-space:nowrap;
-                            z-index:10;
-                        "></div>
+                    <div style="position:relative; width:100%; height:100%; min-height:200px;">
+                        <canvas id="allTimeProfitChart" style="opacity:0;"></canvas>
                     </div>
                 </div>
 
             </div>
 
             <script>
-            (function () {
-                const container = document.getElementById('allTimeProfitChart');
-                if (!container || typeof LightweightCharts === 'undefined') return;
+            setTimeout(function () {
+                const canvas = document.getElementById('allTimeProfitChart');
+                if (!canvas || typeof Chart === 'undefined') return;
 
-                const chart = LightweightCharts.createChart(container, {
-                    layout: {
-                        background: { color: 'transparent' },
-                        textColor: '#6c757d',
-                    },
-                    grid: {
-                        vertLines: { visible: false },
-                        horzLines: { color: '#e9ecef' },
-                    },
-                    rightPriceScale: {
-                        borderVisible: false,
-                        scaleMargins: { top: 0.1, bottom: 0.1 },
-                    },
-                    timeScale: { visible: false, borderVisible: false },
-                    crosshair: {
-                        vertLine: { labelVisible: false },
-                        horzLine: { labelVisible: false },
-                    },
-                    handleScroll: false,
-                    handleScale: false,
-                });
+                // Destroy previous instance if HTMX re-swapped
+                if (canvas._chartInstance) canvas._chartInstance.destroy();
 
-                const series = chart.addSeries(LightweightCharts.LineSeries, {
-                    color: '#198754',
-                    lineWidth: 2,
-                    lineType: 2,
-                    crosshairMarkerVisible: true,
-                    priceLineVisible: false,
-                    lastValueVisible: false,
-                });
+                const raw = <%- JSON.stringify(allTimeDays.map(d => ({ x: d.date, y: Number(d.totalUsd || 0) }))) %>;
+                const labels = raw.map(d => d.x);
+                const values = raw.map(d => d.y);
 
-                const raw = <%- JSON.stringify(allTimeDays.map(d => ({ time: d.date, value: Number(d.totalUsd || 0) }))) %>;
-                if (raw.length > 0) series.setData(raw);
-                chart.timeScale().fitContent();
-
-                // Custom tooltip on hover
-                const tooltip = document.getElementById('allTimeProfitTooltip');
-                chart.subscribeCrosshairMove((param) => {
-                    if (!param.time || !param.point) {
-                        tooltip.style.display = 'none';
-                        return;
+                canvas._chartInstance = new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            borderColor: '#198754',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointHoverBackgroundColor: '#198754',
+                            fill: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 0 },
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    title: (items) => labels[items[0]?.dataIndex] ?? '',
+                                    label: (item) => ' $' + Number(item.parsed.y).toFixed(2),
+                                }
+                            },
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: {
+                                grid: { color: '#e9ecef' },
+                                border: { display: false },
+                                ticks: {
+                                color: '#6c757d',
+                                callback: (v) => '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+                            },
+                            },
+                        },
                     }
-                    const val = param.seriesData.get(series);
-                    if (val === undefined) { tooltip.style.display = 'none'; return; }
-                    const usd = '$' + Number(val.value ?? val).toFixed(2);
-                    tooltip.textContent = param.time + ' · ' + usd;
-                    tooltip.style.display = 'block';
                 });
 
-                // Resize with container
-                new ResizeObserver(() => {
-                    chart.applyOptions({ width: container.clientWidth });
-                }).observe(container);
-            })();
+                canvas.style.animation = 'revealChart 2s cubic-bezier(0.16,1,0.3,1) forwards';
+            }, 50);
             </script>
         </div>
     </div>
