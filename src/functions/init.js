@@ -1392,7 +1392,6 @@ const socketPrices = () => {
 
     lastSocketTickAt = Date.now();
     socketDropAlertSent = false;
-
     const p = Number(price);
     if (!Number.isFinite(p)) return;
 
