@@ -9,6 +9,7 @@ import {
   updateTradeOrder,
   updateTradeConfig,
   addProfit,
+  addCycle,
   addMessage,
   consoleLog,
   startHealthchecksPing,
@@ -1099,6 +1100,13 @@ const runCoins = async function(coinIndex) {
             await handleRebuyFromProfit(coinIndex, profitReal);
           } else {
             void notifyTelegram(sellMsg);
+            addCycle({
+              trade_instance_id: tradeInstanceId,
+              name: cfg.name,
+              pair: order.pair,
+              side: 'SELL',
+              price: order.sell_price,
+            });
           }
           // Needs to update after the last_operation check
           order.last_operation = !order.last_operation;
@@ -1172,6 +1180,13 @@ const runCoins = async function(coinIndex) {
             if (currentPrice >= order.entry_price) calculateFirstProfit(order);
           } else {
             void notifyTelegram(buyMsg);
+            addCycle({
+              trade_instance_id: tradeInstanceId,
+              name: cfg.name,
+              pair: order.pair,
+              side: 'BUY',
+              price: order.buy_price,
+            });
           }
         }
 

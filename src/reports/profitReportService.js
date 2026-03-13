@@ -1,5 +1,6 @@
 // src/reports/profitReportService.js
 import { DateTime } from 'luxon';
+import { Op } from 'sequelize';
 import {
     periodDay,
     periodWeek,
@@ -177,13 +178,38 @@ async function buildAllTimeTotals({ tradeInstanceId }) {
     };
 }
 
+async function buildCycleMtdByDay({ models, tradeInstanceId, period }) {
+    const rows = await models.TradeCycle.findAll({
+        where: {
+            trade_instance_id: tradeInstanceId,
+            date_transaction: {
+                [Op.gte]: `${period.from} 00:00:00`,
+                [Op.lte]: `${period.to} 23:59:59`,
+            },
+        },
+    });
+
+    const plain = rows.map(r => r.get({ plain: true }));
+    const map = new Map();
+    for (const r of plain) {
+        const dt = parseRowDateTime(r, period.timezone);
+        const day = dt ? dt.toFormat('yyyy-LL-dd') : null;
+        if (!day) continue;
+        map.set(day, (map.get(day) || 0) + 1);
+    }
+    return map; // Map<date, count>
+}
+
 async function buildDailyProfitMtd({ models, tradeInstanceId }) {
     const period = periodMonthToDate();
-    const rows = await retrieveTradeProfit({
-        trade_instance_id: tradeInstanceId,
-        date_start: period.from,
-        date_end: period.to,
-    });
+    const [rows, cyclesByDay] = await Promise.all([
+        retrieveTradeProfit({
+            trade_instance_id: tradeInstanceId,
+            date_start: period.from,
+            date_end: period.to,
+        }),
+        buildCycleMtdByDay({ models, tradeInstanceId, period }),
+    ]);
     const plain = toPlainRows(rows);
 
     const grouped = groupProfitByDay(
@@ -193,6 +219,14 @@ async function buildDailyProfitMtd({ models, tradeInstanceId }) {
         period.to,
     );
 
+    // Merge cycle counts into each day
+    const days = grouped.days.map(d => ({
+        ...d,
+        cycles: cyclesByDay.get(d.date) || 0,
+    }));
+
+    const cycles = days.reduce((acc, d) => acc + d.cycles, 0);
+
     return {
         period: {
             key: period.key,
@@ -201,9 +235,10 @@ async function buildDailyProfitMtd({ models, tradeInstanceId }) {
             to: period.to,
             timezone: period.timezone,
         },
-        days: grouped.days,
+        days,
         totalUsd: grouped.totalUsd,
         trades: grouped.trades,
+        cycles,
     };
 }
 
@@ -237,7 +272,7 @@ async function getProfitSummary({ models, tradeInstanceId }) {
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodMonth }),
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodYear }),
         buildAllTimeTotals({  tradeInstanceId }),
-        buildDailyProfitMtd({  tradeInstanceId }),
+        buildDailyProfitMtd({ models, tradeInstanceId }),
         buildExposureNow({ tradeInstanceId }),
     ]);
 

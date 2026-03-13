@@ -14,6 +14,7 @@ import { tradeConfigRoutes } from "./routes/trade-config.js";
 import { tradeOrderRoutes } from "./routes/trade-order.js";
 import { tradeInstanceRoutes } from "./routes/trade-instance.js";
 import { tradeProfitRoutes } from "./routes/trade-profit.js";
+import { tradeCycleRoutes } from "./routes/trade-cycle.js";
 import { messageRoutes } from "./routes/message.js";
 import { openOrdersRoutes } from "./routes/open-orders.js";
 import { orderHistoryRoutes } from "./routes/order-history.js";
@@ -67,6 +68,7 @@ export async function buildServer() {
     await app.register(tradeOrderRoutes, { prefix: "/api", models });
     await app.register(tradeInstanceRoutes, { prefix: "/api", models });
     await app.register(tradeProfitRoutes, { prefix: "/api", models });
+    await app.register(tradeCycleRoutes, { prefix: "/api", models });
     await app.register(messageRoutes, { prefix: "/api", models });
     await app.register(openOrdersRoutes, { prefix: "/api", models });
     await app.register(orderHistoryRoutes, { prefix: "/api", models });

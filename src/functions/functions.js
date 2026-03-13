@@ -152,6 +152,23 @@ const addMessage = (message, color = null) => {
     .catch(() => consoleLog('Erro no addMessage'));
 };
 
+const addCycle = (data) => {
+  const payload = {
+    pair: data.pair,
+    side: data.side,
+    name: data.name,
+    price: data.price,
+    trade_instance_id: data.trade_instance_id,
+    date_transaction_utc: moment.utc().toISOString(),
+    date_transaction: moment().tz(BOT_TZ).toISOString(true),
+  };
+
+  axios.post(apiUrl + 'trade-cycle', payload, headers).catch((error) => {
+    console.log(error);
+    consoleLog('Error on addCycle');
+  });
+};
+
 const addProfit = (data) => {
   const payload = {
     pair: data.pair,
@@ -266,6 +283,7 @@ export {
   updateTradeOrder,
   updateTradeConfig,
   addProfit,
+  addCycle,
   addMessage,
   consoleLog,
   startHealthchecksPing
