@@ -255,6 +255,15 @@ async function buildDailyProfitMtd({ models, tradeInstanceId }) {
     };
 }
 
+async function buildAllTimeDailyProfit({ tradeInstanceId }) {
+    const rows = await retrieveTradeProfit({ trade_instance_id: tradeInstanceId });
+    const plain = toPlainRows(rows);
+    const tz = periodMonthToDate().timezone;
+    const grouped = groupProfitByDay(plain, tz);
+    // groupProfitByDay returns newest-first; reverse for chronological chart order
+    return [...grouped.days].reverse();
+}
+
 function pnlPercent(totalUsd, exposureUsd) {
     const exp = Number(exposureUsd || 0);
     if (!exp) return null;
@@ -285,7 +294,7 @@ async function getProfitSummary({ models, tradeInstanceId }) {
     const pYear  = periodYear();
 
     const [today, week, month, year, allTime, dailyProfitMtd, exposure,
-        cyclesToday, cyclesWeek, cyclesMonth, cyclesYear] = await Promise.all([
+        cyclesToday, cyclesWeek, cyclesMonth, cyclesYear, allTimeDailyProfit] = await Promise.all([
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodDay }),
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodWeek }),
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodMonth }),
@@ -297,6 +306,7 @@ async function getProfitSummary({ models, tradeInstanceId }) {
         countCyclesForPeriod({ models, tradeInstanceId, from: pWeek.from,  to: pWeek.to }),
         countCyclesForPeriod({ models, tradeInstanceId, from: pMonth.from, to: pMonth.to }),
         countCyclesForPeriod({ models, tradeInstanceId, from: pYear.from,  to: pYear.to }),
+        buildAllTimeDailyProfit({ tradeInstanceId }),
     ]);
 
     today.cycles = cyclesToday;
@@ -321,6 +331,7 @@ async function getProfitSummary({ models, tradeInstanceId }) {
             : null,
         totals,
         dailyProfitMtd,
+        allTimeDailyProfit,
     };
 };
 

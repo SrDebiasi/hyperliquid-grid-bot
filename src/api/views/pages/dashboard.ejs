@@ -11,7 +11,7 @@ const pageData = {
 
 <div id="section-account" class="card shadow-sm">
   <div class="card-body">
-    <%- include('../partials/trade_instance', { instance , botStatus}) %>
+    <%- include('../partials/trade_instance', { instance, botStatus, envSecretsConfigured }) %>
   </div>
 </div>
 
@@ -48,7 +48,7 @@ const pageData = {
   </div>
 </div>
 
-<%- include('../partials/modals/secrets-modal', { instance }) %>
+<%- include('../partials/modals/secrets-modal', { instance, envWalletAddress, envPrivateKey }) %>
 <%- include('../partials/modals/trade_config', { config }) %>
 
 <script type="module" src="/js/market.js"></script>

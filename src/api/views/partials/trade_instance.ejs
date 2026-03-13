@@ -1,6 +1,7 @@
 <% const hasInstance = !!instance?.id; %>
 <% const isRunning = !!botStatus?.isRunning; %>
 <% const secretsConfigured = !!instance?.private_key; %>
+<% const secretsReady = secretsConfigured || !!envSecretsConfigured; %>
 
 <style>
 /* Force compact action buttons on normal/desktop so they don't stay full-width */
@@ -22,20 +23,9 @@
 
     <!-- Account block: stacks first on mobile -->
     <div class="trade-instance-account flex-grow-1 flex-md-grow-0 order-1 order-md-1">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-            <div class="d-flex gap-2 align-items-baseline">
-                <span class="fw-semibold">Account</span>
-                <span class="text-muted">ID: <%= instance?.id ?? '-' %></span>
-            </div>
-            <% if (hasInstance) { %>
-                <button
-                    class="btn btn-outline-primary btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#secretsModal"
-                >
-                    Set secrets
-                </button>
-            <% } %>
+        <div class="d-flex gap-2 align-items-baseline mb-2">
+            <span class="fw-semibold">Account</span>
+            <span class="text-muted">#<%= instance?.id ?? '-' %></span>
         </div>
 
         <div class="trade-instance-fields">
@@ -50,12 +40,18 @@
                 <% if (!hasInstance) { %>
                     <span class="text-muted">-</span>
                 <% } else { %>
-                    <span class="badge <%= secretsConfigured ? 'text-bg-success' : 'text-bg-secondary' %> align-self-start align-self-sm-center me-2">
-                        <%= secretsConfigured ? 'Configured' : 'Not configured' %>
+                    <span class="badge <%= secretsReady ? 'text-bg-success' : 'text-bg-secondary' %> align-self-start align-self-sm-center me-2">
+                        <%= secretsReady ? 'Configured' : 'Not configured' %>
                     </span>
-                    <% if (!secretsConfigured) { %>
-                        <span class="text-muted small">Can also be provided via .env</span>
+                    <% if (!secretsReady) { %>
+                        <span class="text-muted small me-1">or via .env</span>
                     <% } %>
+                    <button
+                        class="btn btn-outline-primary btn-sm py-0"
+                        style="font-size: 0.75rem;"
+                        data-bs-toggle="modal"
+                        data-bs-target="#secretsModal"
+                    >Set secrets</button>
                 <% } %>
             </div>
         </div>

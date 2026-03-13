@@ -164,6 +164,10 @@ async function loadDashboardData({ models }) {
         ? await getBotStatus({ instanceId: instance.id })
         : { isRunning: false, statusText: "stopped" };
 
+    const envWalletAddress = process.env.WALLET_ADDRESS || '';
+    const envPrivateKey    = process.env.PRIVATE_KEY    || '';
+    const envSecretsConfigured = !!(envWalletAddress && envPrivateKey);
+
     return {
         instance,
         config,
@@ -172,6 +176,9 @@ async function loadDashboardData({ models }) {
         rebuy,
         portfolioOverview,
         botStatus,
+        envSecretsConfigured,
+        envWalletAddress,
+        envPrivateKey,
     };
 }
 
@@ -179,7 +186,7 @@ export async function dashboardRoutes(app, opts) {
     const { models } = opts;
 
     app.get("/dashboard", async (request, reply) => {
-        const { instance, config, orders, profitSummary, rebuy, botStatus, portfolioOverview } =
+        const { instance, config, orders, profitSummary, rebuy, botStatus, portfolioOverview, envSecretsConfigured, envWalletAddress, envPrivateKey } =
             await loadDashboardData({ models });
 
         return reply.view("layout.ejs", {
@@ -193,6 +200,9 @@ export async function dashboardRoutes(app, opts) {
             profitSummary,
             portfolioOverview,
             rebuy,
+            envSecretsConfigured,
+            envWalletAddress,
+            envPrivateKey,
         });
     });
 

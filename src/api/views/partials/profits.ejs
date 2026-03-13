@@ -156,53 +156,146 @@
                 const daily = profitSummary.dailyProfitMtd || {};
                 const days = daily.days || [];
                 const maxAbs = Math.max(1, ...days.map(d => Math.abs(Number(d.totalUsd || 0))));
+                const allTimeDays = (profitSummary.allTimeDailyProfit || []).filter(d => d.totalUsd !== 0);
             %>
 
             <hr class="my-4" />
 
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <div class="fw-semibold">Daily profit (MTD)</div>
-                <div class="text-muted small">
-                    Total: <%= fmtUsd(daily.totalUsd) %>
-                    • Trades: <%= n(daily.trades, 0) %>
-                    • Cycles: <%= n(daily.cycles, 0) %>
-                </div>
-            </div>
+            <div class="row g-4">
 
-            <div class="small text-muted mb-2">Last <%= days.length %> days</div>
-
-            <div class="vstack gap-0">
-                <% days.forEach(d => {
-                    const v = Number(d.totalUsd || 0);
-                    const pctBar = Math.round((Math.abs(v) / maxAbs) * 100);
-                    const isNeg = v < 0;
-                %>
-                <div class="d-flex align-items-center gap-0 small">
-                    <div style="width:110px" class="text-muted"><%= d.date %></div>
-
-                    <div class="progress flex-grow-1" style="height: 10px;">
-                        <div
-                                class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
-                                role="progressbar"
-                                style="width: <%= pctBar %>%"
-                                aria-valuenow="<%= pctBar %>"
-                                aria-valuemin="0"
-                                aria-valuemax="100">
+                <!-- Left: MTD bar list -->
+                <div class="col-12 col-lg-6">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-semibold">Daily profit (MTD)</div>
+                        <div class="text-muted small">
+                            Total: <%= fmtUsd(daily.totalUsd) %>
+                            • Trades: <%= n(daily.trades, 0) %>
+                            • Cycles: <%= n(daily.cycles, 0) %>
                         </div>
                     </div>
 
-                    <div style="width:120px" class="text-end fw-semibold">
-                        <%= fmtUsd(v) %>
-                    </div>
-                    <div style="width:85px" class="text-end text-muted">
-                        <%= n(d.trades, 0) %> trades
-                    </div>
-                    <div style="width:85px" class="text-end text-muted">
-                        <%= n(d.cycles, 0) %> cycles
+                    <div class="small text-muted mb-2">Last <%= days.length %> days</div>
+
+                    <div class="vstack gap-0">
+                        <% days.forEach(d => {
+                            const v = Number(d.totalUsd || 0);
+                            const pctBar = Math.round((Math.abs(v) / maxAbs) * 100);
+                            const isNeg = v < 0;
+                        %>
+                        <div class="d-flex align-items-center gap-0 small">
+                            <div style="width:110px" class="text-muted"><%= d.date %></div>
+
+                            <div class="progress flex-grow-1" style="height: 10px;">
+                                <div
+                                        class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
+                                        role="progressbar"
+                                        style="width: <%= pctBar %>%"
+                                        aria-valuenow="<%= pctBar %>"
+                                        aria-valuemin="0"
+                                        aria-valuemax="100">
+                                </div>
+                            </div>
+
+                            <div style="width:120px" class="text-end fw-semibold">
+                                <%= fmtUsd(v) %>
+                            </div>
+                            <div style="width:85px" class="text-end text-muted">
+                                <%= n(d.trades, 0) %> trades
+                            </div>
+                            <div style="width:85px" class="text-end text-muted">
+                                <%= n(d.cycles, 0) %> cycles
+                            </div>
+                        </div>
+                        <% }) %>
                     </div>
                 </div>
-                <% }) %>
+
+                <!-- Right: all-time spline chart -->
+                <div class="col-12 col-lg-6">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-semibold">Daily profit (all-time)</div>
+                        <div class="text-muted small"><%= allTimeDays.length %> days</div>
+                    </div>
+                    <div style="position:relative;">
+                        <div id="allTimeProfitChart" style="height: 280px;"></div>
+                        <div id="allTimeProfitTooltip" style="
+                            display:none;
+                            position:absolute;
+                            top:8px; left:8px;
+                            background:rgba(255,255,255,0.92);
+                            border:1px solid #dee2e6;
+                            border-radius:4px;
+                            padding:4px 8px;
+                            font-size:0.75rem;
+                            pointer-events:none;
+                            white-space:nowrap;
+                            z-index:10;
+                        "></div>
+                    </div>
+                </div>
+
             </div>
+
+            <script>
+            (function () {
+                const container = document.getElementById('allTimeProfitChart');
+                if (!container || typeof LightweightCharts === 'undefined') return;
+
+                const chart = LightweightCharts.createChart(container, {
+                    layout: {
+                        background: { color: 'transparent' },
+                        textColor: '#6c757d',
+                    },
+                    grid: {
+                        vertLines: { visible: false },
+                        horzLines: { color: '#e9ecef' },
+                    },
+                    rightPriceScale: {
+                        borderVisible: false,
+                        scaleMargins: { top: 0.1, bottom: 0.1 },
+                    },
+                    timeScale: { visible: false, borderVisible: false },
+                    crosshair: {
+                        vertLine: { labelVisible: false },
+                        horzLine: { labelVisible: false },
+                    },
+                    handleScroll: false,
+                    handleScale: false,
+                });
+
+                const series = chart.addSeries(LightweightCharts.LineSeries, {
+                    color: '#198754',
+                    lineWidth: 2,
+                    lineType: 2,
+                    crosshairMarkerVisible: true,
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                });
+
+                const raw = <%- JSON.stringify(allTimeDays.map(d => ({ time: d.date, value: Number(d.totalUsd || 0) }))) %>;
+                if (raw.length > 0) series.setData(raw);
+                chart.timeScale().fitContent();
+
+                // Custom tooltip on hover
+                const tooltip = document.getElementById('allTimeProfitTooltip');
+                chart.subscribeCrosshairMove((param) => {
+                    if (!param.time || !param.point) {
+                        tooltip.style.display = 'none';
+                        return;
+                    }
+                    const val = param.seriesData.get(series);
+                    if (val === undefined) { tooltip.style.display = 'none'; return; }
+                    const usd = '$' + Number(val.value ?? val).toFixed(2);
+                    tooltip.textContent = param.time + ' · ' + usd;
+                    tooltip.style.display = 'block';
+                });
+
+                // Resize with container
+                new ResizeObserver(() => {
+                    chart.applyOptions({ width: container.clientWidth });
+                }).observe(container);
+            })();
+            </script>
         </div>
     </div>
 <% } %>
