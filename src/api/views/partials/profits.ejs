@@ -4,7 +4,7 @@
     to   { clip-path: inset(0 0%   0 0); opacity: 1; }
 }
 .mtd-row { padding: 2px 4px; border-radius: 4px; transition: background 0.1s; }
-.mtd-row:hover { background: #f8f9fa; }
+.mtd-row:hover { background: var(--bs-secondary-bg); }
 .mtd-row.zero { opacity: 0.38; }
 .progress { border-radius: 6px !important; }
 .progress-bar { border-radius: 6px !important; }
@@ -13,7 +13,7 @@
 .profit-card-danger  { border-left-color: #dc3545 !important; }
 .profit-card-neutral { border-left-color: #adb5bd !important; }
 .period-card { transition: box-shadow 0.15s; }
-.period-card:hover { box-shadow: 0 0 0 1px #dee2e6; }
+.period-card:hover { box-shadow: 0 0 0 1px var(--bs-border-color); }
 </style>
 
 <% if (profitSummary) { %>
@@ -169,7 +169,7 @@
                         <div class="d-flex align-items-center gap-0 small mtd-row <%= isZero ? 'zero' : '' %>">
                             <div style="width:52px" class="text-muted"><%= fmtDate(d.date) %></div>
 
-                            <div class="progress flex-grow-1" style="height:8px; background:#f0f0f0;">
+                            <div class="progress flex-grow-1" style="height:8px; background:var(--bs-secondary-bg);">
                                 <div class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
                                      role="progressbar"
                                      style="width:<%= pctBar %>%">
@@ -208,6 +208,9 @@
                 const raw    = <%- JSON.stringify(allTimeDays.map(d => ({ x: d.date, y: Number(d.totalUsd || 0) }))) %>;
                 const labels = raw.map(d => d.x);
                 const values = raw.map(d => d.y);
+
+                const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+                const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
 
                 const ctx = canvas.getContext('2d');
                 const grad = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
@@ -254,7 +257,7 @@
                         scales: {
                             x: { display: false },
                             y: {
-                                grid: { color: '#f0f0f0' },
+                                grid: { color: gridColor },
                                 border: { display: false },
                                 ticks: {
                                     color: '#adb5bd',

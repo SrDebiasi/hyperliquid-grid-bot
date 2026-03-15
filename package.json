@@ -9,6 +9,7 @@
     "db:setup": "npm run db:create && npm run db:seed",
     "backtest": "node scripts/backtest.js",
     "api": "node src/api/server.js",
+    "api:watch": "node --watch src/api/server.js",
     "start": "node cli.js start",
     "openOrders": "node cli.js openOrders",
     "cancelOrders": "node cli.js cancelOrders",

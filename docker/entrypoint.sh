@@ -69,6 +69,14 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   su - postgres -c "/usr/lib/postgresql/16/bin/initdb -D '$PGDATA'"
 fi
 
+echo "Configuring PostgreSQL for external access..."
+grep -q "^listen_addresses" "$PGDATA/postgresql.conf" \
+  || echo "listen_addresses = '*'" >> "$PGDATA/postgresql.conf"
+sed -i "s/^listen_addresses.*/listen_addresses = '*'/" "$PGDATA/postgresql.conf"
+
+grep -q "^host all all 0.0.0.0/0" "$PGDATA/pg_hba.conf" \
+  || echo "host all all 0.0.0.0/0 trust" >> "$PGDATA/pg_hba.conf"
+
 echo "Starting PostgreSQL..."
 su - postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D '$PGDATA' -l /app/logs/postgres.log -o \"-p ${DB_PORT:-5432}\" start"
 

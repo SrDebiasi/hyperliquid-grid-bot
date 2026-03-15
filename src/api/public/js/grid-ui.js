@@ -190,7 +190,7 @@
             const pair = payload?.meta?.pair ?? "";
 
             simText.innerHTML = `
-<div class="bg-light border rounded p-3 mb-2">
+<div class="bg-body-secondary border rounded p-3 mb-2">
   <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Grid Summary <span class="text-body-secondary">(${pair})</span></div>
   <div class="row g-2">
     <div class="col-6 col-md-3">
@@ -212,7 +212,7 @@
   </div>
 </div>
 
-<div class="bg-light border rounded p-3 mb-2">
+<div class="bg-body-secondary border rounded p-3 mb-2">
   <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Capital Needed <span class="fw-normal text-body-secondary">(estimate)</span></div>
   <div class="row g-2">
     <div class="col-6 col-md-4">
@@ -230,7 +230,7 @@
   </div>
 </div>
 
-<div class="bg-light border rounded p-3 mb-2">
+<div class="bg-body-secondary border rounded p-3 mb-2">
   <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Range Scenarios</div>
   <div class="row g-3">
     <div class="col-6 border-end">
@@ -250,7 +250,7 @@
   </div>
 </div>
 
-<div class="bg-light border rounded p-3 mb-2">
+<div class="bg-body-secondary border rounded p-3 mb-2">
   <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Profit per cycle finished <span class="fw-normal text-body-secondary">(estimate)</span></div>
   <div class="row g-2">
     <div class="col-6 col-md-4">
@@ -268,20 +268,20 @@
   </div>
 </div>
 
-<div class="border rounded p-3 bg-white mb-2">
+<div class="border rounded p-3 bg-body mb-2">
   <div class="d-flex justify-content-between align-items-center">
     <div class="text-muted fw-semibold">Total capital required</div>
     <div class="fw-bold fs-5">$${money(s.est_total_usd_needed)}</div>
   </div>
 </div>
 
-<div class="bg-light border rounded p-3">
+<div class="bg-body-secondary border rounded p-3">
   <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Monthly earnings estimate</div>
   <div class="text-muted mb-2" style="font-size:0.75rem;">Based on total capital × monthly return. Typical grid bots earn 1–5%/month depending on volatility.</div>
   <div class="row g-2">
     ${[1, 2, 3, 4, 5].map(pct => `
     <div class="col">
-      <div class="border rounded p-2 text-center bg-white">
+      <div class="border rounded p-2 text-center bg-body">
         <div class="text-muted" style="font-size:0.7rem;">${pct}%/mo</div>
         <div class="fw-semibold text-success">$${money(s.est_total_usd_needed * pct / 100)}</div>
       </div>

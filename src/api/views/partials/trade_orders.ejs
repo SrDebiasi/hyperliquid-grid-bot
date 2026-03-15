@@ -1,13 +1,15 @@
 <style>
-.orders-table th { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #e9ecef; }
-.orders-table td { font-size: 0.85rem; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
+.orders-table th { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--bs-border-color); }
+.orders-table td { font-size: 0.85rem; vertical-align: middle; border-bottom: 1px solid var(--bs-border-color-translucent); }
 .orders-table tbody tr { transition: background 0.1s; }
-.orders-table tbody tr:hover { background: #f8f9fa !important; }
+.orders-table tbody tr:hover { background: var(--bs-secondary-bg) !important; }
 .orders-table tbody tr.row-buy  { border-left: 3px solid #198754; }
 .orders-table tbody tr.row-sell { border-left: 3px solid #0d6efd; }
 .order-id { font-family: monospace; font-size: 0.78rem; color: #6c757d; cursor: default; }
 .th-buy  { background: #f0faf5; }
 .th-sell { background: #f0f4ff; }
+[data-bs-theme="dark"] .th-buy  { background: rgba(25, 135, 84, 0.12); }
+[data-bs-theme="dark"] .th-sell { background: rgba(13, 110, 253, 0.12); }
 </style>
 
 <h2 class="h5 mb-3">Orders</h2>

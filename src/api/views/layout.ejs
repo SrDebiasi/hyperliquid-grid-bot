@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -16,6 +16,7 @@
 
     <style>
         html { scroll-behavior: smooth; }
+        html, body { background-color: var(--bs-body-bg) !important; }
 
         @keyframes bot-pulse {
             0%, 100% { opacity: 1; }
@@ -73,7 +74,68 @@
         @media (max-width: 767px) {
             .app-sidebar { display: none !important; }
         }
+
+        /* Dark mode — sidebar */
+        [data-bs-theme="dark"] .app-sidebar {
+            background-color: var(--bs-body-bg) !important;
+            border-color: var(--bs-border-color) !important;
+        }
+        [data-bs-theme="dark"] .sidebar-link {
+            color: var(--bs-body-color);
+        }
+        [data-bs-theme="dark"] .sidebar-link:hover {
+            background: var(--bs-secondary-bg);
+            color: var(--bs-body-color);
+        }
+        [data-bs-theme="dark"] .sidebar-link.active {
+            background: rgba(13, 110, 253, 0.15);
+            color: #6ea8fe;
+        }
+        [data-bs-theme="dark"] .app-sidebar .border-top,
+        [data-bs-theme="dark"] .app-sidebar .border-bottom {
+            border-color: var(--bs-border-color) !important;
+        }
+
+        /* Dark mode — outline-secondary buttons: make them visibly active, not muted */
+        [data-bs-theme="dark"] .btn-outline-secondary {
+            color: rgba(255,255,255,0.75);
+            border-color: rgba(255,255,255,0.3);
+        }
+        [data-bs-theme="dark"] .btn-outline-secondary:hover {
+            color: #fff;
+            background-color: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.55);
+        }
+
+        /* Dark mode — switch: use neutral gray instead of blue */
+        [data-bs-theme="dark"] #dark-toggle-input:checked {
+            background-color: #6c757d;
+            border-color: #6c757d;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+        }
+
+        #dark-toggle {
+            position: fixed;
+            top: 0.1rem;
+            right: 0.75rem;
+            z-index: 1050;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            opacity: 0.5;
+            transition: opacity 0.15s;
+        }
+        #dark-toggle:hover { opacity: 1; }
+        #dark-toggle i { font-size: 0.65rem; color: var(--bs-body-color); }
     </style>
+
+    <script>
+        // Apply saved theme before page renders to avoid flash
+        (function() {
+            const t = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', t);
+        })();
+    </script>
 
     <script>
         function copyText(text) {
@@ -82,11 +144,11 @@
     </script>
 </head>
 
-<body class="bg-light">
+<body class="bg-body">
 <div class="d-flex" style="min-height: 100vh;">
 
     <!-- Sidebar -->
-    <aside class="app-sidebar bg-white border-end d-flex flex-column">
+    <aside class="app-sidebar bg-body border-end d-flex flex-column">
 
         <!-- Brand -->
         <div class="px-3 pt-3 pb-2 border-bottom">
@@ -157,6 +219,23 @@
 </div>
 
 <script>
+    // Dark mode toggle
+    document.addEventListener('DOMContentLoaded', () => {
+        const darkInput = document.getElementById('dark-toggle-input');
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-bs-theme', theme);
+            localStorage.setItem('theme', theme);
+            darkInput.checked = theme === 'dark';
+        }
+
+        applyTheme(localStorage.getItem('theme') || 'light');
+
+        darkInput.addEventListener('change', () => {
+            applyTheme(darkInput.checked ? 'dark' : 'light');
+        });
+    });
+
     // Live clock
     function updateClock() {
         const el = document.getElementById('sidebar-clock');
@@ -211,6 +290,15 @@
 </script>
 <script src="/js/grid-ui.js"></script>
 <script src="/js/trade-order.js"></script>
+
+<!-- Dark mode toggle -->
+<div id="dark-toggle" title="Toggle dark mode">
+    <i class="bi bi-sun-fill"></i>
+    <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="dark-toggle-input" style="cursor:pointer; width:1.8em; height:0.9em;">
+    </div>
+    <i class="bi bi-moon-fill"></i>
+</div>
 
 <!-- Donate modal -->
 <div class="modal fade" id="donateModal" tabindex="-1" aria-labelledby="donateModalLabel" aria-hidden="true">

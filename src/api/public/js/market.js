@@ -138,11 +138,13 @@ if (!window.__marketSingletonLoaded) {
             if (!band) return;
 
             const LC = window.LightweightCharts;
+            const isDark = document.documentElement.getAttribute("data-bs-theme") === "dark";
+            const bandLineColor = isDark ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.85)";
 
             bandLineObjs.push(
                 series.createPriceLine({
                     price: band.top,
-                    color: "rgba(0,0,0,0.85)",
+                    color: bandLineColor,
                     lineWidth: 2,
                     lineStyle: LC.LineStyle.Solid,
                     axisLabelVisible: true,
@@ -150,7 +152,7 @@ if (!window.__marketSingletonLoaded) {
                 }),
                 series.createPriceLine({
                     price: band.bot,
-                    color: "rgba(0,0,0,0.85)",
+                    color: bandLineColor,
                     lineWidth: 2,
                     lineStyle: LC.LineStyle.Solid,
                     axisLabelVisible: true,
