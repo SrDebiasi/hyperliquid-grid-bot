@@ -17,6 +17,19 @@
     <style>
         html { scroll-behavior: smooth; }
 
+        @keyframes bot-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.25; }
+        }
+        .bot-running-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: bot-pulse 2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
         .app-sidebar {
             width: 210px;
             flex-shrink: 0;
@@ -77,7 +90,12 @@
 
         <!-- Brand -->
         <div class="px-3 pt-3 pb-2 border-bottom">
-            <div class="fw-bold" style="font-size: 0.95rem;">Grid Bot</div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-bold" style="font-size: 0.95rem;">Grid Bot</div>
+                <% if (botStatus && botStatus.isRunning) { %>
+                    <div class="bot-running-dot" title="Bot is running"></div>
+                <% } %>
+            </div>
             <div class="text-muted" style="font-size: 0.7rem;">Hyperliquid</div>
         </div>
 
@@ -87,7 +105,7 @@
                 <i class="bi bi-person-circle"></i> Account
             </a>
             <a href="#section-config" class="sidebar-link" data-section="section-config">
-                <i class="bi bi-sliders"></i> Configuration
+                <i class="bi bi-sliders"></i> Grid Range
             </a>
             <a href="#section-profits" class="sidebar-link" data-section="section-profits">
                 <i class="bi bi-graph-up-arrow"></i> Profits
@@ -103,6 +121,22 @@
         <!-- Bottom: donate + clock -->
         <div class="border-top px-3 py-3">
             <button
+                    class="btn btn-outline-secondary btn-sm w-100 mb-2"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#secretsModal"
+            >
+                <i class="bi bi-key"></i> Set secrets
+            </button>
+            <button
+                    class="btn btn-outline-secondary btn-sm w-100 mb-2"
+                    type="button"
+                    data-bs-toggle="modal"
+                    data-bs-target="#variablesModal"
+            >
+                <i class="bi bi-sliders"></i> Configuration
+            </button>
+            <button
                     class="btn btn-outline-success btn-sm w-100 mb-2"
                     type="button"
                     data-bs-toggle="modal"
@@ -117,7 +151,7 @@
 
     <!-- Main content -->
     <main class="flex-grow-1 p-4" style="min-width: 0;">
-        <%- include(page, { instance, config, botStatus, orders, profitSummary, portfolioOverview, rebuy }) %>
+        <%- include(page, { instance, config, botStatus, orders, profitSummary, portfolioOverview, rebuy, envSecretsConfigured, envWalletAddress, envPrivateKey, envTelegramBotToken, envTelegramChatId, envHealthchecksPingUrl, envHealthchecksPingIntervalMs, envBotTz, envHyperliquidTestnet }) %>
     </main>
 
 </div>

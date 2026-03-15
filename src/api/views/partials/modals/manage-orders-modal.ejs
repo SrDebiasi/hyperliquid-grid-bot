@@ -1,0 +1,189 @@
+<!-- Manage Orders -->
+<div class="modal fade" id="manageOrdersModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header py-2">
+                <h5 class="modal-title d-flex align-items-center gap-2">
+                    <i class="bi bi-list-ul text-secondary"></i>
+                    Manage Orders
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- Stats cards -->
+                <div class="row g-3 mb-3">
+
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
+                            <div class="text-muted small mb-1">Current price</div>
+                            <div class="fs-6 fw-semibold" id="moCurrentPrice">-</div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
+                            <div class="text-muted small mb-1">BTC needed</div>
+                            <div class="fw-semibold d-flex align-items-center gap-2 flex-wrap">
+                                <span id="moBtcNeeded">-</span>
+                                <span id="moBtcDelta" class="small"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
+                            <div class="text-muted small mb-1">USD needed</div>
+                            <div class="fw-semibold d-flex align-items-center gap-2 flex-wrap">
+                                <span id="moUsdNeeded">-</span>
+                                <span id="moUsdDelta" class="small"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-6 col-md-3">
+                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
+                            <div class="text-muted small mb-1" id="moNetChangeLabel" style="display:none;">Change</div>
+                            <div class="text-muted small mb-1" id="moNetChangeLabelPlaceholder">Net change</div>
+                            <div class="fw-semibold">
+                                <span id="moNetChange" class="small"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Controls bar -->
+                <div class="border-top border-bottom py-2 my-2">
+                    <div class="d-flex flex-wrap gap-3 align-items-center">
+
+                        <!-- Select all -->
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="checkbox" id="moSelectAll" checked>
+                            <label class="form-check-label small" for="moSelectAll">Select all</label>
+                        </div>
+
+                        <!-- Slider -->
+                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 180px;">
+                            <span class="small text-muted text-nowrap">Order value (USD)</span>
+                            <input
+                                type="range"
+                                class="form-range"
+                                id="moValueSlider"
+                                min="11"
+                                max="500"
+                                step="1"
+                                value="100"
+                                style="min-width: 80px;"
+                            />
+                            <span class="fw-semibold small text-nowrap" id="moValueSliderLabel">$100</span>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="d-flex gap-2 ms-auto">
+                            <button class="btn btn-sm btn-outline-secondary" id="moRollbackBtn" type="button" disabled>
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" id="moDeleteBtn" type="button">
+                                <i class="bi bi-trash me-1"></i>Delete
+                            </button>
+                            <button class="btn btn-sm btn-success" id="moSaveBtn" type="button" disabled>
+                                <i class="bi bi-check2 me-1"></i>Save changes
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="table-responsive">
+                    <table class="table table-sm orders-table mb-0">
+                        <thead>
+                        <tr>
+                            <th style="width: 36px;"></th>
+                            <th class="th-buy text-end">Buy price</th>
+                            <th class="th-buy text-end">Buy USD</th>
+                            <th class="th-sell text-end">Sell price</th>
+                            <th class="th-sell text-end">Sell USD</th>
+                            <th class="text-end">Qty</th>
+                            <th class="text-end">Entry price</th>
+                        </tr>
+                        </thead>
+                        <tbody id="moTbody">
+                        <tr><td colspan="7" class="text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small text-muted mt-2">
+                    <i class="bi bi-info-circle me-1"></i>Slider changes only update the local view until you click "Save changes".
+                </div>
+
+            </div>
+
+            <div class="modal-footer py-2">
+                <div class="me-auto small text-muted" id="moStatus"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Save / Cancel on Exchange -->
+<div class="modal fade" id="moConfirmSaveModal" tabindex="-1" aria-labelledby="moConfirmSaveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="moConfirmSaveModalLabel">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                    Confirm save
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="fw-semibold mb-2">This will cancel orders on the exchange</div>
+                <div class="text-muted small">
+                    If you proceed, <strong>ALL</strong> affected orders will be cancelled on Hyperliquid (buy and sell).
+                    Then your new quantities will be saved.
+                </div>
+            </div>
+
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-success" id="moConfirmSaveProceedBtn">Yes, cancel &amp; save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Delete -->
+<div class="modal fade" id="moConfirmDeleteModal" tabindex="-1" aria-labelledby="moConfirmDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="moConfirmDeleteModalLabel">
+                    <i class="bi bi-trash text-danger"></i>
+                    Delete orders
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="fw-semibold mb-2">This will cancel orders on the exchange</div>
+                <div class="text-muted small">
+                    You are about to delete <strong><span id="moDeleteCount">0</span></strong> selected orders from the database.
+                    If you proceed, their buy/sell orders will be cancelled on Hyperliquid (best effort) before deletion.
+                </div>
+            </div>
+
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-danger" id="moConfirmDeleteProceedBtn">Yes, cancel &amp; delete</button>
+            </div>
+        </div>
+    </div>
+</div>

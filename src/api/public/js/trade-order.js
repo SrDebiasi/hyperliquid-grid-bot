@@ -266,6 +266,19 @@
 
         renderTable();
 
+        // seed slider from first row's sell USD value
+        if (rows.length > 0) {
+            const first = rows[0];
+            const sellPx = num(first.sell_price);
+            const qty = num(first.quantity);
+            if (sellPx > 0 && qty > 0) {
+                const sellUsd = Math.round(sellPx * qty);
+                const clamped = Math.min(Math.max(sellUsd, Number(sliderEl.min)), Number(sliderEl.max));
+                sliderEl.value = clamped;
+                sliderLabelEl.textContent = `$${clamped}`;
+            }
+        }
+
         // baseline (ALL rows)
         const base = computeNeededAll();
         baselineAll = { btc: base.btcNeeded, usd: base.usdNeeded };
@@ -276,7 +289,7 @@
 
     function renderTable() {
         if (!Array.isArray(rows) || rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="11" class="text-muted">No orders found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-muted">No orders found.</td></tr>`;
             return;
         }
 
@@ -290,23 +303,24 @@
             const buyUsd = buyPx > 0 ? buyPx * qty : null;
             const sellUsd = sellPx > 0 ? sellPx * qty : null;
 
-            const lastPlaced = r.last_order_placed_at || r.last_order_placed || r.updated_at || '';
+            const hasSell = r.sell_order_id != null && String(r.sell_order_id) !== '';
+            const rowClass = hasSell ? 'row-sell' : 'row-buy';
 
             return `
-        <tr data-id="${r.id}">
-          <td>
+        <tr data-id="${r.id}" class="${rowClass}">
+          <td style="width:36px;">
             <input class="form-check-input mo-row-check" type="checkbox" ${checked} />
           </td>
 
-          <td class="text-nowrap">${buyPx ? fmt(buyPx, 2) : '-'}</td>
-          <td class="text-nowrap">${buyUsd != null ? fmtUsd(buyUsd) : '-'}</td>
+          <td class="text-end fw-medium">${buyPx ? fmt(buyPx, 2) : '<span class="text-muted">—</span>'}</td>
+          <td class="text-end text-muted">${buyUsd != null ? fmtUsd(buyUsd) : '<span class="text-muted">—</span>'}</td>
 
-          <td class="text-nowrap">${sellPx ? fmt(sellPx, 2) : '-'}</td>
-          <td class="text-nowrap">${sellUsd != null ? fmtUsd(sellUsd) : '-'}</td>
+          <td class="text-end fw-medium">${sellPx ? fmt(sellPx, 2) : '<span class="text-muted">—</span>'}</td>
+          <td class="text-end text-muted">${sellUsd != null ? fmtUsd(sellUsd) : '<span class="text-muted">—</span>'}</td>
 
-          <td class="text-nowrap"><span class="mo-qty">${fmt(qty, 8)}</span></td>
+          <td class="text-end text-muted"><span class="mo-qty">${fmt(qty, 8)}</span></td>
 
-          <td class="text-nowrap">${r.entry_price != null ? fmt(r.entry_price, 2) : '-'}</td>
+          <td class="text-end text-muted">${r.entry_price != null ? fmt(r.entry_price, 2) : '<span class="text-muted">—</span>'}</td>
         </tr>
       `;
         }).join('');

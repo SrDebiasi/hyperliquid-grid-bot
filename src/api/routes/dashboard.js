@@ -168,6 +168,13 @@ async function loadDashboardData({ models }) {
     const envPrivateKey    = process.env.PRIVATE_KEY    || '';
     const envSecretsConfigured = !!(envWalletAddress && envPrivateKey);
 
+    const envTelegramBotToken          = process.env.TELEGRAM_BOT_TOKEN            || '';
+    const envTelegramChatId            = process.env.TELEGRAM_CHAT_ID              || '';
+    const envHealthchecksPingUrl       = process.env.HEALTHCHECKS_PING_URL         || '';
+    const envHealthchecksPingIntervalMs = process.env.HEALTHCHECKS_PING_INTERVAL_MS || '0';
+    const envBotTz                     = process.env.BOT_TZ                        || 'America/Edmonton';
+    const envHyperliquidTestnet        = process.env.HYPERLIQUID_TESTNET            || '0';
+
     return {
         instance,
         config,
@@ -179,6 +186,12 @@ async function loadDashboardData({ models }) {
         envSecretsConfigured,
         envWalletAddress,
         envPrivateKey,
+        envTelegramBotToken,
+        envTelegramChatId,
+        envHealthchecksPingUrl,
+        envHealthchecksPingIntervalMs,
+        envBotTz,
+        envHyperliquidTestnet,
     };
 }
 
@@ -186,23 +199,13 @@ export async function dashboardRoutes(app, opts) {
     const { models } = opts;
 
     app.get("/dashboard", async (request, reply) => {
-        const { instance, config, orders, profitSummary, rebuy, botStatus, portfolioOverview, envSecretsConfigured, envWalletAddress, envPrivateKey } =
-            await loadDashboardData({ models });
+        const data = await loadDashboardData({ models });
 
         return reply.view("layout.ejs", {
             page: "pages/dashboard.ejs",
             title: "Grid Bot Dashboard",
             now: new Date().toISOString(),
-            instance,
-            botStatus,
-            config,
-            orders,
-            profitSummary,
-            portfolioOverview,
-            rebuy,
-            envSecretsConfigured,
-            envWalletAddress,
-            envPrivateKey,
+            ...data,
         });
     });
 

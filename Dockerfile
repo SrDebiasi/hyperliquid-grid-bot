@@ -25,14 +25,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && npm install -g pm2 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-
 RUN mkdir -p /app/docker /app/data/postgres /app/logs /app/.pm2
 
-RUN chmod +x /app/docker/entrypoint.sh /app/docker/setup-env.sh
+COPY docker/entrypoint.sh /app/docker/entrypoint.sh
+RUN chmod +x /app/docker/entrypoint.sh
 
 EXPOSE 3000 5432
 

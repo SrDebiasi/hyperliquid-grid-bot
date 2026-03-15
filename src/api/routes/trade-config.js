@@ -358,6 +358,12 @@ async function buildGrid(cfg, { save, saveTradeOrder, runtimeInputs = {} } = {})
     const profitIfSoldAlongTheWay = proceedsIfSoldAlongTheWay - costIfBoughtNow;
     const profitIfHeldToExit = baseNeeded * (exit - pxNow);
 
+    const buyRowsBelow = rows.filter((r) => r.buy_price < pxNow);
+    const btcAccumulatedGoingDown = buyRowsBelow.reduce((acc, r) => acc + r.quantity, 0);
+    const totalBtcAtBottom = baseNeeded + btcAccumulatedGoingDown;
+    const totalValueAtBottom = totalBtcAtBottom * entry;
+    const downsideUnrealizedLoss = (quoteNeededUsd + costIfBoughtNow) - totalValueAtBottom;
+
     const orderValue = usdPerLevel;
     const grossProfitPerOp = orderValue * (targetPct / 100);
     const exchangeFees = orderValue * 0.0015;
@@ -392,6 +398,11 @@ async function buildGrid(cfg, { save, saveTradeOrder, runtimeInputs = {} } = {})
 
             profit_if_sold_along_the_way: profitIfSoldAlongTheWay,
             profit_if_held_to_exit: profitIfHeldToExit,
+
+            btc_accumulated_going_down: btcAccumulatedGoingDown,
+            total_btc_at_bottom: totalBtcAtBottom,
+            total_value_at_bottom: totalValueAtBottom,
+            downside_unrealized_loss: downsideUnrealizedLoss,
 
             gross_profit_per_op_usd: grossProfitPerOp,
             est_fees_per_op_usd: exchangeFees,

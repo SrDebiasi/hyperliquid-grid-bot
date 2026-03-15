@@ -189,30 +189,105 @@
             const s = payload.summary;
             const pair = payload?.meta?.pair ?? "";
 
-            const lines = [
-                `GRID SUMMARY (${pair})`,
-                `Range: <strong>${s.entry_price}</strong> → <strong>${s.exit_price}</strong>`,
-                `Levels (orders): <strong>${s.levels}</strong>`,
-                `Per order: <strong>$${money(s.usd_per_level)}</strong> | Profit target per level: <strong>${s.target_percent}%</strong> | Grid spacing: <strong>${s.margin_percent}%</strong>`,
-                ``,
-                `CAPITAL NEEDED (ESTIMATE)`,
-                `Current price: <strong>${money(s.current_price)}</strong>`,
-                `If price goes UP: need <strong>~${num(s.base_needed, 6)}</strong> (≈ <strong>$${money(s.base_value_usd)}</strong>)`,
-                `If price goes DOWN: need <strong>~$${money(s.quote_needed_usd)}</strong>`,
-                ``,
-                `POTENTIAL UPSIDE (ONE-WAY MOVE UP THROUGH THE GRID)`,
-                `If you buy the required amount now and price reaches <strong>${s.exit_price}</strong>:`,
-                `- Buy cost today: <strong>$${money(s.base_value_usd)}</strong>`,
-                `- Estimated profit if sold along the way: <strong>$${money(s.profit_if_sold_along_the_way)}</strong>`,
-                ``,
-                `PER-TRADE PROFIT (ESTIMATE)`,
-                `Gross profit per completed cycle: <strong>$${money(s.gross_profit_per_op_usd)}</strong>`,
-                `Estimated fees per cycle: <strong>$${money(s.est_fees_per_op_usd)}</strong>`,
-                `Estimated net profit per operation: <strong>$${money(s.est_net_profit_per_op_usd)}</strong>`,
-                `Total estimated capital required: <strong>$${money(s.est_total_usd_needed)}</strong>`,
-            ];
+            simText.innerHTML = `
+<div class="bg-light border rounded p-3 mb-2">
+  <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Grid Summary <span class="text-body-secondary">(${pair})</span></div>
+  <div class="row g-2">
+    <div class="col-6 col-md-3">
+      <div class="text-muted" style="font-size:0.7rem;">Range</div>
+      <div class="fw-semibold">${s.entry_price} → ${s.exit_price}</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="text-muted" style="font-size:0.7rem;">Levels (orders)</div>
+      <div class="fw-semibold">${s.levels}</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="text-muted" style="font-size:0.7rem;">Per order</div>
+      <div class="fw-semibold">$${money(s.usd_per_level)}</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="text-muted" style="font-size:0.7rem;">Profit target / Grid spacing</div>
+      <div class="fw-semibold">${s.target_percent}% / ${s.margin_percent}%</div>
+    </div>
+  </div>
+</div>
 
-            simText.innerHTML = lines.join("<br>");
+<div class="bg-light border rounded p-3 mb-2">
+  <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Capital Needed <span class="fw-normal text-body-secondary">(estimate)</span></div>
+  <div class="row g-2">
+    <div class="col-6 col-md-4">
+      <div class="text-muted" style="font-size:0.7rem;">Current price</div>
+      <div class="fw-semibold">${money(s.current_price)}</div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="text-muted" style="font-size:0.7rem;">If price goes up</div>
+      <div class="fw-semibold">~$${money(s.base_value_usd)} <span class="text-muted fw-normal">(≈ ${num(s.base_needed, 6)})</span></div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="text-muted" style="font-size:0.7rem;">If price goes down</div>
+      <div class="fw-semibold">~$${money(s.quote_needed_usd)}</div>
+    </div>
+  </div>
+</div>
+
+<div class="bg-light border rounded p-3 mb-2">
+  <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Range Scenarios</div>
+  <div class="row g-3">
+    <div class="col-6 border-end">
+      <div class="text-muted mb-2" style="font-size:0.7rem;">If price reaches <strong class="text-body">${s.exit_price}</strong> ↑</div>
+      <div class="text-muted" style="font-size:0.7rem;">Initial BTC cost</div>
+      <div class="fw-semibold mb-2">$${money(s.base_value_usd)}</div>
+      <div class="text-muted" style="font-size:0.7rem;">Est. profit selling along the way</div>
+      <div class="fw-semibold text-success fs-6">+$${money(s.profit_if_sold_along_the_way)}</div>
+    </div>
+    <div class="col-6">
+      <div class="text-muted mb-2" style="font-size:0.7rem;">If price drops to <strong class="text-body">${s.entry_price}</strong> ↓</div>
+      <div class="text-muted" style="font-size:0.7rem;">Total BTC held at bottom</div>
+      <div class="fw-semibold mb-2">${num(s.total_btc_at_bottom, 6)} <span class="text-muted fw-normal">(≈ $${money(s.total_value_at_bottom)})</span></div>
+      <div class="text-muted" style="font-size:0.7rem;">Unrealized loss vs capital invested</div>
+      <div class="fw-semibold text-danger fs-6">–$${money(s.downside_unrealized_loss)}</div>
+    </div>
+  </div>
+</div>
+
+<div class="bg-light border rounded p-3 mb-2">
+  <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Profit per cycle finished <span class="fw-normal text-body-secondary">(estimate)</span></div>
+  <div class="row g-2">
+    <div class="col-6 col-md-4">
+      <div class="text-muted" style="font-size:0.7rem;">Gross per cycle</div>
+      <div class="fw-semibold">$${money(s.gross_profit_per_op_usd)}</div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="text-muted" style="font-size:0.7rem;">Est. fees per cycle</div>
+      <div class="fw-semibold text-danger">-$${money(s.est_fees_per_op_usd)}</div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="text-muted" style="font-size:0.7rem;">Net per cycle</div>
+      <div class="fw-semibold text-success">$${money(s.est_net_profit_per_op_usd)}</div>
+    </div>
+  </div>
+</div>
+
+<div class="border rounded p-3 bg-white mb-2">
+  <div class="d-flex justify-content-between align-items-center">
+    <div class="text-muted fw-semibold">Total capital required</div>
+    <div class="fw-bold fs-5">$${money(s.est_total_usd_needed)}</div>
+  </div>
+</div>
+
+<div class="bg-light border rounded p-3">
+  <div class="text-uppercase text-muted fw-semibold mb-2" style="font-size:0.7rem;letter-spacing:.06em;">Monthly earnings estimate</div>
+  <div class="text-muted mb-2" style="font-size:0.75rem;">Based on total capital × monthly return. Typical grid bots earn 1–5%/month depending on volatility.</div>
+  <div class="row g-2">
+    ${[1, 2, 3, 4, 5].map(pct => `
+    <div class="col">
+      <div class="border rounded p-2 text-center bg-white">
+        <div class="text-muted" style="font-size:0.7rem;">${pct}%/mo</div>
+        <div class="fw-semibold text-success">$${money(s.est_total_usd_needed * pct / 100)}</div>
+      </div>
+    </div>`).join("")}
+  </div>
+</div>`;
 
             lastSimInputs = inputs;
             approveBtn.disabled = false;

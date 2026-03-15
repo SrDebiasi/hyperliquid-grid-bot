@@ -17,7 +17,7 @@ const pageData = {
 
 <div id="section-config" class="card shadow-sm mt-3">
   <div class="card-body">
-    <%- include('../partials/trade_config', { instance, config }) %>
+    <%- include('../partials/trade_config', { instance, config, orders }) %>
   </div>
 
   <%- include('../partials/modals/grid-simulate') %>
@@ -49,6 +49,7 @@ const pageData = {
 </div>
 
 <%- include('../partials/modals/secrets-modal', { instance, envWalletAddress, envPrivateKey }) %>
+<%- include('../partials/modals/variables-modal', { instance, envTelegramBotToken, envTelegramChatId, envHealthchecksPingUrl, envHealthchecksPingIntervalMs, envBotTz, envHyperliquidTestnet }) %>
 <%- include('../partials/modals/trade_config', { config }) %>
 
 <script type="module" src="/js/market.js"></script>

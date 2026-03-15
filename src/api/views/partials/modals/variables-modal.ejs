@@ -1,0 +1,177 @@
+<% if (!instance) { %>
+    <% /* no modal if no instance */ %>
+<% } else { %>
+    <div class="modal fade" id="variablesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div id="variablesResult"></div>
+
+                    <form
+                        id="variablesForm"
+                        hx-put="/api/trade-instance/<%= instance.id %>/variables"
+                        hx-target="#variablesResult"
+                        hx-swap="innerHTML"
+                        hx-headers='{"Accept":"text/html"}'
+                    >
+                        <p class="text-muted small mb-3">These settings are optional. Leave blank to disable.</p>
+
+                        <h6 class="text-muted mb-2">Telegram</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Bot token</label>
+                            <input
+                                name="telegram_bot_token"
+                                type="password"
+                                class="form-control"
+                                autocomplete="off"
+                                value="<%= envTelegramBotToken %>"
+                                placeholder="1234567890:ABC..."
+                            />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Chat ID</label>
+                            <input
+                                name="telegram_chat_id"
+                                class="form-control"
+                                autocomplete="off"
+                                value="<%= envTelegramChatId %>"
+                                placeholder="123456789"
+                            />
+                        </div>
+
+                        <h6 class="text-muted mb-2 mt-4">Healthchecks.io</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Ping URL</label>
+                            <input
+                                name="healthchecks_ping_url"
+                                class="form-control"
+                                autocomplete="off"
+                                value="<%= envHealthchecksPingUrl %>"
+                                placeholder="https://hc-ping.com/..."
+                            />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ping interval <span class="text-muted">(ms)</span></label>
+                            <input
+                                name="healthchecks_ping_interval_ms"
+                                type="number"
+                                class="form-control"
+                                value="<%= envHealthchecksPingIntervalMs %>"
+                                placeholder="60000"
+                            />
+                        </div>
+
+                        <h6 class="text-muted mb-2 mt-4">Network</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Timezone</label>
+                            <select name="bot_tz" class="form-select">
+                                <%
+                                const tzOptions = [
+                                    // Americas
+                                    ['America/New_York',       'New York (ET)'],
+                                    ['America/Chicago',        'Chicago (CT)'],
+                                    ['America/Denver',         'Denver (MT)'],
+                                    ['America/Edmonton',       'Edmonton (MT)'],
+                                    ['America/Los_Angeles',    'Los Angeles (PT)'],
+                                    ['America/Vancouver',      'Vancouver (PT)'],
+                                    ['America/Toronto',        'Toronto (ET)'],
+                                    ['America/Sao_Paulo',      'São Paulo (BRT)'],
+                                    ['America/Mexico_City',    'Mexico City (CST)'],
+                                    ['America/Bogota',         'Bogotá (COT)'],
+                                    ['America/Buenos_Aires',   'Buenos Aires (ART)'],
+                                    // Europe
+                                    ['Europe/London',          'London (GMT/BST)'],
+                                    ['Europe/Paris',           'Paris (CET)'],
+                                    ['Europe/Berlin',          'Berlin (CET)'],
+                                    ['Europe/Madrid',          'Madrid (CET)'],
+                                    ['Europe/Rome',            'Rome (CET)'],
+                                    ['Europe/Amsterdam',       'Amsterdam (CET)'],
+                                    ['Europe/Zurich',          'Zurich (CET)'],
+                                    ['Europe/Stockholm',       'Stockholm (CET)'],
+                                    ['Europe/Moscow',          'Moscow (MSK)'],
+                                    ['Europe/Istanbul',        'Istanbul (TRT)'],
+                                    // Asia / Pacific
+                                    ['Asia/Dubai',             'Dubai (GST)'],
+                                    ['Asia/Kolkata',           'India (IST)'],
+                                    ['Asia/Bangkok',           'Bangkok (ICT)'],
+                                    ['Asia/Singapore',         'Singapore (SGT)'],
+                                    ['Asia/Shanghai',          'Shanghai (CST)'],
+                                    ['Asia/Hong_Kong',         'Hong Kong (HKT)'],
+                                    ['Asia/Tokyo',             'Tokyo (JST)'],
+                                    ['Asia/Seoul',             'Seoul (KST)'],
+                                    ['Australia/Sydney',       'Sydney (AEST)'],
+                                    ['Australia/Melbourne',    'Melbourne (AEST)'],
+                                    ['Pacific/Auckland',       'Auckland (NZST)'],
+                                    // UTC
+                                    ['UTC',                    'UTC'],
+                                ];
+                                %>
+                                <% for (const [value, label] of tzOptions) { %>
+                                    <option value="<%= value %>" <%= envBotTz === value ? 'selected' : '' %>><%= label %></option>
+                                <% } %>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    role="switch"
+                                    id="variablesTestnet"
+                                    name="hyperliquid_testnet"
+                                    value="1"
+                                    <%= envHyperliquidTestnet === '1' ? 'checked' : '' %>
+                                />
+                                <label class="form-check-label" for="variablesTestnet">Use Hyperliquid testnet</label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.body.addEventListener('htmx:afterRequest', function (e) {
+            if (!e.target || e.target.id !== 'variablesForm') return;
+
+            const result = document.getElementById('variablesResult');
+            if (!result) return;
+
+            if (e.detail.successful) {
+                result.innerHTML = `
+                    <div id="variablesAlert" class="alert alert-success d-flex align-items-center gap-2 py-2 mb-3" role="alert" style="transition: opacity 0.5s ease;">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>Configuration saved successfully.</span>
+                    </div>`;
+
+                setTimeout(() => {
+                    const alert = document.getElementById('variablesAlert');
+                    if (alert) alert.style.opacity = '0';
+                }, 3500);
+
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('variablesModal'));
+                    modal?.hide();
+                    if (result) result.innerHTML = '';
+                }, 4000);
+            } else {
+                result.innerHTML = `
+                    <div class="alert alert-danger d-flex align-items-center gap-2 py-2 mb-3" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <span>Failed to save. Please try again.</span>
+                    </div>`;
+            }
+        });
+    </script>
+<% } %>

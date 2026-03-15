@@ -1,0 +1,16 @@
+services:
+  bot:
+    build: .
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+      - bot_data:/app/data
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  node_modules:
+  bot_data:

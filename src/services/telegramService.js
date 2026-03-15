@@ -10,8 +10,7 @@ const chatId = process.env.TELEGRAM_CHAT_ID;
 
 const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton';
 
-if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN');
-if (!chatId) throw new Error('Missing TELEGRAM_CHAT_ID');
+const telegramEnabled = !!(token && chatId);
 
 import {
   getExchange,
@@ -33,9 +32,9 @@ import {
 } from '../functions/datePeriods.js';
 
 function mustGetTelegramToken() {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error('Missing TELEGRAM_BOT_TOKEN');
-  return token;
+  const t = process.env.TELEGRAM_BOT_TOKEN;
+  if (!t) throw new Error('Missing TELEGRAM_BOT_TOKEN');
+  return t;
 }
 
 function isAllowedChat(msg) {
@@ -679,6 +678,7 @@ async function getCurrentExposure() {
 }
 
 function createTelegramBot({ polling = true } = {}) {
+  if (!telegramEnabled) return null;
   const token = mustGetTelegramToken();
   const bot = new TelegramBot(token, { polling });
 
@@ -970,6 +970,8 @@ function createTelegramBot({ polling = true } = {}) {
 }
 
 async function notifyTelegram(message) {
+  if (!telegramEnabled) return;
+
   const bot =
       createTelegramBot._senderSingleton ||
       (createTelegramBot._senderSingleton = createTelegramBot({ polling: false }));
