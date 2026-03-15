@@ -25,10 +25,16 @@ if (!window.__marketSingletonLoaded) {
 
             if (chart && series) return true;
 
+            const isDark = document.documentElement.getAttribute("data-bs-theme") === "dark";
+
             chart = LC.createChart(container, {
                 height: 340,
+                layout: {
+                    background: { color: isDark ? "#212529" : "#ffffff" },
+                    textColor: isDark ? "#adb5bd" : "#495057",
+                },
                 rightPriceScale: { borderVisible: false },
-                timeScale: { borderVisible: false },
+                timeScale: { borderVisible: false, borderColor: isDark ? "#373b3e" : "#e9ecef" },
                 grid: { vertLines: { visible: false }, horzLines: { visible: false } },
             });
 
