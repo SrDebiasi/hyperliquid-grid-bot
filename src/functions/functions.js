@@ -29,8 +29,7 @@ const initExchange = (data) => new Promise((resolve, reject) => {
         if (!privateKey) throw new Error('Missing HYPERLIQUID PRIVATE KEY');
 
         const isTestnet = _botInstanceCfg?.hyperliquid_testnet === true
-            || _botInstanceCfg?.hyperliquid_testnet === 1
-            || process.env.HYPERLIQUID_TESTNET === '1';
+            || _botInstanceCfg?.hyperliquid_testnet === 1;
 
         exchange = new HyperliquidAdapter({
           userAddress,
@@ -88,6 +87,20 @@ const retrieveTradeProfit = (data) => new Promise((resolve, reject) => {
   if (data.date_end) params.date_end = String(data.date_end).slice(0, 10);
 
   axios.get(apiUrl + 'trade-profit', { params }, headers)
+      .then(result => resolve(result.data))
+      .catch((ex) => reject({ error: ex.toString() }));
+});
+
+const retrieveTradeCycles = (data) => new Promise((resolve, reject) => {
+  const params = {
+    trade_instance_id: data.trade_instance_id,
+  };
+
+  if (data.pair) params.pair = data.pair;
+  if (data.date_start) params.date_start = String(data.date_start).slice(0, 10);
+  if (data.date_end) params.date_end = String(data.date_end).slice(0, 10);
+
+  axios.get(apiUrl + 'trade-cycle', { params }, headers)
       .then(result => resolve(result.data))
       .catch((ex) => reject({ error: ex.toString() }));
 });
@@ -285,6 +298,7 @@ export {
   retrieveOrders,
   initExchange,
   retrieveTradeProfit,
+  retrieveTradeCycles,
   saveTradeOrder,
   updateTradeOrder,
   updateTradeInstance,

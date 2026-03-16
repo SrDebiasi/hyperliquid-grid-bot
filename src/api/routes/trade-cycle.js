@@ -1,10 +1,8 @@
 import { Op, Sequelize } from "sequelize";
 import { DateTime } from "luxon";
 import { literal } from "sequelize";
-const BOT_TZ = process.env.BOT_TZ || "America/Edmonton";
-
 export async function tradeCycleRoutes(app, { models }) {
-    const { TradeCycle } = models;
+    const { TradeCycle, TradeInstance } = models;
 
     app.get("/trade-cycle", async (request) => {
         const { trade_instance_id, date_start, date_end, pair } = request.query ?? {};
@@ -44,6 +42,11 @@ export async function tradeCycleRoutes(app, { models }) {
     app.post("/trade-cycle", async (request, reply) => {
         const body = request.body ?? {};
 
+        const instance = body.trade_instance_id
+            ? await TradeInstance.findByPk(body.trade_instance_id)
+            : null;
+        const botTz = instance?.bot_tz || 'America/Edmonton';
+
         const utc =
             body.date_transaction_utc
                 ? DateTime.fromISO(body.date_transaction_utc, { zone: "utc" })
@@ -51,7 +54,7 @@ export async function tradeCycleRoutes(app, { models }) {
 
         body.date_transaction_utc = utc.toISO({ suppressMilliseconds: false });
 
-        const localWall = utc.setZone(BOT_TZ).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
+        const localWall = utc.setZone(botTz).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
 
         if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/.test(localWall)) {
             return reply.code(500).send({ error: "Unexpected timestamp format" });

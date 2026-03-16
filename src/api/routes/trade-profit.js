@@ -1,10 +1,8 @@
 import { Op, Sequelize } from "sequelize";
 import {DateTime} from "luxon";
 import { literal } from 'sequelize';
-const BOT_TZ = process.env.BOT_TZ || "America/Edmonton";
-
 export async function tradeProfitRoutes(app, { models }) {
-    const { TradeProfit } = models;
+    const { TradeProfit, TradeInstance } = models;
 
     app.get("/trade-profit", async (request) => {
         const { trade_instance_id, date_start, date_end, pair } = request.query ?? {};
@@ -46,6 +44,11 @@ export async function tradeProfitRoutes(app, { models }) {
     app.post("/trade-profit", async (request, reply) => {
         const body = request.body ?? {};
 
+        const instance = body.trade_instance_id
+            ? await TradeInstance.findByPk(body.trade_instance_id)
+            : null;
+        const botTz = instance?.bot_tz || 'America/Edmonton';
+
         // Normalize UTC instant
         const utc =
             body.date_transaction_utc
@@ -56,7 +59,7 @@ export async function tradeProfitRoutes(app, { models }) {
         body.date_transaction_utc = utc.toISO({ suppressMilliseconds: false });
 
         // Compute wall-clock string in bot timezone (no offset, stored as-is)
-        const localWall = utc.setZone(BOT_TZ).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
+        const localWall = utc.setZone(botTz).toFormat("yyyy-LL-dd HH:mm:ss.SSS");
 
         // Guard: Luxon should always produce this format, but validate before
         // interpolating into a SQL literal to prevent any unexpected injection.

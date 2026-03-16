@@ -172,17 +172,16 @@ async function loadDashboardData({ models, instanceId = null }) {
     const envPrivateKey    = process.env.PRIVATE_KEY    || '';
     const envSecretsConfigured = !!(envWalletAddress && envPrivateKey);
 
-    // DB value takes priority; .env is the fallback
-    const envTelegramBotToken           = instance?.telegram_bot_token            || process.env.TELEGRAM_BOT_TOKEN            || '';
-    const envTelegramChatId             = instance?.telegram_chat_id              || process.env.TELEGRAM_CHAT_ID              || '';
-    const envHealthchecksPingUrl        = instance?.healthchecks_ping_url         || process.env.HEALTHCHECKS_PING_URL         || '';
+    const envTelegramBotToken           = instance?.telegram_bot_token            || '';
+    const envTelegramChatId             = instance?.telegram_chat_id              || '';
+    const envHealthchecksPingUrl        = instance?.healthchecks_ping_url         || '';
     const envHealthchecksPingIntervalMs = instance?.healthchecks_ping_interval_ms != null
         ? String(instance.healthchecks_ping_interval_ms)
-        : (process.env.HEALTHCHECKS_PING_INTERVAL_MS || '0');
-    const envBotTz                      = instance?.bot_tz                        || process.env.BOT_TZ                        || 'America/Edmonton';
+        : '0';
+    const envBotTz                      = instance?.bot_tz                        || 'America/Edmonton';
     const envHyperliquidTestnet         = instance?.hyperliquid_testnet != null
         ? (instance.hyperliquid_testnet ? '1' : '0')
-        : (process.env.HYPERLIQUID_TESTNET || '0');
+        : '0';
 
     return {
         instances,

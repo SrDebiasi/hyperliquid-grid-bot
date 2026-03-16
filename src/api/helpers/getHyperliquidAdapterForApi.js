@@ -22,7 +22,7 @@ export async function getHyperliquidAdapterForApi({ models, tradeInstanceId, for
     const key = tradeInstanceId != null ? String(tradeInstanceId) : 'default';
     if (!force && cache.has(key)) return cache.get(key);
 
-    // 1) env first
+    // 1) env first (wallet/key only — both env and DB supported per design)
     let userAddress = String(process.env.WALLET_ADDRESS ?? '').trim();
     let privateKey = String(
         process.env.PRIVATE_KEY ??
@@ -30,16 +30,19 @@ export async function getHyperliquidAdapterForApi({ models, tradeInstanceId, for
         '',
     ).trim();
 
-    // 2) DB fallback
-    if ((!userAddress || !privateKey) && tradeInstanceId != null) {
-        const TradeInstance = models.trade_instance;
-        if (!TradeInstance) throw new Error('models.trade_instance is missing (check buildModels output)');
+    // 2) DB — always fetch instance when id is available to get testnet flag;
+    //    also fills wallet/key if not set in env
+    let isTestnet = false;
+    if (tradeInstanceId != null) {
+        const TradeInstance = models.TradeInstance;
+        if (!TradeInstance) throw new Error('models.TradeInstance is missing (check buildModels output)');
 
         const ti = await TradeInstance.findByPk(tradeInstanceId);
         if (!ti) throw new Error(`TradeInstance not found: ${tradeInstanceId}`);
 
         if (!userAddress) userAddress = String(ti.wallet_address ?? '').trim();
         if (!privateKey) privateKey = String(ti.private_key ?? '').trim();
+        isTestnet = !!ti.hyperliquid_testnet;
     }
 
     privateKey = normalizePk(privateKey);
@@ -47,7 +50,7 @@ export async function getHyperliquidAdapterForApi({ models, tradeInstanceId, for
     const ex = await createHyperliquidAdapter({
         userAddress,
         privateKey,
-        isTestnet: process.env.HYPERLIQUID_TESTNET === '1',
+        isTestnet,
     });
 
     cache.set(key, ex);

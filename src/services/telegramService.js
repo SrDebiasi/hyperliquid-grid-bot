@@ -22,6 +22,7 @@ import {
   retrieveInstance,
   retrieveOrders,
   retrieveTradeProfit,
+  retrieveTradeCycles,
 } from '../functions/functions.js';
 import { getInstanceId, getLastOperation } from '../functions/state.js';
 
@@ -124,23 +125,19 @@ function groupProfitByDay(rows) {
   return { days, monthTotal, monthCount };
 }
 
-function buildDailyProfitMessage({ period, days, monthTotal, monthCount }) {
+function buildDailyProfitMessage({ period, days, monthTotal, monthCount, monthCycles }) {
   const lines = [
     `*${eM('Daily profit (month-to-date)')}*`,
     `${eM(period.label)}`,
     `${eM('Range')}: *${eM(period.from)}* ${eM('to')} *${eM(period.to)}*`,
     ``,
     `*${eM('Days')}*`,
-    ...days.map(
-        d =>
-            `${eM('•')} *${eM(d.date)}*: *${eM(formatUSD(d.total))}* \\(${eM(
-                String(d.count),
-            )} ${eM('trades')}\\)`,
-    ),
+    ...days.map(d => {
+      const cyclesPart = d.cycles != null ? ` / ${eM(String(d.cycles))} ${eM('cycles')}` : '';
+      return `${eM('•')} *${eM(d.date)}*: *${eM(formatUSD(d.total))}* \\(${eM(String(d.count))} ${eM('trades')}${cyclesPart}\\)`;
+    }),
     ``,
-    `*${eM('Month-to-date total')}*: *${eM(formatUSD(monthTotal))}* \\(${eM(
-        String(monthCount),
-    )} ${eM('trades')}\\)`,
+    `*${eM('Month-to-date total')}*: *${eM(formatUSD(monthTotal))}* \\(${eM(String(monthCount))} ${eM('trades')} / ${eM(String(monthCycles ?? 0))} ${eM('cycles')}\\)`,
   ];
 
   return lines.join('\n');
@@ -216,12 +213,23 @@ async function getAggregatedStatusSnapshot() {
     gridPositionPct = Math.max(0, Math.min(100, gridPositionPct));
   }
 
-  // profits
-  const today = await getProfitTotalForPeriod(periodDay);
-  const month = await getProfitTotalForPeriod(periodMonth);
+  // profits + cycles
+  const [today, month, mtd, cyclesTodayRows, allTimeRows] = await Promise.all([
+    getProfitTotalForPeriod(periodDay),
+    getProfitTotalForPeriod(periodMonth),
+    getProfitTotalForPeriod(periodMonthToDate),
+    retrieveTradeCycles({
+      trade_instance_id: instanceId,
+      date_start: periodDay().from,
+      date_end: periodDay().to,
+    }),
+    retrieveTradeProfit({ trade_instance_id: instanceId }),
+  ]);
+
+  const cyclesToday = Array.isArray(cyclesTodayRows) ? cyclesTodayRows.length : 0;
+  const { total: allTimeProfit } = sumProfit(allTimeRows);
 
   // estimate (month)
-  const mtd = await getProfitTotalForPeriod(periodMonthToDate);
   const daysElapsed = Number(mtd.period?.meta?.dayOfMonth || 0);
   const daysInMonth = Number(mtd.period?.meta?.daysInMonth || 0);
 
@@ -252,11 +260,14 @@ async function getAggregatedStatusSnapshot() {
     totalReboughtValueUsd: toNumberSafe(cfg.rebought_value),
     totalReboughtCoin: toNumberSafe(cfg.rebought_coin),
     profitTodayUsd: today.total,
+    profitTodayCount: today.count,
     profitMonthUsd: month.total,
     estimateMonthUsd: estMonth,
     exposureTotalUsd: exposure.totalExposureUsd,
     pnlCurrentMonthPct,
     pnlEstimateMonthPct,
+    cyclesToday,
+    allTimeProfit,
   };
 }
 
@@ -312,11 +323,14 @@ function buildStatusMessage(snapshot) {
     lastOpAt = null,
 
     profitTodayUsd = 0,
+    profitTodayCount = 0,
     profitMonthUsd = 0,
     estimateMonthUsd = 0,
     exposureTotalUsd = 0,
     pnlCurrentMonthPct = 0,
     pnlEstimateMonthPct = 0,
+    cyclesToday = 0,
+    allTimeProfit = 0,
     rebuyActive = false,
     rebuyPercent = 0,
 
@@ -364,10 +378,13 @@ function buildStatusMessage(snapshot) {
     ``,
     `*${eM('Summary')}*`,
     `${eM('•')} ${eM('Profit today')}: *${eM(formatUSD(profitTodayUsd))}*`,
+    `${eM('•')} ${eM('Cycles today')}: *${eM(String(cyclesToday))}*`,
+    `${eM('•')} ${eM('Avg per trade today')}: *${eM(profitTodayCount > 0 ? formatUSD(profitTodayUsd / profitTodayCount) : 'N/A')}*`,
     `${eM('•')} ${eM('Month profit')}: *${eM(formatUSD(profitMonthUsd))}*`,
     `${eM('•')} ${eM('PnL current month')}: *${eM(curPctSign + Math.abs(pnlCurrentMonthPct).toFixed(2) + '%')}*`,
     `${eM('•')} ${eM('PnL estimate month')}: *${eM(estPctSign + Math.abs(pnlEstimateMonthPct).toFixed(2) + '%')}*`,
     `${eM('•')} ${eM('Month estimate')}: *${eM(formatUSD(estimateMonthUsd))}*`,
+    `${eM('•')} ${eM('All-time profit')}: *${eM(formatUSD(allTimeProfit))}*`,
     `${eM('•')} ${eM('Exposure total')}: *${eM(formatUSD(exposureTotalUsd))}*`,
     ``,
     `*${eM(`Rebuy summary - ${rebuyLabel} - ${pctLabel}%`)}*`,
@@ -380,7 +397,7 @@ function buildStatusMessage(snapshot) {
   return lines.join('\n');
 }
 
-function buildEstimateMessage({ period, total, count, avgPerDay, estDay, estWeek, estMonth }) {
+function buildEstimateMessage({ period, total, count, avgPerDay, estDay, estWeek, estMonth, cycles, avgCyclesPerDay, estCyclesWeek, estCyclesMonth }) {
   const daysElapsed = period?.meta?.dayOfMonth || 0;
   const daysInMonth = period?.meta?.daysInMonth || 0;
 
@@ -391,12 +408,18 @@ function buildEstimateMessage({ period, total, count, avgPerDay, estDay, estWeek
     ``,
     `${eM('•')} ${eM('Month-to-date profit')}: *${eM(formatUSD(total))}*`,
     `${eM('•')} ${eM('Trades count')}: *${eM(String(count))}*`,
+    `${eM('•')} ${eM('Cycles MTD')}: *${eM(String(cycles ?? 0))}*`,
     `${eM('•')} ${eM('Days elapsed')}: *${eM(String(daysElapsed))}* ${eM('/')} *${eM(String(daysInMonth))}*`,
     ``,
-    `*${eM('Estimates')}*`,
+    `*${eM('Profit estimates')}*`,
     `${eM('•')} ${eM('Avg per day')}: *${eM(formatUSD(avgPerDay))}*`,
     `${eM('•')} ${eM('Estimate per week')}: *${eM(formatUSD(estWeek))}*`,
     `${eM('•')} ${eM('Estimate month total')}: *${eM(formatUSD(estMonth))}*`,
+    ``,
+    `*${eM('Cycle estimates')}*`,
+    `${eM('•')} ${eM('Avg cycles per day')}: *${eM((avgCyclesPerDay ?? 0).toFixed(1))}*`,
+    `${eM('•')} ${eM('Est cycles per week')}: *${eM(Math.round(estCyclesWeek ?? 0).toString())}*`,
+    `${eM('•')} ${eM('Est cycles per month')}: *${eM(Math.round(estCyclesMonth ?? 0).toString())}*`,
   ];
 
   return lines.join('\n');
@@ -470,20 +493,27 @@ function buildHelpMessage() {
     `*${eM('Bot commands')}*`,
     ``,
     `${eM('/help')} ${eM('- show this help')}`,
-    `${eM('/status')} ${eM('- show grid bot status (all-in-one)')}`,
-    `${eM('/exposure')} ${eM('- shows open capital currently running in the grid')}`,
+    `${eM('/status')} ${eM('- full grid bot status (all-in-one)')}`,
+    `${eM('/grid')} ${eM('- quick grid position and price check')}`,
+    `${eM('/exposure')} ${eM('- open capital currently running in the grid')}`,
     ``,
     `*${eM('Profit summaries')}*`,
-    `${eM('/day')} ${eM('- profit summary for today (00:00 to 23:59)')}`,
-    `${eM('/daily_profit')} ${eM('- daily profit list for current month (day 1 to today)')}`,
-    `${eM('/week')} ${eM('- profit summary for this week (Mon to Sun)')}`,
-    `${eM('/month')} ${eM('- profit summary for this month (day 1 to end)')}`,
-    `${eM('/estimate')} ${eM('- estimate monthly profit based on month-to-date average')}`,
+    `${eM('/day')} ${eM('- profit summary for today')}`,
+    `${eM('/daily_profits')} ${eM('- daily profit list for current month')}`,
+    `${eM('/week')} ${eM('- profit summary for this week')}`,
+    `${eM('/month')} ${eM('- profit summary for this month')}`,
+    `${eM('/estimate')} ${eM('- estimate monthly profit from MTD average')}`,
+    `${eM('/alltime')} ${eM('- all-time profit, trades, and cycles')}`,
     ``,
     `*${eM('Previous periods')}*`,
     `${eM('/previous_day')} ${eM('- profit summary for previous day')}`,
     `${eM('/previous_week')} ${eM('- profit summary for previous week')}`,
     `${eM('/previous_month')} ${eM('- profit summary for previous month')}`,
+    ``,
+    `*${eM('Performance')}*`,
+    `${eM('/cycles')} ${eM('- cycle counts and efficiency for day/week/month')}`,
+    `${eM('/avg')} ${eM('- performance averages (all-time and this month)')}`,
+    `${eM('/pnl')} ${eM('- multi-period PnL table')}`,
   ];
 
   return lines.join('\n');
@@ -499,15 +529,24 @@ function formatPct(n) {
   return `${n.toFixed(2)}%`;
 }
 
-function buildProfitSummaryMessage({ title, period, total, count, exposure, pnlPct }) {
+function buildProfitSummaryMessage({ title, period, total, count, cycles, exposure, pnlPct }) {
+  const avgPerTrade = count > 0 ? total / count : 0;
+  const efficiency = cycles > 0 && count > 0 ? (count / cycles) * 100 : null;
+
   const lines = [
     `*${eM(title)}*`,
     `${eM(period.label)}`,
     `${eM('Range')}: *${eM(period.from)}* ${eM('to')} *${eM(period.to)}*`,
     ``,
     `${eM('•')} ${eM('Profit total')}: *${eM(formatUSD(total))}*`,
+    `${eM('•')} ${eM('Avg per trade')}: *${eM(formatUSD(avgPerTrade))}*`,
     `${eM('•')} ${eM('Trades count')}: *${eM(String(count))}*`,
+    `${eM('•')} ${eM('Cycles started')}: *${eM(String(cycles ?? 0))}*`,
   ];
+
+  if (efficiency !== null) {
+    lines.push(`${eM('•')} ${eM('Efficiency')}: *${eM(efficiency.toFixed(1) + '%')}* ${eM('(trades/cycles)')}`);
+  }
 
   const totalExposureUsd = toNumberSafe(exposure?.totalExposureUsd);
   if (totalExposureUsd > 0) {
@@ -525,13 +564,21 @@ async function handleProfitSummaryCommand(msg, { title, periodFn }) {
   const instanceId = getInstanceId();
   const period = periodFn();
 
-  const rows = await retrieveTradeProfit({
-    trade_instance_id: instanceId,
-    date_start: period.from,
-    date_end: period.to,
-  });
+  const [rows, cycleRows] = await Promise.all([
+    retrieveTradeProfit({
+      trade_instance_id: instanceId,
+      date_start: period.from,
+      date_end: period.to,
+    }),
+    retrieveTradeCycles({
+      trade_instance_id: instanceId,
+      date_start: period.from,
+      date_end: period.to,
+    }),
+  ]);
 
   const { total, count } = sumProfit(rows);
+  const cycles = Array.isArray(cycleRows) ? cycleRows.length : 0;
 
   // Exposure snapshot (now) to compute PnL %
   let exposure = null;
@@ -555,6 +602,7 @@ async function handleProfitSummaryCommand(msg, { title, periodFn }) {
     period,
     total,
     count,
+    cycles,
     exposure,
     pnlPct,
   });
@@ -648,6 +696,97 @@ function scheduleDailyStatus(bot) {
   }, delay);
 }
 
+function buildGridMessage(snapshot) {
+  const {
+    symbol, rangeMin, rangeMax, currentPrice,
+    gridPositionPct, waitingCycles, expectedRange,
+    buyPct, sellPct, lastOpAt,
+  } = snapshot;
+
+  const fmtPct = (v) => v === null ? eM('N/A') : eM(v.toFixed(2) + '%');
+  const fmtGridPos = (v) => v === null ? eM('N/A') : eM(v.toFixed(1) + '%');
+  const expBuy = expectedRange?.highestBuy ?? null;
+  const expSell = expectedRange?.lowestSell ?? null;
+
+  return [
+    `*${eM('Grid position')}* — *${eM(symbol)}*`,
+    ``,
+    `${eM('•')} ${eM('Current price')}: *${eM(String(currentPrice))}*`,
+    `${eM('•')} ${eM('Range')}: *${eM(String(rangeMin))}* ${eM('→')} *${eM(String(rangeMax))}*`,
+    `${eM('•')} ${eM('Position in grid')}: *${fmtGridPos(gridPositionPct)}*`,
+    ``,
+    `${eM('•')} ${eM('Next sell')}: *${eM(String(expSell ?? 'N/A'))}* \\(${eM('↑')} ${fmtPct(sellPct)}\\)`,
+    `${eM('•')} ${eM('Next buy')}: *${eM(String(expBuy ?? 'N/A'))}* \\(${eM('↓')} ${fmtPct(buyPct)}\\)`,
+    `${eM('•')} ${eM('Waiting cycles')}: *${eM(String(waitingCycles))}*`,
+    `${eM('•')} ${eM('Last operation')}: *${eM(formatDateTime(lastOpAt))}*`,
+  ].join('\n');
+}
+
+function buildAlltimeMessage({ symbol, totalProfit, trades, cycles, since, avgPerDay }) {
+  const avgPerTrade = trades > 0 ? totalProfit / trades : 0;
+  const efficiency = cycles > 0 && trades > 0 ? (trades / cycles) * 100 : null;
+
+  const lines = [
+    `*${eM('All-time summary')}* — *${eM(symbol)}*`,
+    ``,
+    `${eM('•')} ${eM('Total profit')}: *${eM(formatUSD(totalProfit))}*`,
+    `${eM('•')} ${eM('Avg per trade')}: *${eM(formatUSD(avgPerTrade))}*`,
+    `${eM('•')} ${eM('Total trades')}: *${eM(String(trades))}*`,
+    `${eM('•')} ${eM('Total cycles')}: *${eM(String(cycles))}*`,
+  ];
+
+  if (efficiency !== null) {
+    lines.push(`${eM('•')} ${eM('Efficiency')}: *${eM(efficiency.toFixed(1) + '%')}* ${eM('(trades/cycles)')}`);
+  }
+
+  lines.push(
+    `${eM('•')} ${eM('Avg per day')}: *${eM(formatUSD(avgPerDay))}*`,
+    `${eM('•')} ${eM('Running since')}: *${eM(since ?? 'N/A')}*`,
+  );
+
+  return lines.join('\n');
+}
+
+function buildCyclesMessage({ symbol, day, week, month }) {
+  function formatRow(label, data) {
+    const eff = data.efficiency !== null ? ` \\(${eM(data.efficiency.toFixed(1) + '%')} ${eM('eff')}\\)` : '';
+    return `${eM('•')} *${eM(label)}*: *${eM(String(data.cycles))}* ${eM('cycles')}, *${eM(String(data.trades))}* ${eM('trades')}${eff}`;
+  }
+
+  return [
+    `*${eM('Cycle stats')}* — *${eM(symbol)}*`,
+    ``,
+    formatRow('Today', day),
+    formatRow('This week', week),
+    formatRow('This month', month),
+    ``,
+    `${eM('•')} ${eM('Avg cycles/day (MTD)')}: *${eM((month.avgCyclesPerDay ?? 0).toFixed(1))}*`,
+  ].join('\n');
+}
+
+function buildAvgMessage({ symbol, allTime, month }) {
+  function formatSection(label, data) {
+    const lines = [
+      `*${eM(label)}*`,
+      `${eM('•')} ${eM('Avg per trade')}: *${eM(formatUSD(data.avgPerTrade))}*`,
+      `${eM('•')} ${eM('Avg trades per day')}: *${eM(data.avgTradesPerDay.toFixed(1))}*`,
+      `${eM('•')} ${eM('Avg cycles per day')}: *${eM(data.avgCyclesPerDay.toFixed(1))}*`,
+    ];
+    if (data.efficiency !== null) {
+      lines.push(`${eM('•')} ${eM('Efficiency')}: *${eM(data.efficiency.toFixed(1) + '%')}* ${eM('(trades/cycles)')}`);
+    }
+    return lines;
+  }
+
+  return [
+    `*${eM('Performance averages')}* — *${eM(symbol)}*`,
+    ``,
+    ...formatSection('All-time', allTime),
+    ``,
+    ...formatSection('This month', month),
+  ].join('\n');
+}
+
 async function getCurrentSymbol() {
   const instanceId = getInstanceId();
 
@@ -724,20 +863,30 @@ function createTelegramBot({ polling = true } = {}) {
         const instanceId = getInstanceId();
         const period = periodMonthToDate();
 
-        const rows = await retrieveTradeProfit({
-          trade_instance_id: instanceId,
-          date_start: period.from,
-          date_end: period.to,
-        });
+        const [rows, cycleRows] = await Promise.all([
+          retrieveTradeProfit({
+            trade_instance_id: instanceId,
+            date_start: period.from,
+            date_end: period.to,
+          }),
+          retrieveTradeCycles({
+            trade_instance_id: instanceId,
+            date_start: period.from,
+            date_end: period.to,
+          }),
+        ]);
 
-        const { days, monthTotal, monthCount } = groupProfitByDay(rows);
+        const cyclesByDay = new Map();
+        for (const r of (cycleRows || [])) {
+          const day = rowLocalDay(r);
+          if (day) cyclesByDay.set(day, (cyclesByDay.get(day) || 0) + 1);
+        }
 
-        const message = buildDailyProfitMessage({
-          period,
-          days,
-          monthTotal,
-          monthCount,
-        });
+        const { days: rawDays, monthTotal, monthCount } = groupProfitByDay(rows);
+        const days = rawDays.map(d => ({ ...d, cycles: cyclesByDay.get(d.date) || 0 }));
+        const monthCycles = Array.isArray(cycleRows) ? cycleRows.length : 0;
+
+        const message = buildDailyProfitMessage({ period, days, monthTotal, monthCount, monthCycles });
 
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
@@ -846,21 +995,32 @@ function createTelegramBot({ polling = true } = {}) {
         const instanceId = getInstanceId();
         const period = periodMonthToDate();
 
-        const rows = await retrieveTradeProfit({
-          trade_instance_id: instanceId,
-          date_start: period.from,
-          date_end: period.to,
-        });
+        const [rows, cycleRows] = await Promise.all([
+          retrieveTradeProfit({
+            trade_instance_id: instanceId,
+            date_start: period.from,
+            date_end: period.to,
+          }),
+          retrieveTradeCycles({
+            trade_instance_id: instanceId,
+            date_start: period.from,
+            date_end: period.to,
+          }),
+        ]);
 
         const { total, count } = sumProfit(rows);
+        const cycles = Array.isArray(cycleRows) ? cycleRows.length : 0;
 
         const daysElapsed = Number(period?.meta?.dayOfMonth || 0);
         const daysInMonth = Number(period?.meta?.daysInMonth || 0);
 
         const avgPerDay = daysElapsed > 0 ? total / daysElapsed : 0;
+        const avgCyclesPerDay = daysElapsed > 0 ? cycles / daysElapsed : 0;
 
         const estWeek = avgPerDay * 7;
         const estMonth = daysInMonth > 0 ? avgPerDay * daysInMonth : 0;
+        const estCyclesWeek = avgCyclesPerDay * 7;
+        const estCyclesMonth = daysInMonth > 0 ? avgCyclesPerDay * daysInMonth : 0;
 
         const message = buildEstimateMessage({
           period,
@@ -870,6 +1030,10 @@ function createTelegramBot({ polling = true } = {}) {
           estDay: avgPerDay,
           estWeek,
           estMonth,
+          cycles,
+          avgCyclesPerDay,
+          estCyclesWeek,
+          estCyclesMonth,
         });
 
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
@@ -964,6 +1128,154 @@ function createTelegramBot({ polling = true } = {}) {
           eM(`Failed to get /pnl: ${err.message || err}`),
           { parse_mode: 'MarkdownV2' },
         );
+      }
+    });
+
+    bot.onText(/\/grid\b/, async msg => {
+      if (!isAllowedChat(msg)) return;
+
+      try {
+        const snapshot = await getAggregatedStatusSnapshot();
+        const message = buildGridMessage(snapshot);
+        bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        bot.sendMessage(msg.chat.id, eM(`Failed to get /grid: ${err.message || err}`), { parse_mode: 'MarkdownV2' });
+      }
+    });
+
+    bot.onText(/\/alltime\b/, async msg => {
+      if (!isAllowedChat(msg)) return;
+
+      try {
+        const instanceId = getInstanceId();
+        let cfg = await retrieveInstance({ id: instanceId });
+        cfg = cfg?.[0];
+
+        const [profitRows, cycleRows] = await Promise.all([
+          retrieveTradeProfit({ trade_instance_id: instanceId }),
+          retrieveTradeCycles({ trade_instance_id: instanceId }),
+        ]);
+
+        const { total: totalProfit, count: trades } = sumProfit(profitRows);
+        const cycles = Array.isArray(cycleRows) ? cycleRows.length : 0;
+
+        const sorted = [...(profitRows || [])].sort((a, b) =>
+          new Date(a.date_transaction || 0) - new Date(b.date_transaction || 0),
+        );
+        const since = sorted[0] ? rowLocalDay(sorted[0]) : null;
+
+        let avgPerDay = 0;
+        if (since) {
+          const start = DateTime.fromFormat(since, 'yyyy-LL-dd', { zone: getBotTz() });
+          const days = Math.max(1, Math.floor(DateTime.now().setZone(getBotTz()).diff(start, 'days').days) + 1);
+          avgPerDay = totalProfit / days;
+        }
+
+        const message = buildAlltimeMessage({ symbol: cfg?.pair ?? 'N/A', totalProfit, trades, cycles, since, avgPerDay });
+        bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        bot.sendMessage(msg.chat.id, eM(`Failed to get /alltime: ${err.message || err}`), { parse_mode: 'MarkdownV2' });
+      }
+    });
+
+    bot.onText(/\/cycles\b/, async msg => {
+      if (!isAllowedChat(msg)) return;
+
+      try {
+        const instanceId = getInstanceId();
+        let cfg = await retrieveInstance({ id: instanceId });
+        cfg = cfg?.[0];
+
+        const dayPeriod   = periodDay();
+        const weekPeriod  = periodWeek();
+        const mtdPeriod   = periodMonthToDate();
+
+        const [dayProfitRows, weekProfitRows, monthProfitRows, dayCycleRows, weekCycleRows, monthCycleRows] = await Promise.all([
+          retrieveTradeProfit({ trade_instance_id: instanceId, date_start: dayPeriod.from,  date_end: dayPeriod.to }),
+          retrieveTradeProfit({ trade_instance_id: instanceId, date_start: weekPeriod.from, date_end: weekPeriod.to }),
+          retrieveTradeProfit({ trade_instance_id: instanceId, date_start: mtdPeriod.from,  date_end: mtdPeriod.to }),
+          retrieveTradeCycles({ trade_instance_id: instanceId, date_start: dayPeriod.from,  date_end: dayPeriod.to }),
+          retrieveTradeCycles({ trade_instance_id: instanceId, date_start: weekPeriod.from, date_end: weekPeriod.to }),
+          retrieveTradeCycles({ trade_instance_id: instanceId, date_start: mtdPeriod.from,  date_end: mtdPeriod.to }),
+        ]);
+
+        const dayTrades   = sumProfit(dayProfitRows).count;
+        const weekTrades  = sumProfit(weekProfitRows).count;
+        const monthTrades = sumProfit(monthProfitRows).count;
+        const dayCycles   = Array.isArray(dayCycleRows)   ? dayCycleRows.length   : 0;
+        const weekCycles  = Array.isArray(weekCycleRows)  ? weekCycleRows.length  : 0;
+        const monthCycles = Array.isArray(monthCycleRows) ? monthCycleRows.length : 0;
+
+        const daysElapsed = Math.max(1, Number(mtdPeriod?.meta?.dayOfMonth || 1));
+
+        const message = buildCyclesMessage({
+          symbol: cfg?.pair ?? 'N/A',
+          day:   { cycles: dayCycles,   trades: dayTrades,   efficiency: dayCycles   > 0 ? (dayTrades   / dayCycles)   * 100 : null },
+          week:  { cycles: weekCycles,  trades: weekTrades,  efficiency: weekCycles  > 0 ? (weekTrades  / weekCycles)  * 100 : null },
+          month: { cycles: monthCycles, trades: monthTrades, efficiency: monthCycles > 0 ? (monthTrades / monthCycles) * 100 : null, avgCyclesPerDay: monthCycles / daysElapsed },
+        });
+
+        bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        bot.sendMessage(msg.chat.id, eM(`Failed to get /cycles: ${err.message || err}`), { parse_mode: 'MarkdownV2' });
+      }
+    });
+
+    bot.onText(/\/avg\b/, async msg => {
+      if (!isAllowedChat(msg)) return;
+
+      try {
+        const instanceId = getInstanceId();
+        let cfg = await retrieveInstance({ id: instanceId });
+        cfg = cfg?.[0];
+
+        const mtdPeriod   = periodMonthToDate();
+        const monthPeriod = periodMonth();
+
+        const [allProfitRows, allCycleRows, monthProfitRows, monthCycleRows] = await Promise.all([
+          retrieveTradeProfit({ trade_instance_id: instanceId }),
+          retrieveTradeCycles({ trade_instance_id: instanceId }),
+          retrieveTradeProfit({ trade_instance_id: instanceId, date_start: monthPeriod.from, date_end: monthPeriod.to }),
+          retrieveTradeCycles({ trade_instance_id: instanceId, date_start: monthPeriod.from, date_end: monthPeriod.to }),
+        ]);
+
+        const { total: allTimeTotal, count: allTimeTrades } = sumProfit(allProfitRows);
+        const allTimeCycles = Array.isArray(allCycleRows) ? allCycleRows.length : 0;
+
+        const { total: monthTotal, count: monthTrades } = sumProfit(monthProfitRows);
+        const monthCycles = Array.isArray(monthCycleRows) ? monthCycleRows.length : 0;
+
+        const sorted = [...(allProfitRows || [])].sort((a, b) =>
+          new Date(a.date_transaction || 0) - new Date(b.date_transaction || 0),
+        );
+        const since = sorted[0] ? rowLocalDay(sorted[0]) : null;
+        let allTimeDays = 1;
+        if (since) {
+          const start = DateTime.fromFormat(since, 'yyyy-LL-dd', { zone: getBotTz() });
+          allTimeDays = Math.max(1, Math.floor(DateTime.now().setZone(getBotTz()).diff(start, 'days').days) + 1);
+        }
+
+        const daysElapsedMtd = Math.max(1, Number(mtdPeriod?.meta?.dayOfMonth || 1));
+
+        const message = buildAvgMessage({
+          symbol: cfg?.pair ?? 'N/A',
+          allTime: {
+            avgPerTrade:      allTimeTrades > 0 ? allTimeTotal / allTimeTrades : 0,
+            avgTradesPerDay:  allTimeTrades / allTimeDays,
+            avgCyclesPerDay:  allTimeCycles / allTimeDays,
+            efficiency:       allTimeCycles > 0 ? (allTimeTrades / allTimeCycles) * 100 : null,
+          },
+          month: {
+            avgPerTrade:      monthTrades > 0 ? monthTotal / monthTrades : 0,
+            avgTradesPerDay:  monthTrades / daysElapsedMtd,
+            avgCyclesPerDay:  monthCycles / daysElapsedMtd,
+            efficiency:       monthCycles > 0 ? (monthTrades / monthCycles) * 100 : null,
+          },
+        });
+
+        bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        bot.sendMessage(msg.chat.id, eM(`Failed to get /avg: ${err.message || err}`), { parse_mode: 'MarkdownV2' });
       }
     });
 
