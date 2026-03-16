@@ -220,7 +220,8 @@ export async function dashboardRoutes(app, opts) {
     });
 
     app.get("/dashboard/profits", async (request, reply) => {
-        const { profitSummary, portfolioOverview, rebuy } = await loadDashboardData({ models });
+        const instanceId = Number(request.query?.instanceId) || null;
+        const { profitSummary, portfolioOverview, rebuy } = await loadDashboardData({ models, instanceId });
 
         return reply.view("partials/profits.ejs", { profitSummary, portfolioOverview, rebuy });
     });

@@ -108,14 +108,43 @@
                 </div>
             <% } %>
 
+            <%
+                const daily      = profitSummary.dailyProfitMtd || {};
+                const days       = daily.days || [];
+                const maxAbs     = Math.max(1, ...days.map(d => Math.abs(Number(d.totalUsd || 0))));
+                const allTimeDays = (profitSummary.allTimeDailyProfit || []).filter(d => d.totalUsd !== 0);
+
+                // Estimates: actual period profit ÷ days elapsed × total period days
+                const _today = new Date();
+
+                // Week: days elapsed since Monday (Mon=1 … Sun=7)
+                const _dayOfWeek = ((_today.getDay() + 6) % 7) + 1;
+                const estWeek = _dayOfWeek > 0 ? (n(t.week.totalUsd, 0) / _dayOfWeek) * 7 : 0;
+
+                // Month: days elapsed since day 1
+                const mtdElapsed = days.length || 1;
+                let totalDaysInMonth = 30;
+                if (daily.period && daily.period.from) {
+                    const p = String(daily.period.from).split('-');
+                    if (p.length >= 2) totalDaysInMonth = new Date(parseInt(p[0],10), parseInt(p[1],10), 0).getDate();
+                }
+                const estMonth = (n(t.month.totalUsd, 0) / mtdElapsed) * totalDaysInMonth;
+
+                // Year: days elapsed since Jan 1
+                const _jan1 = new Date(_today.getFullYear(), 0, 1);
+                const _daysElapsedYear = Math.floor((_today - _jan1) / 86400000) + 1;
+                const _daysInYear = ((_today.getFullYear() % 4 === 0 && _today.getFullYear() % 100 !== 0) || _today.getFullYear() % 400 === 0) ? 366 : 365;
+                const estYear = _daysElapsedYear > 0 ? (n(t.year.totalUsd, 0) / _daysElapsedYear) * _daysInYear : 0;
+            %>
+
             <!-- Period widgets -->
             <div class="row g-3">
                 <% [
                     { label: 'Today', data: t.today },
-                    { label: 'Week',  data: t.week  },
-                    { label: 'Month', data: t.month },
-                    { label: 'Year',  data: t.year  },
-                ].forEach(({ label, data }) => {
+                    { label: 'Week',  data: t.week,  estimate: estWeek },
+                    { label: 'Month', data: t.month, estimate: estMonth },
+                    { label: 'Year',  data: t.year,  estimate: estYear },
+                ].forEach(({ label, data, estimate }) => {
                     const isPos  = n(data.totalUsd, 0) > 0;
                     const isNeg  = n(data.totalUsd, 0) < 0;
                     const hasPct = n(data.pnlPercent, 0) !== 0;
@@ -133,18 +162,16 @@
                         <div class="fs-5 fw-semibold <%= isPos ? 'text-success' : isNeg ? 'text-danger' : '' %>">
                             <%= fmtUsd(data.totalUsd) %>
                         </div>
-                        <div class="text-muted small"><%= n(data.trades,0) %> trades · <%= n(data.cycles,0) %> cycles</div>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <div class="text-muted small"><%= n(data.trades,0) %> trades · <%= n(data.cycles,0) %> cycles</div>
+                            <% if (estimate != null) { %>
+                                <div class="text-muted small">est. <%= fmtUsd(estimate) %></div>
+                            <% } %>
+                        </div>
                     </div>
                 </div>
                 <% }) %>
             </div>
-
-            <%
-                const daily      = profitSummary.dailyProfitMtd || {};
-                const days       = daily.days || [];
-                const maxAbs     = Math.max(1, ...days.map(d => Math.abs(Number(d.totalUsd || 0))));
-                const allTimeDays = (profitSummary.allTimeDailyProfit || []).filter(d => d.totalUsd !== 0);
-            %>
 
             <hr class="my-4" />
 

@@ -44,7 +44,7 @@ const pageData = {
 <div id="section-profits" class="card shadow-sm mt-3">
   <div class="card-body">
     <div
-            hx-get="/dashboard/profits"
+            hx-get="/dashboard/profits?instanceId=<%= instance?.id ?? '' %>"
             hx-trigger="load, every 1m"
             hx-swap="innerHTML"
     >

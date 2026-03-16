@@ -65,43 +65,17 @@
         const isBlank = (v) => v === null || v === undefined || v === '';
     %>
 
-    <!-- Quick stats row -->
-    <div class="row g-2 mb-3">
-        <div class="col-12 col-md-4">
-            <div class="border rounded p-2 h-100 profit-card profit-card-neutral">
-                <div class="text-muted small mb-1">Spot pair</div>
-                <div class="fw-semibold"><%= config.pair ?? '—' %></div>
-            </div>
-        </div>
-
-        <div class="col-6 col-md-4">
-            <div class="border rounded p-2 h-100 profit-card profit-card-neutral">
-                <div class="text-muted small mb-1">Target profit</div>
-                <div class="fw-semibold"><%= fmtPct(config.target_percent) %></div>
-            </div>
-        </div>
-
-        <div class="col-6 col-md-4">
-            <div class="border rounded p-2 h-100 profit-card profit-card-neutral">
-                <div class="text-muted small mb-1">Grid distance</div>
-                <div class="fw-semibold"><%= fmtPct(config.margin_percent) %></div>
-            </div>
-        </div>
-    </div>
-
     <!-- Secondary info -->
     <div class="vstack gap-1 small">
-        <div class="d-flex align-items-center gap-2">
-            <% if (isBlank(config.execution_price_min) && isBlank(config.execution_price_max)) { %>
-                <i class="bi bi-arrow-left-right text-muted" style="width:14px;"></i>
-                <span class="text-muted">Execution range</span>
-                <span class="text-muted ms-1" style="opacity:0.5;">(not set)</span>
-            <% } else { %>
-                <span class="fw-semibold"><%= fmtPrice(config.execution_price_min) %></span>
-                <i class="bi bi-arrow-left-right text-muted"></i>
-                <span class="fw-semibold"><%= fmtPrice(config.execution_price_max) %></span>
-                <span class="text-muted">Execution range</span>
+        <div class="text-muted">
+            Running on <span class="fw-semibold text-body"><%= config.pair ?? '—' %></span>
+            <% if (!isBlank(config.execution_price_min) || !isBlank(config.execution_price_max)) { %>
+                <span class="fw-semibold text-body"><%= fmtPrice(config.execution_price_min) %></span>
+                →
+                <span class="fw-semibold text-body"><%= fmtPrice(config.execution_price_max) %></span>
             <% } %>
+            to target <span class="fw-semibold text-body"><%= fmtPct(config.target_percent) %></span>
+            with <span class="fw-semibold text-body"><%= fmtPct(config.margin_percent) %></span> distance between orders
         </div>
 
         <div class="d-flex align-items-center gap-2">
