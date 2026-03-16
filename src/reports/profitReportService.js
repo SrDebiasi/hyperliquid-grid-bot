@@ -10,7 +10,7 @@ import {
     now,
 } from '../functions/datePeriods.js';
 import {calcExposureFromOrders} from "./exposureService.js";
-import {fetchHyperliquidMidFromPair, retrieveConfig, retrieveOrders, retrieveTradeProfit} from "../functions/functions.js";
+import {fetchHyperliquidMidFromPair, retrieveTradeProfit} from "../functions/functions.js";
 
 function toPlainRows(rows) {
     return (rows || []).map(r => (r?.get ? r.get({ plain: true }) : r));
@@ -271,18 +271,17 @@ function pnlPercent(totalUsd, exposureUsd) {
 }
 
 
-async function buildExposureNow({ tradeInstanceId }) {
-    // config
-    let cfg = await retrieveConfig({ trade_instance_id: tradeInstanceId });
-    cfg = cfg?.[0];
-    if (!cfg?.pair) return null;
+async function buildExposureNow({ models, tradeInstanceId }) {
+    const row = await models.TradeInstance.findByPk(tradeInstanceId);
+    if (!row?.pair) return null;
+    const cfg = row.toJSON ? row.toJSON() : row;
 
-    // price
     const currentPrice = await fetchHyperliquidMidFromPair(cfg.pair);
 
-    // orders
-    const orders =
-        (await retrieveOrders({ pair: cfg.pair, trade_instance_id: tradeInstanceId })) || [];
+    const ordersRaw = await models.TradeOrder.findAll({
+        where: { trade_instance_id: tradeInstanceId },
+    });
+    const orders = ordersRaw.map(o => o.get({ plain: true }));
 
     return calcExposureFromOrders(orders, currentPrice);
 }
@@ -301,7 +300,7 @@ async function getProfitSummary({ models, tradeInstanceId }) {
         buildTotalsForPeriod({ tradeInstanceId, periodFn: periodYear }),
         buildAllTimeTotals({  tradeInstanceId }),
         buildDailyProfitMtd({ models, tradeInstanceId }),
-        buildExposureNow({ tradeInstanceId }),
+        buildExposureNow({ models, tradeInstanceId }),
         countCyclesForPeriod({ models, tradeInstanceId, from: pDay.from,   to: pDay.to }),
         countCyclesForPeriod({ models, tradeInstanceId, from: pWeek.from,  to: pWeek.to }),
         countCyclesForPeriod({ models, tradeInstanceId, from: pMonth.from, to: pMonth.to }),

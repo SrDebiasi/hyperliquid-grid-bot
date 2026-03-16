@@ -8,29 +8,34 @@ let apiUrl = process.env.API_URL_LOCAL || 'http://127.0.0.1/api/';
 
 let headers = { headers: { 'Content-Type': 'application/json' }, validateStatus: false };
 
-const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton';
-
 function nowTz() {
-  return moment().tz(BOT_TZ);
+  return moment().tz(_botInstanceCfg?.bot_tz || 'America/Edmonton');
 }
+
+let _botInstanceCfg = null;
+export function setBotInstanceConfig(cfg) { _botInstanceCfg = cfg || null; }
 
 let exchange = null;
 let healthchecksTimer = null;
 const getExchange = () => exchange;
 
-const retrieveInstance = (data) => new Promise((resolve, reject) => {
+const initExchange = (data) => new Promise((resolve, reject) => {
   axios.get(apiUrl + 'trade-instance', { params: { id: data.id } }, headers)
       .then(async (result) => {
-        const userAddress = process.env.WALLET_ADDRESS ?? result.data.wallet_address ?? '';
-        const privateKey = process.env.PRIVATE_KEY ?? result.data.private_key ?? '';
+        const userAddress = process.env.WALLET_ADDRESS || result.data.wallet_address || '';
+        const privateKey = process.env.PRIVATE_KEY || result.data.private_key || '';
         consoleLog('Private Key loaded.');
 
         if (!privateKey) throw new Error('Missing HYPERLIQUID PRIVATE KEY');
 
+        const isTestnet = _botInstanceCfg?.hyperliquid_testnet === true
+            || _botInstanceCfg?.hyperliquid_testnet === 1
+            || process.env.HYPERLIQUID_TESTNET === '1';
+
         exchange = new HyperliquidAdapter({
           userAddress,
           privateKey,
-          isTestnet: process.env.HYPERLIQUID_TESTNET === '1',
+          isTestnet,
         });
 
         await exchange.init();
@@ -45,6 +50,14 @@ const retrieveInstance = (data) => new Promise((resolve, reject) => {
         }
         reject({ error: err?.toString?.() || String(err) });
       });
+});
+
+const retrieveInstance = (data) => new Promise((resolve, reject) => {
+  axios.get(apiUrl + 'trade-instance', { params: { id: data.id } }, headers)
+    .then(result => {
+      resolve([result.data]);
+    })
+    .catch((ex) => reject({ error: ex.toString() }));
 });
 
 
@@ -62,13 +75,6 @@ function isConnRefusedToLocalhost(err) {
   return code === 'ECONNREFUSED' && looksLikeLocalApi;
 }
 
-const retrieveConfig = (data) => new Promise((resolve, reject) => {
-  axios.get(apiUrl + 'trade-config', { params: { trade_instance_id: data.trade_instance_id } }, headers)
-    .then(result => {
-      resolve(result.data);
-    })
-    .catch((ex) => reject({ error: ex.toString() }));
-});
 
 const retrieveTradeProfit = (data) => new Promise((resolve, reject) => {
   const params = {
@@ -109,9 +115,9 @@ const updateTradeOrder = (data) => new Promise((resolve, reject) => {
     .catch((ex) => reject({ error: ex.toString() }));
 });
 
-const updateTradeConfig = (data) => new Promise((resolve, reject) => {
+const updateTradeInstance = (data) => new Promise((resolve, reject) => {
   let headersPut = { headers: { 'Content-Type': 'application/json' }, validateStatus: false, method: 'put' };
-  axios.put(apiUrl + 'trade-config/' + data.id, data, headersPut)
+  axios.put(apiUrl + 'trade-instance/' + data.id + '/config', data, headersPut)
     .then(result => resolve(result.data))
     .catch((ex) => reject({ error: ex.toString() }));
 });
@@ -160,7 +166,7 @@ const addCycle = (data) => {
     price: data.price,
     trade_instance_id: data.trade_instance_id,
     date_transaction_utc: moment.utc().toISOString(),
-    date_transaction: moment().tz(BOT_TZ).toISOString(true),
+    date_transaction: moment().tz(_botInstanceCfg?.bot_tz || 'America/Edmonton').toISOString(true),
   };
 
   axios.post(apiUrl + 'trade-cycle', payload, headers).catch((error) => {
@@ -181,7 +187,7 @@ const addProfit = (data) => {
     price_intermediate: data.price_intermediate,
     price_final: data.price_final,
     date_transaction_utc: moment.utc().toISOString(),
-    date_transaction: moment().tz(BOT_TZ).toISOString(true),
+    date_transaction: moment().tz(_botInstanceCfg?.bot_tz || 'America/Edmonton').toISOString(true),
   };
 
   const profitStr = Number.parseFloat(data.value).toFixed(2);
@@ -217,8 +223,8 @@ const consoleLog = (message, color = null) => {
 };
 
 function startHealthchecksPing(
-    pingUrl = process.env.HEALTHCHECKS_PING_URL,
-    intervalMs = Number(process.env.HEALTHCHECKS_PING_INTERVAL_MS || 60000),
+    pingUrl = _botInstanceCfg?.healthchecks_ping_url,
+    intervalMs = Number(_botInstanceCfg?.healthchecks_ping_interval_ms || 60000),
 ) {
   if (intervalMs === 0 || !pingUrl) return;
   try {
@@ -275,13 +281,13 @@ export {
   setApi,
   getExchange,
   fetchHyperliquidMidFromPair,
-  retrieveConfig,
-  retrieveOrders,
   retrieveInstance,
+  retrieveOrders,
+  initExchange,
   retrieveTradeProfit,
   saveTradeOrder,
   updateTradeOrder,
-  updateTradeConfig,
+  updateTradeInstance,
   addProfit,
   addCycle,
   addMessage,

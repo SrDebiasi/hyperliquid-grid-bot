@@ -1,7 +1,7 @@
 (() => {
     console.log("[grid-ui] loaded");
 
-    let lastSimConfigId = null;
+    let lastSimInstanceId = null;
     let lastSimInputs = null;
 
     function money(n) {
@@ -87,7 +87,7 @@
     }
 
     function setSimButtons(configId) {
-        lastSimConfigId = configId;
+        lastSimInstanceId = configId;
 
         const btn = getEl("simApproveBtn");
         if (!btn) return;
@@ -108,7 +108,7 @@
             btn.disabled = true;
 
             try {
-                const res = await fetch(`/api/trade-config/${configId}/build-grid`, {
+                const res = await fetch(`/api/trade-instance/${configId}/build-grid`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -172,7 +172,7 @@
                 usd_transaction: inputs.usd_transaction,
             });
 
-            const res = await fetch(`/api/trade-config/${configId}/simulate?${params.toString()}`, {
+            const res = await fetch(`/api/trade-instance/${configId}/simulate?${params.toString()}`, {
                 headers: { Accept: "application/json" },
             });
 
@@ -299,7 +299,7 @@
     }
 
     function openSimulationFlow(configId) {
-        lastSimConfigId = configId;
+        lastSimInstanceId = configId;
         clearSimState();
         setSimButtons(configId);
 
@@ -329,15 +329,15 @@
 
         const simRunBtn = ev.target.closest("#simRunBtn");
         if (simRunBtn) {
-            if (!lastSimConfigId) return;
-            void runSimulation(lastSimConfigId);
+            if (!lastSimInstanceId) return;
+            void runSimulation(lastSimInstanceId);
         }
     });
 
     document.addEventListener("DOMContentLoaded", () => {
         const cfgId = window.__GRID_UI__?.configId;
         if (cfgId) {
-            lastSimConfigId = cfgId;
+            lastSimInstanceId = cfgId;
             setSimButtons(cfgId);
         }
     });

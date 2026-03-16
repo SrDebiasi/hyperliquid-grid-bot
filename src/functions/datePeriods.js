@@ -1,10 +1,11 @@
 // datePeriods.js
 import { DateTime } from 'luxon';
 
-const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton'; // Calgary default
+let _tz = 'America/Edmonton';
+export function setDatePeriodsTimezone(tz) { _tz = tz || 'America/Edmonton'; }
 
 function now() {
-  return DateTime.now().setZone(BOT_TZ);
+  return DateTime.now().setZone(_tz);
 }
 
 function ymd(dt) {
@@ -110,7 +111,6 @@ function periodMonthToDate(ref = now()) {
 }
 
 export {
-  BOT_TZ,
   now,
   ymd,
   periodDay,

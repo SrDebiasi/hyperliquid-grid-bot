@@ -3,22 +3,29 @@
 import {
   setApi,
   getExchange,
-  retrieveConfig,
   retrieveInstance,
+  initExchange,
   retrieveOrders,
   updateTradeOrder,
-  updateTradeConfig,
+  updateTradeInstance,
   addProfit,
   addCycle,
   addMessage,
   consoleLog,
   startHealthchecksPing,
+  setBotInstanceConfig,
 } from './functions.js';
 
 import { setPrices, setPrice, getInstanceId, setInstanceId, setLastOperation } from './state.js';
-import { notifyTelegram, createTelegramBot } from '../services/telegramService.js';
+import { notifyTelegram, createTelegramBot, setTelegramInstanceConfig } from '../services/telegramService.js';
 import { ORDER_STATUS_NOT_OPEN , ORDER_STATUS_FILLED} from '../exchange/HyperliquidAdapter.js';
 import { FEE_RATE_MAKER_PER_SIDE } from "./fees.js";
+
+function applyInstanceConfig(cfg) {
+  if (!cfg) return;
+  setBotInstanceConfig(cfg);
+  setTelegramInstanceConfig(cfg);
+}
 
 let wallet = null;
 let enable = true;
@@ -253,7 +260,7 @@ async function cancelReserveQuoteOrder(coinIndex) {
   }
 
   try {
-    await updateTradeConfig({
+    await updateTradeInstance({
       id: cfg.id,
       reserve_quote_order_id: '',
     });
@@ -291,7 +298,7 @@ async function cancelReserveBaseOrder(coinIndex) {
   }
 
   try {
-    await updateTradeConfig({
+    await updateTradeInstance({
       id: cfg.id,
       reserve_base_order_id: '',
     });
@@ -365,7 +372,7 @@ async function detectReserveOrdersByExtremes(cfg) {
   // 3) Need DB orders to get baseline qty (only if we need to verify at least one side)
   const dbOrders = await retrieveOrders({
     pair: cfg.pair,
-    trade_instance_id: cfg.trade_instance_id,
+    trade_instance_id: cfg.id,
   });
 
   const maxDbQty = Math.max(0, ...dbOrders.map(o => Number(o.quantity) || 0));
@@ -405,8 +412,8 @@ async function detectReserveOrdersByExtremes(cfg) {
   }
 
   if (Object.keys(updates).length) {
-    await updateTradeConfig({
-      trade_instance_id: cfg.trade_instance_id,
+    await updateTradeInstance({
+      id: cfg.id,
       pair: cfg.pair,
       ...updates,
     });
@@ -565,7 +572,7 @@ async function createReserveOrders(coinIndex, currentPrice) {
 
           const id = o?.orderId;
           if (id) {
-            await updateTradeConfig({ id: cfg.id, reserve_quote_order_id: id });
+            await updateTradeInstance({ id: cfg.id, reserve_quote_order_id: id });
             cfg.reserve_quote_order_id = id;
             consoleLog(`${timesExecuted}) Updated reserve_quote_order_id to ${id}`);
           }
@@ -603,7 +610,7 @@ async function createReserveOrders(coinIndex, currentPrice) {
 
           const id = o?.orderId;
           if (id) {
-            await updateTradeConfig({ id: cfg.id, reserve_base_order_id: id });
+            await updateTradeInstance({ id: cfg.id, reserve_base_order_id: id });
             cfg.reserve_base_order_id = id;
             consoleLog(`${timesExecuted}) Updated reserve_base_order_id to ${id}`);
           }
@@ -938,10 +945,17 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
  * @returns {Promise<void>}
  */
 const runCoins = async function(coinIndex) {
+  // Lock acquired BEFORE any await — prevents concurrent executions even when
+  // called simultaneously from multiple WS callbacks or timers. Previously the
+  // lock was acquired after `await retrieveInstance`, leaving a race window where
+  // two calls could both read checking[coinIndex] === false before either set it.
+  if (checking[coinIndex]) { return; }
+  checking[coinIndex] = true;
+
   let timeToExecute = 20000;
   let pair = 'unknown';
   try {
-    data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => console.log(ex));
+    data = await retrieveInstance({ id: getInstanceId() }).catch((ex) => console.log(ex));
 
     const cfg = data[coinIndex];
     if (!cfg) {
@@ -949,20 +963,15 @@ const runCoins = async function(coinIndex) {
       return;
     }
     pair = cfg.pair;
-    const tradeInstanceId = cfg.trade_instance_id;
+    const tradeInstanceId = cfg.id;
     const dp = cfg.decimal_price;
     const dq = cfg.decimal_quantity;
 
-    // Skip execution if the bot is disabled or the market is not ready to be checked yet.
     if (!enable) {
       runWithTime(coinIndex, 5000);
       return;
     }
-    if (checking[pair]) {
-      return;
-    }
 
-    checking[pair] = true;
     timesExecuted++;
 
     await updatePrices([pair]);
@@ -1212,7 +1221,7 @@ const runCoins = async function(coinIndex) {
     consoleLog(`${timesExecuted}) runCoins error (${pair ?? 'unknown'}): ${e?.message ?? e}`, 'red');
     timeToExecute = 60000; // retry after error
   } finally {
-    checking[pair] = false;
+    checking[coinIndex] = false;
     runWithTime(coinIndex, timeToExecute);
   }
 };
@@ -1301,15 +1310,6 @@ const createOrderLimit = async (param) => {
 };
 
 
-function enqueueWs(fn) {
-  wsQueue = wsQueue
-      .then(fn)
-      .catch((err) => {
-        consoleLog(`WS queue error: ${err?.message ?? err}`, 'red');
-      });
-  return wsQueue;
-}
-
 let socketUnsubscribe = null;
 let socketWatchdogInterval = null;
 let socketRestarting = false;
@@ -1329,6 +1329,11 @@ function stopSocketPrices() {
   if (socketWatchdogInterval) {
     clearInterval(socketWatchdogInterval);
     socketWatchdogInterval = null;
+  }
+
+  if (wsTriggerInterval) {
+    clearInterval(wsTriggerInterval);
+    wsTriggerInterval = null;
   }
 }
 
@@ -1353,8 +1358,12 @@ async function restartSocketPrices() {
 }
 
 
-let wsQueue = Promise.resolve();
-const wsQueuedOrRunning = {};
+// Pending WS triggers: sym → true when price crossed the grid boundary.
+// The interval consumer (started in socketPrices) drains this and calls startMarket.
+// Using a flag instead of enqueueing runCoins directly means any number of
+// simultaneous WS callbacks (e.g. duplicate subscriptions) collapse into one trigger.
+const wsTriggerPending = {};
+let wsTriggerInterval = null;
 
 /**
  * Subscribes to aggregated trade updates (price stream) for all configured pairs.
@@ -1404,24 +1413,23 @@ const socketPrices = () => {
 
     if (!Number.isFinite(minPrice) || !Number.isFinite(maxPrice)) return;
     if (p < minPrice || p > maxPrice) {
-      if (wsQueuedOrRunning[sym]) return;
-
-      wsQueuedOrRunning[sym] = true;
-
-      consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
-
-      enqueueWs(async () => {
-        const idx = pairToIndex[sym];
-        if (idx == null) return;
-
-        try {
-          await runCoins(idx);
-        } finally {
-          wsQueuedOrRunning[sym] = false;
-        }
-      });
+      if (!wsTriggerPending[sym]) {
+        consoleLog(`WS trigger: price=${p} outside [${minPrice}, ${maxPrice}]`, 'yellow');
+      }
+      wsTriggerPending[sym] = true;
     }
   });
+
+  // Drain pending WS triggers every 50 ms and call startMarket once per symbol.
+  // Decoupling the WS callback from startMarket means any number of simultaneous
+  // WS events (e.g. duplicate subscriptions) collapse into a single startMarket call.
+  wsTriggerInterval = setInterval(() => {
+    for (const sym of Object.keys(wsTriggerPending)) {
+      delete wsTriggerPending[sym];
+      const idx = pairToIndex[sym];
+      if (idx != null) startMarket(idx);
+    }
+  }, 50);
 
   if (socketWatchdogInterval) {
     clearInterval(socketWatchdogInterval);
@@ -1486,7 +1494,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
 
     // Add only the configured percent of profit to the rebuy wallet
     const newRebuyValue = round(cfg.rebuy_value + rebuyProfitPortion, 8);
-    await updateTradeConfig({ id: cfg.id, rebuy_value: newRebuyValue });
+    await updateTradeInstance({ id: cfg.id, rebuy_value: newRebuyValue });
     cfg.rebuy_value = newRebuyValue;
 
     const amountToBuyQuote = 15; // quote currency per rebuy (e.g., USDC/USDT)
@@ -1523,7 +1531,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     const updatedReboughtValue = round(cfg.rebought_value + amountToBuyQuote, 8);
     const updatedReboughtCoin = round(cfg.rebought_coin + qtyToBuy, 8);
 
-    await updateTradeConfig({
+    await updateTradeInstance({
       id: cfg.id,
       rebuy_value: updatedRebuyValue,
       rebought_value: updatedReboughtValue,
@@ -1555,7 +1563,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
       const revertedReboughtValue = round(cfg.rebought_value - amountToBuyQuote, 8);
       const revertedReboughtCoin = round(cfg.rebought_coin - qtyToBuy, 8);
 
-      await updateTradeConfig({
+      await updateTradeInstance({
         id: cfg.id,
         rebuy_value: revertedRebuyValue,
         rebought_value: revertedReboughtValue,
@@ -1590,7 +1598,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
  * @param {number|string} instance - Trade instance id.
  * @returns {Promise<Array<object>>} Configuration rows for the given pair.
  */
-const loadConfig = async function(pair, instance) {
+const loadInstance = async function(pair, instance) {
   setApi();
   setInstanceId(instance);
 
@@ -1599,8 +1607,12 @@ const loadConfig = async function(pair, instance) {
     process.exit();
   }
 
+  // Apply per-instance DB settings to process.env before services start
+  const rawEarly = await retrieveInstance({ id: getInstanceId() }).catch(() => null);
+  applyInstanceConfig(rawEarly?.[0] ?? null);
+
   // Load API credentials for the given instance
-  await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
+  await initExchange({ id: getInstanceId() }).catch((ex) => {
     consoleLog('Unable to load private_key');
     console.log(ex);
     process.exit();
@@ -1609,7 +1621,7 @@ const loadConfig = async function(pair, instance) {
   // Allow the exchange client to finish initialization
   await sleep(1000);
 
-  data = await retrieveConfig({ pair, trade_instance_id: getInstanceId() }).catch((ex) => {
+  data = await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
@@ -1650,7 +1662,7 @@ async function startCoinsStaggered() {
   for (let idx = 0; idx < data.length; idx++) {
     const coin = data[idx];
     pairToIndex[getExchange().normalizeSymbolForPrice(coin.pair)] = idx;
-    if (checking[coin.pair] == null) checking[coin.pair] = false;
+    if (checking[idx] == null) checking[idx] = false;
 
     // Trigger once when bot is started
     await handleRebuyFromProfit(idx, 0);
@@ -1681,22 +1693,27 @@ const start = async function(instance) {
   setInstanceId(instance);
   setApi();
 
-  createTelegramBot({ polling: true });
-
-  startHealthchecksPing()
   if (getInstanceId() == null) {
     console.log('Instance ID is mandatory.');
     process.exit();
   }
+
+  // Load instance early so DB values override process.env before any service starts
+  const rawEarly = await retrieveInstance({ id: getInstanceId() }).catch(() => null);
+  applyInstanceConfig(rawEarly?.[0] ?? null);
+
+  createTelegramBot({ polling: true });
+  startHealthchecksPing();
+
   consoleLog('Retrieving coin data.');
-  await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
+  await initExchange({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     console.log('Unable to load private_key');
     process.exit();
   });
   void notifyTelegram('Bot grid initiated.');
 
-  data = await retrieveConfig({ trade_instance_id: getInstanceId() }).catch((ex) => {
+  data = await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
@@ -1722,7 +1739,7 @@ const openOrders = async function(instance, pair) {
   setInstanceId(instance);
   consoleLog('Checking open orders.', 'green');
 
-  await loadConfig(pair, getInstanceId());
+  await loadInstance(pair, getInstanceId());
 
   try {
     const rows = await getExchange().getOpenOrders({});
@@ -1745,7 +1762,7 @@ const openOrders = async function(instance, pair) {
 const cancelOrders = async function( instance, pair) {
   setInstanceId(instance);
 
-  await loadConfig(pair, getInstanceId());
+  await loadInstance(pair, getInstanceId());
 
   consoleLog(`Cancelling all open orders for ${pair}...`, 'yellow');
 

@@ -9,6 +9,23 @@ const pageData = {
   window.__GRID_UI__ = <%- JSON.stringify(pageData) %>;
 </script>
 
+<% if (instances && instances.length > 1) { %>
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="d-flex align-items-center gap-2">
+      <span class="text-muted small">Instance</span>
+      <select class="form-select form-select-sm w-auto" onchange="window.location.href='/dashboard?instanceId='+this.value">
+        <% instances.forEach(inst => { %>
+        <option value="<%= inst.id %>" <%= inst.id === instance?.id ? 'selected' : '' %>>
+          #<%= inst.id %> — <%= inst.name || inst.pair || ('Instance ' + inst.id) %>
+        </option>
+        <% }) %>
+      </select>
+    </div>
+  </div>
+</div>
+<% } %>
+
 <div id="section-account" class="card shadow-sm">
   <div class="card-body">
     <%- include('../partials/trade_instance', { instance, botStatus, envSecretsConfigured }) %>
@@ -17,7 +34,7 @@ const pageData = {
 
 <div id="section-config" class="card shadow-sm mt-3">
   <div class="card-body">
-    <%- include('../partials/trade_config', { instance, config, orders }) %>
+    <%- include('../partials/grid_config', { instance, config, orders }) %>
   </div>
 
   <%- include('../partials/modals/grid-simulate') %>
@@ -50,6 +67,6 @@ const pageData = {
 
 <%- include('../partials/modals/secrets-modal', { instance, envWalletAddress, envPrivateKey }) %>
 <%- include('../partials/modals/variables-modal', { instance, envTelegramBotToken, envTelegramChatId, envHealthchecksPingUrl, envHealthchecksPingIntervalMs, envBotTz, envHyperliquidTestnet }) %>
-<%- include('../partials/modals/trade_config', { config }) %>
+<%- include('../partials/modals/config_modal', { config }) %>
 
 <script type="module" src="/js/market.js"></script>

@@ -10,7 +10,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { connectDb, sequelize } from "./db.js";
-import { tradeConfigRoutes } from "./routes/trade-config.js";
 import { tradeOrderRoutes } from "./routes/trade-order.js";
 import { tradeInstanceRoutes } from "./routes/trade-instance.js";
 import { tradeProfitRoutes } from "./routes/trade-profit.js";
@@ -64,7 +63,6 @@ export async function buildServer() {
     await app.register(dashboardRoutes, { models });
     await app.register(marketRoutes, { models });
     // Existing API routes
-    await app.register(tradeConfigRoutes, { prefix: "/api", models });
     await app.register(tradeOrderRoutes, { prefix: "/api", models });
     await app.register(tradeInstanceRoutes, { prefix: "/api", models });
     await app.register(tradeProfitRoutes, { prefix: "/api", models });

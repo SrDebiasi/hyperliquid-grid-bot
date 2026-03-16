@@ -7,8 +7,16 @@ import {fetchHyperliquidMidFromPair} from "../../functions/functions.js";
 
 
 // Shared loader used by /dashboard and /dashboard/profits
-async function loadDashboardData({ models }) {
-    const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
+async function loadDashboardData({ models, instanceId = null }) {
+    const allInstanceRows = await models.TradeInstance.findAll({ order: [["id", "ASC"]] });
+    const instances = allInstanceRows.map(r => r.toJSON());
+
+    let instanceRow = null;
+    if (instanceId) {
+        instanceRow = allInstanceRows.find(r => r.id === instanceId) ?? null;
+    }
+    if (!instanceRow) instanceRow = allInstanceRows[0] ?? null;
+
     const instance = instanceRow ? instanceRow.toJSON() : null;
 
     let config = null;
@@ -18,11 +26,7 @@ async function loadDashboardData({ models }) {
     let portfolioOverview = null;
 
     if (instance) {
-        const configRow = await models.TradeConfig.findOne({
-            where: { trade_instance_id: instance.id },
-            order: [["id", "ASC"]],
-        });
-        config = configRow ? configRow.toJSON() : null;
+        config = instance;
 
         const ordersRaw = await models.TradeOrder.findAll({
             where: { trade_instance_id: instance.id },
@@ -168,14 +172,20 @@ async function loadDashboardData({ models }) {
     const envPrivateKey    = process.env.PRIVATE_KEY    || '';
     const envSecretsConfigured = !!(envWalletAddress && envPrivateKey);
 
-    const envTelegramBotToken          = process.env.TELEGRAM_BOT_TOKEN            || '';
-    const envTelegramChatId            = process.env.TELEGRAM_CHAT_ID              || '';
-    const envHealthchecksPingUrl       = process.env.HEALTHCHECKS_PING_URL         || '';
-    const envHealthchecksPingIntervalMs = process.env.HEALTHCHECKS_PING_INTERVAL_MS || '0';
-    const envBotTz                     = process.env.BOT_TZ                        || 'America/Edmonton';
-    const envHyperliquidTestnet        = process.env.HYPERLIQUID_TESTNET            || '0';
+    // DB value takes priority; .env is the fallback
+    const envTelegramBotToken           = instance?.telegram_bot_token            || process.env.TELEGRAM_BOT_TOKEN            || '';
+    const envTelegramChatId             = instance?.telegram_chat_id              || process.env.TELEGRAM_CHAT_ID              || '';
+    const envHealthchecksPingUrl        = instance?.healthchecks_ping_url         || process.env.HEALTHCHECKS_PING_URL         || '';
+    const envHealthchecksPingIntervalMs = instance?.healthchecks_ping_interval_ms != null
+        ? String(instance.healthchecks_ping_interval_ms)
+        : (process.env.HEALTHCHECKS_PING_INTERVAL_MS || '0');
+    const envBotTz                      = instance?.bot_tz                        || process.env.BOT_TZ                        || 'America/Edmonton';
+    const envHyperliquidTestnet         = instance?.hyperliquid_testnet != null
+        ? (instance.hyperliquid_testnet ? '1' : '0')
+        : (process.env.HYPERLIQUID_TESTNET || '0');
 
     return {
+        instances,
         instance,
         config,
         orders,
@@ -199,7 +209,8 @@ export async function dashboardRoutes(app, opts) {
     const { models } = opts;
 
     app.get("/dashboard", async (request, reply) => {
-        const data = await loadDashboardData({ models });
+        const instanceId = Number(request.query?.instanceId) || null;
+        const data = await loadDashboardData({ models, instanceId });
 
         return reply.view("layout.ejs", {
             page: "pages/dashboard.ejs",

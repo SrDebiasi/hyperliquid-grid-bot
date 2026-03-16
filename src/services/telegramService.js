@@ -5,16 +5,21 @@ import moment from 'moment-timezone';
 import { DateTime } from 'luxon';
 import { calcExposureFromOrders } from '../reports/exposureService.js';
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const chatId = process.env.TELEGRAM_CHAT_ID;
+let _instanceCfg = null;
 
-const BOT_TZ = process.env.BOT_TZ || 'America/Edmonton';
+/** Called once at bot startup with the loaded DB instance config */
+export function setTelegramInstanceConfig(cfg) {
+  _instanceCfg = cfg || null;
+  setDatePeriodsTimezone(_instanceCfg?.bot_tz);
+}
 
-const telegramEnabled = !!(token && chatId);
+const getBotTz        = () => _instanceCfg?.bot_tz            || 'America/Edmonton';
+const getChatId       = () => _instanceCfg?.telegram_chat_id  || '';
+const isTelegramEnabled = () => !!(_instanceCfg?.telegram_bot_token && _instanceCfg?.telegram_chat_id);
 
 import {
   getExchange,
-  retrieveConfig,
+  retrieveInstance,
   retrieveOrders,
   retrieveTradeProfit,
 } from '../functions/functions.js';
@@ -29,16 +34,17 @@ import {
   periodPreviousWeek,
   periodPreviousMonth,
   periodYear,
+  setDatePeriodsTimezone,
 } from '../functions/datePeriods.js';
 
 function mustGetTelegramToken() {
-  const t = process.env.TELEGRAM_BOT_TOKEN;
-  if (!t) throw new Error('Missing TELEGRAM_BOT_TOKEN');
+  const t = _instanceCfg?.telegram_bot_token;
+  if (!t) throw new Error('Missing telegram_bot_token in instance config');
   return t;
 }
 
 function isAllowedChat(msg) {
-  return String(msg.chat.id) === chatId;
+  return String(msg.chat.id) === getChatId();
 }
 
 function eM(text) {
@@ -61,16 +67,16 @@ function toNumberSafe(v) {
 }
 
 /**
- * Bucket a row into a BOT_TZ local day.
+ * Bucket a row into a getBotTz() local day.
  * Prefers date_transaction if present.
  */
 function rowLocalDay(row) {
   const raw = row?.date_transaction;
   if (!raw) return null;
 
-  // If it's already a Date, treat it as an instant and convert to BOT_TZ for bucketing
+  // If it's already a Date, treat it as an instant and convert to getBotTz() for bucketing
   if (raw instanceof Date) {
-    const dt = DateTime.fromJSDate(raw, { zone: 'utc' }).setZone(BOT_TZ);
+    const dt = DateTime.fromJSDate(raw, { zone: 'utc' }).setZone(getBotTz());
     return dt.isValid ? dt.toFormat('yyyy-LL-dd') : null;
   }
 
@@ -81,13 +87,13 @@ function rowLocalDay(row) {
     let dt = DateTime.fromISO(s, { setZone: true });
     if (!dt.isValid) dt = DateTime.fromSQL(s, { setZone: true });
     if (!dt.isValid) return null;
-    return dt.setZone(BOT_TZ).toFormat('yyyy-LL-dd');
+    return dt.setZone(getBotTz()).toFormat('yyyy-LL-dd');
   }
 
-  // SQL-ish "YYYY-MM-DD HH:mm:ss(.sss...)" -> assume BOT_TZ local wall time
+  // SQL-ish "YYYY-MM-DD HH:mm:ss(.sss...)" -> assume getBotTz() local wall time
   const noMicros = s.replace(/\.\d{1,6}$/, '');
-  let dt = DateTime.fromFormat(noMicros, 'yyyy-LL-dd HH:mm:ss', { zone: BOT_TZ });
-  if (!dt.isValid) dt = DateTime.fromSQL(noMicros, { zone: BOT_TZ });
+  let dt = DateTime.fromFormat(noMicros, 'yyyy-LL-dd HH:mm:ss', { zone: getBotTz() });
+  if (!dt.isValid) dt = DateTime.fromSQL(noMicros, { zone: getBotTz() });
   if (!dt.isValid) return null;
 
   return dt.toFormat('yyyy-LL-dd');
@@ -164,7 +170,7 @@ async function getAggregatedStatusSnapshot() {
   const instanceId = getInstanceId();
 
   // config
-  let cfg = await retrieveConfig({ trade_instance_id: instanceId });
+  let cfg = await retrieveInstance({ id: instanceId });
   cfg = cfg?.[0];
   if (!cfg?.pair) throw new Error('Missing pair in config');
 
@@ -406,7 +412,7 @@ async function getPnlForPeriod(periodFn) {
   const period = periodFn();
 
   // config (symbol)
-  let cfg = await retrieveConfig({ trade_instance_id: instanceId });
+  let cfg = await retrieveInstance({ id: instanceId });
   cfg = cfg?.[0];
   if (!cfg?.pair) throw new Error('Missing pair in config');
 
@@ -606,7 +612,7 @@ async function buildExposureMessage({currentPrice, exposure}) {
 }
 
 function msUntilNext2359() {
-  const now = DateTime.now().setZone(BOT_TZ);
+  const now = DateTime.now().setZone(getBotTz());
 
   let target = now.set({ hour: 23, minute: 59, second: 0, millisecond: 0 });
   if (target <= now) target = target.plus({ days: 1 });
@@ -633,7 +639,7 @@ function scheduleDailyStatus(bot) {
 
   setTimeout(async () => {
     try {
-      await sendStatusToChat(bot, chatId);
+      await sendStatusToChat(bot, getChatId());
     } catch (err) {
       console.error('Daily /status failed:', err?.message || err);
     } finally {
@@ -645,14 +651,14 @@ function scheduleDailyStatus(bot) {
 async function getCurrentSymbol() {
   const instanceId = getInstanceId();
 
-  let cfg = await retrieveConfig({ trade_instance_id: instanceId });
+  let cfg = await retrieveInstance({ id: instanceId });
   cfg = cfg?.[0];
   if (!cfg?.pair) throw new Error('Missing pair in config');
   return cfg.pair;
 }
 
 async function getCurrentExposure() {
-  let cfg = await retrieveConfig({ trade_instance_id: getInstanceId() });
+  let cfg = await retrieveInstance({ id: getInstanceId() });
   cfg = cfg?.[0];
   if (!cfg?.pair) throw new Error('Missing pair in config');
   const pair = cfg.pair;
@@ -678,7 +684,7 @@ async function getCurrentExposure() {
 }
 
 function createTelegramBot({ polling = true } = {}) {
-  if (!telegramEnabled) return null;
+  if (!isTelegramEnabled()) return null;
   const token = mustGetTelegramToken();
   const bot = new TelegramBot(token, { polling });
 
@@ -970,17 +976,17 @@ function createTelegramBot({ polling = true } = {}) {
 }
 
 async function notifyTelegram(message) {
-  if (!telegramEnabled) return;
+  if (!isTelegramEnabled()) return;
 
   const bot =
       createTelegramBot._senderSingleton ||
       (createTelegramBot._senderSingleton = createTelegramBot({ polling: false }));
 
-  const ts = moment().tz(BOT_TZ).format('YYYY-MM-DD HH:mm:ss');
+  const ts = moment().tz(getBotTz()).format('YYYY-MM-DD HH:mm:ss');
   const text = `${ts} - ${String(message)}`;
 
   try {
-    await bot.sendMessage(chatId, text);
+    await bot.sendMessage(getChatId(), text);
   } catch (err) {
     const details = err?.message ? err.message : String(err);
     console.error(`Error sending Telegram notification: ${details}`);

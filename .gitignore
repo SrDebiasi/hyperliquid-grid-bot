@@ -2,3 +2,9 @@
 /src/market/cache/
 /CLAUDE.md
 /agents/
+/cache/
+/logs/
+/node_modules/
+/.claude/
+/.pm2/
+/.idea/

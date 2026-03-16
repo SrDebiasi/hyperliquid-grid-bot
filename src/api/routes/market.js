@@ -32,13 +32,10 @@ export async function marketRoutes(app, opts) {
                 return reply.code(400).send({error: 'invalid trade_instance_id'});
             }
 
-            const configRow = await models.TradeConfig.findOne({
-                where: { trade_instance_id: ti },
-                order: [['id', 'ASC']],
-            });
+            const configRow = await models.TradeInstance.findByPk(ti);
 
             const config = configRow ? configRow.toJSON() : null;
-            if (!config?.pair) return reply.code(404).send({ error: 'trade_config not found' });
+            if (!config?.pair) return reply.code(404).send({ error: 'instance not found or pair not configured' });
 
             effectivePair = String(config.pair);
 
@@ -69,14 +66,7 @@ export async function marketRoutes(app, opts) {
             const instanceRow = await models.TradeInstance.findOne({ order: [["id", "ASC"]] });
             const instance = instanceRow ? instanceRow.toJSON() : null;
 
-            let config = null;
-            if (instance) {
-                const configRow = await models.TradeConfig.findOne({
-                    where: { trade_instance_id: instance.id },
-                    order: [["id", "ASC"]],
-                });
-                config = configRow ? configRow.toJSON() : null;
-            }
+            const config = instance; // config fields are now on trade_instance
 
             // Defaults if config missing
             const grid = {

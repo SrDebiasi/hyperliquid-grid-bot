@@ -16,24 +16,24 @@
                         .tip-label { cursor: help; }
                         .section-accent { border-left: 3px solid #dee2e6; padding-left: 0.65rem; }
                         .readonly-display {
-                            background-color: #f8f9fa;
-                            color: #6c757d;
+                            background-color: var(--bs-secondary-bg);
+                            color: var(--bs-secondary-color);
                             font-family: monospace;
                             font-size: 0.8rem;
                             padding: 0.4rem 0.65rem;
-                            border: 1px solid #dee2e6;
+                            border: 1px solid var(--bs-border-color);
                             border-radius: 0.375rem;
                             min-height: 2.375rem;
                             overflow: hidden;
                             text-overflow: ellipsis;
                             white-space: nowrap;
                         }
-                        .field-disabled { background-color: #f8f9fa !important; color: #6c757d !important; }
+                        .field-disabled { background-color: var(--bs-secondary-bg) !important; color: var(--bs-secondary-color) !important; }
                     </style>
 
                     <form
                             id="tradeConfigForm"
-                            hx-put="/api/trade-config/<%= config.id %>"
+                            hx-put="/api/trade-instance/<%= config.id %>/config"
                             hx-swap="none"
                     >
                         <!-- Header -->
@@ -42,8 +42,8 @@
                                 <%= config.name ?? '-' %>
                                 <span class="text-muted small ms-1">(<%= config.pair ?? '-' %>)</span>
                             </div>
-                            <% if (config.trade_instance_id != null) { %>
-                                <div class="text-muted small">Instance #<%= config.trade_instance_id %></div>
+                            <% if (config.id != null) { %>
+                                <div class="text-muted small">Instance #<%= config.id %></div>
                             <% } %>
                         </div>
 
@@ -241,47 +241,6 @@
     document.addEventListener('DOMContentLoaded', () => {
         const els = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         els.forEach((el) => new bootstrap.Tooltip(el));
-    });
-
-    document.body.addEventListener("htmx:afterRequest", (e) => {
-        const form = e.target;
-        if (!(form instanceof HTMLFormElement)) return;
-        if (form.id !== "tradeConfigForm") return;
-
-        const target = document.getElementById("configResult");
-        if (!target) return;
-
-        let payload = null;
-        try {
-            payload = JSON.parse(e.detail.xhr.responseText || "{}");
-        } catch {
-            renderAlert(target, "danger", "Unexpected response from server.");
-            return;
-        }
-
-        if (e.detail.successful && payload && payload.success) {
-            renderAlert(target, "success", "Config saved.");
-            setTimeout(() => { target.innerHTML = ""; }, 2500);
-        } else {
-            const msg =
-                payload?.message ||
-                payload?.error ||
-                "Could not save config. Please try again.";
-            renderAlert(target, "danger", msg);
-        }
-    });
-
-    function renderAlert(targetEl, type, message) {
-        targetEl.innerHTML = `
-      <div class="alert alert-${type} d-flex align-items-center gap-2 mb-0 py-2" role="alert">
-        <span class="fw-semibold">${message}</span>
-      </div>
-    `;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        const els = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        els.forEach((el) => new bootstrap.Tooltip(el));
 
         const form = document.getElementById("tradeConfigForm");
         if (!form) return;
@@ -315,12 +274,8 @@
 
             if (simBtn) simBtn.disabled = dirty;
 
-            // optional: small hint while dirty
             if (dirty && configTarget) {
                 renderAlert(configTarget, "warning", "You have unsaved changes. Please save before simulating.");
-            } else if (!dirty && configTarget) {
-                // don’t clear a success message immediately; just leave as-is
-                // (you already clear success after 2.5s)
             }
         }
 
@@ -338,24 +293,19 @@
             setDirty(now !== baseline);
         }
 
-        // Mark dirty on any edit
         form.addEventListener("input", checkDirty, true);
         form.addEventListener("change", checkDirty, true);
 
-        // When modal opens, reset baseline (so we compare from “current loaded values”)
         const modalEl = document.getElementById("configModal");
         if (modalEl) {
             modalEl.addEventListener("shown.bs.modal", () => {
-                // clear simulate result when opening, optional
                 if (simTarget) simTarget.innerHTML = "";
                 refreshBaseline();
             });
         } else {
-            // if modal event isn’t available for some reason, set baseline once on load
             refreshBaseline();
         }
 
-        // Block simulate if dirty (extra guard even though we disable button)
         if (simBtn) {
             simBtn.addEventListener("click", (e) => {
                 if (!dirty) return;
@@ -369,12 +319,10 @@
                     renderAlert(configTarget, "warning", "Please save your changes before simulating.");
                 }
 
-                // optional: nudge user to save
                 if (saveBtn) saveBtn.focus();
             });
         }
 
-        // expose helper for save handler below
         window.__tradeConfigDirty = {
             refreshBaseline,
             setDirty,
@@ -400,7 +348,6 @@
         if (e.detail.successful && payload && payload.success) {
             renderAlert(target, "success", "Config saved.");
 
-            // IMPORTANT: after save, reset dirty + baseline
             if (window.__tradeConfigDirty?.refreshBaseline) {
                 window.__tradeConfigDirty.refreshBaseline();
             }
