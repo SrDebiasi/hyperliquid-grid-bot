@@ -90,6 +90,8 @@
     }
 
     // Needed computation for ALL rows (selection does NOT affect totals)
+    // currentPrice > sellPrice → BTC side (order holds/needs BTC)
+    // currentPrice < sellPrice → USD side (order needs USD to buy)
     function computeNeededAll() {
         let btcNeeded = 0;
         let usdNeeded = 0;
@@ -98,30 +100,13 @@
             const qty = getQty(r);
             if (!(qty > 0)) continue;
 
-            const hasSellOrder = r.sell_order_id != null && String(r.sell_order_id) !== '';
-            const hasBuyOrder  = r.buy_order_id  != null && String(r.buy_order_id)  !== '';
+            const sellPx = getSellPrice(r);
+            const buyPx  = getBuyPrice(r);
 
-            if (hasSellOrder) {
-                btcNeeded += qty;
-                continue;
-            }
-
-            if (hasBuyOrder) {
-                const buyPx = getBuyPrice(r);
-                if (buyPx > 0) usdNeeded += buyPx * qty;
-                continue;
-            }
-
-            const entryPx = num(r.entry_price) ?? 0;
-            if (currentPrice == null || currentPrice <= 0 || entryPx <= 0) continue;
-
-            // Infer when no order ids
-            if (entryPx > currentPrice) {
+            if (currentPrice != null && currentPrice > 0 && sellPx > 0 && currentPrice > sellPx) {
                 btcNeeded += qty;
             } else {
-                const buyPx = getBuyPrice(r);
-                const px = buyPx > 0 ? buyPx : entryPx;
-                usdNeeded += px * qty;
+                if (buyPx > 0) usdNeeded += buyPx * qty;
             }
         }
 
@@ -303,7 +288,7 @@
             const buyUsd = buyPx > 0 ? buyPx * qty : null;
             const sellUsd = sellPx > 0 ? sellPx * qty : null;
 
-            const hasSell = r.sell_order_id != null && String(r.sell_order_id) !== '';
+            const hasSell = r.sell_order != null && String(r.sell_order) !== '';
             const rowClass = hasSell ? 'row-sell' : 'row-buy';
 
             return `
