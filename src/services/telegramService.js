@@ -240,8 +240,11 @@ async function getAggregatedStatusSnapshot() {
   const pnlCurrentMonthPct = pctOrZero(month.total, exposure.totalExposureUsd);
   const pnlEstimateMonthPct = pctOrZero(estMonth, exposure.totalExposureUsd);
 
-  // last operation date (from state)
-  const lastOpAt = getLastOperation(cfg.pair);
+  // last operation date — prefer live in-memory state, fall back to most recent profit row
+  const lastOpAt = getLastOperation(cfg.pair)
+    ?? allTimeRows?.[0]?.date_transaction_utc
+    ?? allTimeRows?.[0]?.date_transaction
+    ?? null;
 
   return {
     isRunning: true,
