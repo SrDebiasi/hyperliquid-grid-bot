@@ -219,6 +219,12 @@ export async function dashboardRoutes(app, opts) {
         });
     });
 
+    app.get("/dashboard/orders", async (request, reply) => {
+        const instanceId = Number(request.query?.instanceId) || null;
+        const { orders } = await loadDashboardData({ models, instanceId });
+        return reply.view("partials/trade_orders.ejs", { orders });
+    });
+
     app.get("/dashboard/profits", async (request, reply) => {
         const instanceId = Number(request.query?.instanceId) || null;
         const { profitSummary, portfolioOverview, rebuy } = await loadDashboardData({ models, instanceId });

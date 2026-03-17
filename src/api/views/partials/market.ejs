@@ -1,3 +1,83 @@
+<!-- Price ticker -->
+<style>
+.price-ticker-wrap {
+    overflow: hidden;
+    border-bottom: 1px solid var(--bs-border-color);
+    margin: -1rem -1rem 1rem -1rem;
+    padding: 0.35rem 1rem;
+    background: var(--bs-secondary-bg);
+}
+.price-ticker-track {
+    display: flex;
+    gap: 2.5rem;
+    animation: ticker-scroll 60s linear infinite;
+    width: max-content;
+}
+.price-ticker-wrap:hover .price-ticker-track { animation-play-state: paused; }
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+.ticker-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; white-space: nowrap; }
+.ticker-item .ticker-name { color: var(--bs-secondary-color); }
+.ticker-item .ticker-price { font-weight: 600; }
+</style>
+
+<div class="price-ticker-wrap">
+    <div class="price-ticker-track" id="tickerTrack">
+        <span class="ticker-item"><span class="ticker-name">BTC</span><span class="ticker-price" id="tick-BTC">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">ETH</span><span class="ticker-price" id="tick-ETH">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">SOL</span><span class="ticker-price" id="tick-SOL">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">BNB</span><span class="ticker-price" id="tick-BNB">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">XRP</span><span class="ticker-price" id="tick-XRP">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">TRX</span><span class="ticker-price" id="tick-TRX">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">ADA</span><span class="ticker-price" id="tick-ADA">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">HYPE</span><span class="ticker-price" id="tick-HYPE">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">LINK</span><span class="ticker-price" id="tick-LINK">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">AVAX</span><span class="ticker-price" id="tick-AVAX">—</span></span>
+        <!-- duplicated for seamless loop -->
+        <span class="ticker-item"><span class="ticker-name">BTC</span><span class="ticker-price" id="tick-BTC2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">ETH</span><span class="ticker-price" id="tick-ETH2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">SOL</span><span class="ticker-price" id="tick-SOL2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">BNB</span><span class="ticker-price" id="tick-BNB2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">XRP</span><span class="ticker-price" id="tick-XRP2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">TRX</span><span class="ticker-price" id="tick-TRX2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">ADA</span><span class="ticker-price" id="tick-ADA2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">HYPE</span><span class="ticker-price" id="tick-HYPE2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">LINK</span><span class="ticker-price" id="tick-LINK2">—</span></span>
+        <span class="ticker-item"><span class="ticker-name">AVAX</span><span class="ticker-price" id="tick-AVAX2">—</span></span>
+    </div>
+</div>
+
+<script>
+(function () {
+    const SYMBOLS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'TRX', 'ADA', 'HYPE', 'LINK', 'AVAX'];
+
+    function fmtPrice(p) {
+        if (!p) return '—';
+        return '$' + Number(p).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    async function loadTickers() {
+        try {
+            const res = await fetch('/api/market/tickers?symbols=BTC,ETH,SOL,BNB,XRP,TRX,ADA,HYPE,LINK,AVAX', { headers: { Accept: 'application/json' } });
+            if (!res.ok) return;
+            const data = await res.json();
+            for (const { symbol, price } of data) {
+                const v = fmtPrice(price);
+                const el1 = document.getElementById(`tick-${symbol}`);
+                const el2 = document.getElementById(`tick-${symbol}2`);
+                if (el1) el1.textContent = v;
+                if (el2) el2.textContent = v;
+            }
+        } catch (_) {}
+    }
+
+    loadTickers();
+    setInterval(loadTickers, 30_000);
+})();
+</script>
+
 <div class="d-flex justify-content-between align-items-center mb-2">
     <div>
         <div class="fw-semibold">Market</div>

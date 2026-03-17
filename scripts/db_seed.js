@@ -24,13 +24,12 @@ async function getOrCreateTradeInstance(client) {
     const instanceName = 'BTC';
 
     const existing = await client.query(
-        `SELECT id FROM trade_instance WHERE name = $1 LIMIT 1`,
-        [instanceName]
+        `SELECT id FROM trade_instance LIMIT 1`
     );
 
     if (existing.rowCount > 0) {
         const id = existing.rows[0].id;
-        console.log(`Using existing trade_instance name="${instanceName}" id=${id}`);
+        console.log(`trade_instance already exists (id=${id}), skipping seed.`);
         return id;
     }
 

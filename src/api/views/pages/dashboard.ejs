@@ -54,7 +54,7 @@ const pageData = {
 </div>
 
 <div id="section-orders" class="card shadow-sm mt-3">
-  <div class="card-body">
+  <div class="card-body" id="section-orders-body">
     <%- include('../partials/trade_orders', { orders }) %>
   </div>
 </div>
@@ -70,3 +70,26 @@ const pageData = {
 <%- include('../partials/modals/config_modal', { config }) %>
 
 <script type="module" src="/js/market.js"></script>
+
+<script>
+(function () {
+    const instanceId = <%= instance?.id ?? 'null' %>;
+    if (!instanceId) return;
+
+    // ── Orders auto-refresh ───────────────────────────────────────────────
+    const ordersBody = document.getElementById('section-orders-body');
+
+    async function refreshOrders() {
+        // Skip if manage-orders modal is open to avoid interfering
+        if (document.getElementById('manageOrdersModal')?.classList.contains('show')) return;
+        try {
+            const res = await fetch(`/dashboard/orders?instanceId=${instanceId}`, { headers: { Accept: 'text/html' } });
+            if (!res.ok) return;
+            const html = await res.text();
+            if (ordersBody) ordersBody.innerHTML = html;
+        } catch (_) {}
+    }
+
+    setInterval(refreshOrders, 30_000);
+})();
+</script>

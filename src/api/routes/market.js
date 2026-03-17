@@ -54,6 +54,29 @@ export async function marketRoutes(app, opts) {
             return { pair: effectivePair, price, dp: config?.decimal_price, dq: config?.decimal_quantity };
         });
 
+        // GET /api/market/tickers?symbols=BTC,ETH,SOL
+        app.get('/api/market/tickers', async (request, reply) => {
+            const symbolsRaw = String(request.query.symbols ?? 'BTC,ETH,SOL');
+            const symbols = symbolsRaw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+
+            let mids = {};
+            try {
+                const res = await fetch('https://api.hyperliquid.xyz/info', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: 'allMids' }),
+                });
+                if (res.ok) mids = await res.json();
+            } catch (_) {}
+
+            const result = symbols.map(sym => ({
+                symbol: sym,
+                price: Number(mids?.[sym]) || null,
+            }));
+
+            return reply.send(result);
+        });
+
         // GET /market/klines?symbol=BTCUSDT&interval=5m&days=5
         app.get("/api/market/klines", async (request, reply) => {
             const symbol = String(request.query.symbol ?? "BTCUSDT").toUpperCase().trim();
