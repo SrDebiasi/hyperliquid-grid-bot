@@ -28,6 +28,8 @@
     // In-memory state
     let tradeInstanceId = null;
     let pair = null;
+    let marginPct = 0;
+    let targetPct = 0;
     let rows = [];
     let selectedIds = new Set();      // selection is ONLY for which rows get resized
     let editedQtyById = new Map();    // id -> newQty
@@ -232,8 +234,10 @@
         if (m.dp != null) decPrice = m.dp;
 
         rows = await res.json();
-        // normalize ids to strings for consistency
-        rows = rows.map(r => ({ ...r, id: String(r.id) }));
+        // normalize ids to strings for consistency, sort highest price first
+        rows = rows
+            .map(r => ({ ...r, id: String(r.id) }))
+            .sort((a, b) => Number(b.buy_price ?? 0) - Number(a.buy_price ?? 0));
 
         // selection defaults to all (ONLY affects which rows slider edits)
         selectedIds = new Set(rows.map(r => r.id));
@@ -272,13 +276,30 @@
         statusEl.textContent = `Loaded ${rows.length} orders`;
     }
 
+    function extendRowHtml(direction) {
+        const preview = computeExtendPreview(direction);
+        const label   = direction === 'top' ? '↑ Add level to top' : '↓ Add level to bottom';
+        const detail  = preview
+            ? `<span class="ms-2 text-muted" style="opacity:.7;">Buy ${fmt(preview.buyPrice, 2)} · Sell ${fmt(preview.sellPrice, 2)} · ${fmt(preview.quantity, 8)} qty</span>`
+            : '';
+        return `
+        <tr class="extend-row" data-extend-direction="${direction}">
+          <td colspan="7" class="p-1">
+            <button type="button" class="mo-extend-btn btn btn-link btn-sm text-muted w-100 text-start py-1 px-2"
+                    style="border:1px dashed var(--bs-border-color);border-radius:4px;">
+              <i class="bi bi-plus-circle me-1"></i><span class="small">${label}</span>${detail}
+            </button>
+          </td>
+        </tr>`;
+    }
+
     function renderTable() {
         if (!Array.isArray(rows) || rows.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-muted">No orders found.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = rows.map((r) => {
+        const rowsHtml = rows.map((r) => {
             const checked = selectedIds.has(r.id) ? 'checked' : '';
             const qty = getQty(r);
 
@@ -309,6 +330,16 @@
         </tr>
       `;
         }).join('');
+
+        tbody.innerHTML = extendRowHtml('top') + rowsHtml + extendRowHtml('bottom');
+
+        // Extend button handlers
+        tbody.querySelectorAll('.mo-extend-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const dir = btn.closest('tr[data-extend-direction]').dataset.extendDirection;
+                openExtendModal(dir);
+            });
+        });
 
         // Row checkbox handlers (only affects which rows slider edits)
         tbody.querySelectorAll('.mo-row-check').forEach((el) => {
@@ -405,6 +436,10 @@
         const btn = evt.relatedTarget;
         tradeInstanceId = Number(btn?.getAttribute('data-trade-instance-id') || '');
         pair = btn?.getAttribute('data-pair') || null;
+        marginPct = Number(btn?.getAttribute('data-margin-percent') || 0);
+        targetPct = Number(btn?.getAttribute('data-target-percent') || 0);
+        if (btn?.getAttribute('data-decimal-price') != null) decPrice = Number(btn.getAttribute('data-decimal-price'));
+        if (btn?.getAttribute('data-decimal-qty') != null) decQty = Number(btn.getAttribute('data-decimal-qty'));
         void loadOrders();
     });
 
@@ -477,6 +512,130 @@
     }
 
 
+
+    // ─── Extend Grid ─────────────────────────────────────────────────────────────
+
+    function computeExtendPreview(direction) {
+        if (!rows.length || !marginPct || !targetPct) return null;
+
+        // rows loaded from API sorted ASC by buy_price, but displayed DESC — use array order
+        const sorted = [...rows].sort((a, b) => getBuyPrice(a) - getBuyPrice(b));
+        const refOrder = direction === 'top' ? sorted[sorted.length - 1] : sorted[0];
+
+        const refBuy  = getBuyPrice(refOrder);
+        const refSell = getSellPrice(refOrder);
+        const refQty  = num(refOrder.quantity) ?? 0;
+        if (!(refBuy > 0) || !(refSell > 0) || !(refQty > 0)) return null;
+
+        const newBuyPrice  = direction === 'top'
+            ? refBuy * (1 + marginPct / 100)
+            : refBuy / (1 + marginPct / 100);
+        const newSellPrice = newBuyPrice * (1 + targetPct / 100);
+        const usdValue     = refSell * refQty;
+        const newQuantity  = usdValue / newBuyPrice;
+
+        return {
+            buyPrice:      roundTo(newBuyPrice,  decPrice),
+            sellPrice:     roundTo(newSellPrice, decPrice),
+            quantity:      roundTo(newQuantity,  decQty),
+            refEntryPrice: num(refOrder.entry_price),
+        };
+    }
+
+    let extendModal       = null;
+    let extendDirection   = null;
+    let extendPreviewData = null;
+
+    function openExtendModal(direction) {
+        extendDirection   = direction;
+        extendPreviewData = computeExtendPreview(direction);
+
+        if (!extendPreviewData) {
+            statusEl.textContent = 'Cannot compute extension — missing config data';
+            return;
+        }
+
+        const fmtPx = (v) => v != null
+            ? '$' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '—';
+
+        document.getElementById('moExtendModalTitle').innerHTML =
+            `<i class="bi bi-plus-circle text-primary me-2"></i>Add level &mdash; ${direction === 'top' ? '&#8593; Top' : '&#8595; Bottom'}`;
+
+        document.getElementById('moExtendBuyPrice').textContent  = fmtPx(extendPreviewData.buyPrice);
+        document.getElementById('moExtendSellPrice').textContent = fmtPx(extendPreviewData.sellPrice);
+        document.getElementById('moExtendQty').textContent       = fmt(extendPreviewData.quantity, decQty);
+
+        document.getElementById('moExtendTargetPct').textContent = targetPct ? targetPct + '%' : '—';
+        document.getElementById('moExtendMarginPct').textContent = marginPct ? marginPct + '%' : '—';
+
+        document.getElementById('moExtendEntrySameVal').textContent    = fmtPx(extendPreviewData.refEntryPrice);
+        document.getElementById('moExtendEntryCurrentVal').textContent = fmtPx(currentPrice);
+
+        document.getElementById('moExtendEntrySame').checked = true;
+        const customInput = document.getElementById('moExtendEntryCustomInput');
+        customInput.disabled = true;
+        customInput.value = '';
+
+        if (!extendModal) {
+            const el = document.getElementById('moExtendModal');
+            extendModal = new bootstrap.Modal(el, { backdrop: 'static', keyboard: false });
+
+            document.getElementById('moExtendConfirmBtn').addEventListener('click', performExtend);
+
+            ['moExtendEntrySame', 'moExtendEntryCurrent', 'moExtendEntryCustom'].forEach((id) => {
+                document.getElementById(id).addEventListener('change', () => {
+                    const isCustom = document.getElementById('moExtendEntryCustom').checked;
+                    customInput.disabled = !isCustom;
+                    if (isCustom) customInput.focus();
+                });
+            });
+        }
+
+        extendModal.show();
+    }
+
+    async function performExtend() {
+        const type = document.querySelector('input[name="moExtendEntryType"]:checked')?.value;
+        let entryPrice;
+
+        if (type === 'same')         entryPrice = extendPreviewData.refEntryPrice;
+        else if (type === 'current') entryPrice = currentPrice;
+        else                         entryPrice = Number(document.getElementById('moExtendEntryCustomInput').value);
+
+        if (!Number.isFinite(entryPrice) || entryPrice <= 0) {
+            statusEl.textContent = 'Invalid entry price';
+            return;
+        }
+
+        const confirmBtn = document.getElementById('moExtendConfirmBtn');
+        confirmBtn.disabled = true;
+
+        try {
+            const res = await fetch('/api/trade-order/extend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    trade_instance_id: tradeInstanceId,
+                    direction: extendDirection,
+                    entry_price: entryPrice,
+                }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                statusEl.textContent = `Failed: ${err.error ?? res.status}`;
+                return;
+            }
+
+            extendModal.hide();
+            statusEl.textContent = 'Level added. Reloading...';
+            await loadOrders();
+            applySliderValueNow();
+        } finally {
+            confirmBtn.disabled = false;
+        }
+    }
 
     // Do the actual save work here
     async function performSave() {

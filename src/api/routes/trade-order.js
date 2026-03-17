@@ -131,6 +131,68 @@ export async function tradeOrderRoutes(app, { models }) {
         };
     });
 
+    // POST /api/trade-order/extend
+    app.post('/trade-order/extend', async (request, reply) => {
+        const { trade_instance_id, direction, entry_price } = request.body ?? {};
+
+        const instanceId = Number(trade_instance_id);
+        if (!Number.isFinite(instanceId) || instanceId <= 0)
+            return reply.code(400).send({ error: 'trade_instance_id is required' });
+
+        if (direction !== 'top' && direction !== 'bottom')
+            return reply.code(400).send({ error: 'direction must be "top" or "bottom"' });
+
+        const entryPx = Number(entry_price);
+        if (!Number.isFinite(entryPx) || entryPx <= 0)
+            return reply.code(400).send({ error: 'entry_price is required and must be > 0' });
+
+        const instanceRow = await models.TradeInstance.findByPk(instanceId);
+        if (!instanceRow) return reply.code(404).send({ error: 'instance not found' });
+        const cfg = instanceRow.toJSON();
+
+        const marginPct = Number(cfg.margin_percent);
+        const targetPct = Number(cfg.target_percent);
+        const decQty    = Number(cfg.decimal_quantity ?? 0);
+        const decPrice  = Number(cfg.decimal_price ?? 0);
+
+        const ordersRaw = await TradeOrder.findAll({
+            where: { trade_instance_id: instanceId },
+            order: [['buy_price', 'ASC']],
+        });
+
+        if (!ordersRaw.length)
+            return reply.code(400).send({ error: 'no orders found for this instance' });
+
+        const orders   = ordersRaw.map(r => r.get({ plain: true }));
+        const refOrder = direction === 'top' ? orders[orders.length - 1] : orders[0];
+
+        const refBuy  = Number(refOrder.buy_price);
+        const refSell = Number(refOrder.sell_price);
+        const refQty  = Number(refOrder.quantity);
+
+        const newBuyPrice = direction === 'top'
+            ? refBuy * (1 + marginPct / 100)
+            : refBuy / (1 + marginPct / 100);
+
+        const newSellPrice = newBuyPrice * (1 + targetPct / 100);
+        const usdValue     = refSell * refQty;
+        const newQuantity  = usdValue / newBuyPrice;
+
+        const roundTo = (n, d) => Number.isFinite(n) ? Number(n.toFixed(d)) : n;
+
+        const order = await TradeOrder.create({
+            pair:              cfg.pair,
+            buy_price:         roundTo(newBuyPrice,  decPrice),
+            sell_price:        roundTo(newSellPrice, decPrice),
+            quantity:          roundTo(newQuantity,  decQty),
+            entry_price:       entryPx,
+            last_operation:    false,
+            trade_instance_id: instanceId,
+        });
+
+        return reply.code(201).send(order);
+    });
+
     app.patch('/trade-order/bulk-qty', async (request, reply) => {
         const body = request.body ?? {};
         const updates = Array.isArray(body.updates) ? body.updates : [];

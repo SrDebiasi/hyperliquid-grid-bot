@@ -132,6 +132,79 @@
     </div>
 </div>
 
+<!-- Extend Grid -->
+<div class="modal fade" id="moExtendModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h5 class="modal-title d-flex align-items-center gap-2" id="moExtendModalTitle">
+                    <i class="bi bi-plus-circle text-primary"></i> Add level
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Preview -->
+                <div class="border rounded p-3 mb-3 small">
+                    <div class="text-muted mb-2">New order preview</div>
+                    <div class="row g-2 text-center">
+                        <div class="col-4">
+                            <div class="text-muted small">Buy price</div>
+                            <div class="fw-semibold" id="moExtendBuyPrice">—</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">Sell price</div>
+                            <div class="fw-semibold" id="moExtendSellPrice">—</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">Quantity</div>
+                            <div class="fw-semibold" id="moExtendQty">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Config params (read-only) -->
+                <div class="d-flex gap-3 mb-3 small text-muted">
+                    <span><i class="bi bi-bullseye me-1"></i>Target <span class="fw-semibold text-body" id="moExtendTargetPct">—</span></span>
+                    <span><i class="bi bi-arrows-collapse-vertical me-1"></i>Grid distance <span class="fw-semibold text-body" id="moExtendMarginPct">—</span></span>
+                </div>
+
+                <!-- Entry price -->
+                <div class="mb-1">
+                    <div class="fw-semibold small mb-2">Entry price</div>
+                    <div class="vstack gap-2">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="moExtendEntryType" id="moExtendEntrySame" value="same" checked>
+                            <label class="form-check-label small" for="moExtendEntrySame">
+                                Same as adjacent order &mdash; <span class="fw-semibold" id="moExtendEntrySameVal">—</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="moExtendEntryType" id="moExtendEntryCurrent" value="current">
+                            <label class="form-check-label small" for="moExtendEntryCurrent">
+                                Current market price &mdash; <span class="fw-semibold" id="moExtendEntryCurrentVal">—</span>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="moExtendEntryType" id="moExtendEntryCustom" value="custom">
+                            <label class="form-check-label small" for="moExtendEntryCustom">Custom</label>
+                        </div>
+                        <input type="number" class="form-control form-control-sm" id="moExtendEntryCustomInput"
+                               placeholder="Enter price…" step="any" disabled>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary" id="moExtendConfirmBtn">
+                    <i class="bi bi-plus-circle me-1"></i>Add level
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Confirm Save / Cancel on Exchange -->
 <div class="modal fade" id="moConfirmSaveModal" tabindex="-1" aria-labelledby="moConfirmSaveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">

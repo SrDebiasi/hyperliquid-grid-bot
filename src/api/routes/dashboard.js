@@ -34,7 +34,7 @@ async function loadDashboardData({ models, instanceId = null }) {
 
         orders = ordersRaw
             .map((o) => o.get({ plain: true }))
-            .sort((a, b) => Number(a.buy_price ?? 0) - Number(b.buy_price ?? 0));
+            .sort((a, b) => Number(b.buy_price ?? 0) - Number(a.buy_price ?? 0));
 
         profitSummary = await getProfitSummary({ models, tradeInstanceId: instance.id });
 
