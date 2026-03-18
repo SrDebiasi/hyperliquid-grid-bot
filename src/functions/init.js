@@ -44,6 +44,11 @@ const DEFAULT_RESERVE_BASE_OFFSET_PERCENT  = Number(process.env.DEFAULT_RESERVE_
 
 let pairToIndex = {};
 
+// Tracks consecutive NOT_OPEN counts per order ID before we trust the miss and clean up.
+// Hyperliquid's userFills can lag behind a real fill by a few cycles, so we wait before acting.
+const MISSING_ORDER_THRESHOLD = 10;
+const missingOrderAttempts = new Map(); // orderId (number) → consecutive NOT_OPEN count
+
 /**
  * Simple async delay helper.
  * @param {number} ms - Milliseconds to wait.
@@ -947,6 +952,7 @@ const runCoins = async function(coinIndex) {
 
   let timeToExecute = 20000;
   let pair = 'unknown';
+  let hasPendingMissingOrder = false;
   try {
     instances = await retrieveInstances({ id: getInstanceId() }).catch((ex) => console.log(ex));
 
@@ -1050,6 +1056,7 @@ const runCoins = async function(coinIndex) {
       if (hasSell(order)) {
         const sellStatus = statuses.get(Number(order.sell_order))?.status;
         if (sellStatus === ORDER_STATUS_FILLED) {
+          missingOrderAttempts.delete(Number(order.sell_order));
           orderFilled = true;
           setLastOperation(pair);
 
@@ -1119,7 +1126,7 @@ const runCoins = async function(coinIndex) {
 
         // We have an orderId locally, but the order is not open on the exchange.
         if (sellStatus === ORDER_STATUS_NOT_OPEN) {
-          clearMissingOrder({ order, side: 'SELL', tradeOrderId: order.id });
+          if (clearMissingOrder({ order, side: 'SELL', tradeOrderId: order.id })) hasPendingMissingOrder = true;
         }
       }
 
@@ -1127,6 +1134,7 @@ const runCoins = async function(coinIndex) {
       if (hasBuy(order)) {
         const buyStatus  = statuses.get(Number(order.buy_order))?.status;
         if (buyStatus === ORDER_STATUS_FILLED) {
+          missingOrderAttempts.delete(Number(order.buy_order));
           orderFilled = true;
           setLastOperation(pair);
 
@@ -1195,7 +1203,7 @@ const runCoins = async function(coinIndex) {
 
         // We have an orderId locally, but the order is not open on the exchange.
         if (buyStatus === ORDER_STATUS_NOT_OPEN) {
-          clearMissingOrder({ order, side: 'BUY', tradeOrderId: order.id, notify: true });
+          if (clearMissingOrder({ order, side: 'BUY', tradeOrderId: order.id, notify: true })) hasPendingMissingOrder = true;
         }
       }
     }
@@ -1208,6 +1216,8 @@ const runCoins = async function(coinIndex) {
     if (orderFilled) {
       consoleLog(`${timesExecuted}) Order filled fast call called`);
       timeToExecute = 3000; // fast call after a fill
+    } else if (hasPendingMissingOrder) {
+      timeToExecute = 60000; // 1m retry while waiting for fill propagation
     } else {
       timeToExecute = 1000 * 60 * 10; // slower call when idle - 10m
     }
@@ -1227,14 +1237,26 @@ function calculateFeesForCycle(order, feeRatePerSide = FEE_RATE_MAKER_PER_SIDE) 
   return (notionalBuy * feeRatePerSide) + (notionalSell * feeRatePerSide);
 }
 
+// Returns true if the order is pending confirmation (below threshold) — caller should retry soon.
 function clearMissingOrder({ order, side, tradeOrderId, notify = false }) {
   const field = side === 'SELL' ? 'sell_order' : 'buy_order';
-  const orderId = order[field];
-  if (!orderId) return;
+  const orderId = Number(order[field]);
+  if (!orderId) return false;
 
-  if (notify) void notifyTelegram(`Order ${orderId} not found.`);
+  const attempts = (missingOrderAttempts.get(orderId) || 0) + 1;
+  missingOrderAttempts.set(orderId, attempts);
+
+  if (attempts < MISSING_ORDER_THRESHOLD) {
+    consoleLog(`Order ${orderId} not found (attempt ${attempts}/${MISSING_ORDER_THRESHOLD}), will retry...`, 'yellow');
+    return true; // pending — retry soon
+  }
+
+  // Threshold reached — the order is genuinely gone.
+  missingOrderAttempts.delete(orderId);
+  if (notify) void notifyTelegram(`Order ${orderId} not found after ${MISSING_ORDER_THRESHOLD} attempts.`);
   void updateTradeOrder({ id: tradeOrderId, [field]: null }).catch(console.log);
   order[field] = null;
+  return false;
 }
 
 /**
