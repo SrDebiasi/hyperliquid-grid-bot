@@ -216,7 +216,13 @@
                 <div class="col-12 col-lg-6 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="fw-semibold">Daily profit <span class="text-muted fw-normal small">(all-time)</span></div>
-                        <div class="text-muted small"><%= allTimeDays.length %> days</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="text-muted small"><%= allTimeDays.length %> days</div>
+                            <div class="btn-group btn-group-sm" role="group" id="allTimeChartToggle">
+                                <button type="button" class="btn btn-outline-secondary active" data-chart-mode="daily">Daily</button>
+                                <button type="button" class="btn btn-outline-secondary" data-chart-mode="overtime">Overtime</button>
+                            </div>
+                        </div>
                     </div>
                     <div style="position:relative; width:100%; height:100%; min-height:200px;">
                         <canvas id="allTimeProfitChart" style="opacity:0;"></canvas>
@@ -233,22 +239,30 @@
 
                 const raw    = <%- JSON.stringify(allTimeDays.map(d => ({ x: d.date, y: Number(d.totalUsd || 0) }))) %>;
                 const labels = raw.map(d => d.x);
-                const values = raw.map(d => d.y);
+                const dailyValues = raw.map(d => d.y);
+
+                // Cumulative sum for overtime view
+                const overtimeValues = [];
+                let running = 0;
+                for (const v of dailyValues) { running += v; overtimeValues.push(running); }
 
                 const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
                 const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
 
-                const ctx = canvas.getContext('2d');
-                const grad = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
-                grad.addColorStop(0, 'rgba(25,135,84,0.25)');
-                grad.addColorStop(1, 'rgba(25,135,84,0)');
+                function makeGrad(values) {
+                    const ctx = canvas.getContext('2d');
+                    const grad = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
+                    grad.addColorStop(0, 'rgba(25,135,84,0.25)');
+                    grad.addColorStop(1, 'rgba(25,135,84,0)');
+                    return grad;
+                }
 
                 canvas._chartInstance = new Chart(canvas, {
                     type: 'line',
                     data: {
                         labels,
                         datasets: [{
-                            data: values,
+                            data: dailyValues,
                             borderColor: '#198754',
                             borderWidth: 2,
                             tension: 0.4,
@@ -258,7 +272,7 @@
                             pointHoverBorderColor: '#fff',
                             pointHoverBorderWidth: 2,
                             fill: true,
-                            backgroundColor: grad,
+                            backgroundColor: makeGrad(dailyValues),
                         }]
                     },
                     options: {
@@ -296,6 +310,24 @@
                 });
 
                 canvas.style.animation = 'revealChart 2s cubic-bezier(0.16,1,0.3,1) forwards';
+
+                // Toggle handler
+                const toggleGroup = document.getElementById('allTimeChartToggle');
+                if (toggleGroup) {
+                    toggleGroup.addEventListener('click', function (e) {
+                        const btn = e.target.closest('[data-chart-mode]');
+                        if (!btn) return;
+                        const mode = btn.dataset.chartMode;
+                        toggleGroup.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+
+                        const chart = canvas._chartInstance;
+                        if (!chart) return;
+                        chart.data.datasets[0].data = mode === 'overtime' ? overtimeValues : dailyValues;
+                        chart.data.datasets[0].backgroundColor = makeGrad(chart.data.datasets[0].data);
+                        chart.update('none');
+                    });
+                }
             }, 50);
             </script>
         </div>
