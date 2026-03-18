@@ -1,5 +1,9 @@
 # Grid Trading Bot
 
+Please read this README first. If you run into any issues, join the Telegram group for setup help:
+https://t.me/hyperliquidbotgrid
+
+
 Hyperliquid view:
 
 ![Grid bot](docs/bot.png)
@@ -8,8 +12,6 @@ Hyperliquid view:
 Dashboard view:
 ![Dashboard](docs/dashboard.png)
 
-Please read this README first. If you run into any issues, join the Telegram group for setup help:
-https://t.me/hyperliquidbotgrid
 
 ## Overview
 
