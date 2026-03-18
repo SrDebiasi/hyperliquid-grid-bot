@@ -23,7 +23,14 @@
 
                         <h6 class="text-muted mb-2">Telegram</h6>
                         <div class="mb-3">
-                            <label class="form-label">Bot token</label>
+                            <label class="form-label d-flex align-items-center gap-1">
+                                Bot token
+                                <i class="bi bi-info-circle text-muted"
+                                   style="cursor:pointer"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="right"
+                                   title="Open Telegram, search @BotFather, send /newbot and follow the steps. Copy the token it gives you."></i>
+                            </label>
                             <input
                                 name="telegram_bot_token"
                                 class="form-control"
@@ -33,7 +40,14 @@
                             />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Chat ID</label>
+                            <label class="form-label d-flex align-items-center gap-1">
+                                Chat ID
+                                <i class="bi bi-info-circle text-muted"
+                                   style="cursor:pointer"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="right"
+                                   title="Start your bot in Telegram and send it any message. Then open: https://api.telegram.org/bot&lt;YOUR_TOKEN&gt;/getUpdates — look for &quot;chat&quot;:{&quot;id&quot;: ...} — that number is your Chat ID."></i>
+                            </label>
                             <input
                                 name="telegram_chat_id"
                                 class="form-control"
@@ -45,7 +59,14 @@
 
                         <h6 class="text-muted mb-2 mt-4">Healthchecks.io</h6>
                         <div class="mb-3">
-                            <label class="form-label">Ping URL</label>
+                            <label class="form-label d-flex align-items-center gap-1">
+                                Ping URL
+                                <i class="bi bi-info-circle text-muted"
+                                   style="cursor:pointer"
+                                   data-bs-toggle="tooltip"
+                                   data-bs-placement="right"
+                                   title="Create a free check at healthchecks.io — copy the Ping URL (looks like https://hc-ping.com/your-uuid). The bot will ping it periodically; if it stops, you get an alert."></i>
+                            </label>
                             <input
                                 name="healthchecks_ping_url"
                                 class="form-control"
@@ -60,8 +81,8 @@
                                 name="healthchecks_ping_interval_ms"
                                 type="number"
                                 class="form-control"
-                                value="<%= envHealthchecksPingIntervalMs %>"
-                                placeholder="60000"
+                                value="<%= envHealthchecksPingIntervalMs || 600000 %>"
+                                placeholder="600000"
                             />
                         </div>
 

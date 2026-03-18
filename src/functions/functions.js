@@ -104,7 +104,7 @@ const initExchange = (data) => new Promise((resolve, reject) => {
 
 // ─── API Client — Reads ────────────────────────────────────────────────────────
 
-const retrieveInstance = async (data) => {
+const retrieveInstances = async (data) => {
   const result = await axios.get(apiUrl + 'trade-instance', { params: { id: data.id } }, headers);
   return [result.data];
 };
@@ -143,6 +143,11 @@ const saveTradeOrder = async (data) => {
 
 const updateTradeOrder = async (data) => {
   const result = await axios.put(apiUrl + 'trade-order/' + data.id, data, headersput);
+  return result.data;
+};
+
+const bulkClearOrders = async (ids) => {
+  const result = await axios.patch(apiUrl + 'trade-order/bulk-clear-orders', { ids }, headersput);
   return result.data;
 };
 
@@ -284,13 +289,14 @@ export {
   getExchange,
   initExchange,
   // API reads
-  retrieveInstance,
+  retrieveInstances,
   retrieveOrders,
   retrieveTradeProfit,
   retrieveTradeCycles,
   // API writes
   saveTradeOrder,
   updateTradeOrder,
+  bulkClearOrders,
   updateTradeInstance,
   // Bot events
   addMessage,

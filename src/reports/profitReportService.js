@@ -274,9 +274,9 @@ function pnlPercent(totalUsd, exposureUsd) {
 async function buildExposureNow({ models, tradeInstanceId }) {
     const row = await models.TradeInstance.findByPk(tradeInstanceId);
     if (!row?.pair) return null;
-    const cfg = row.toJSON ? row.toJSON() : row;
+    const instance = row.toJSON ? row.toJSON() : row;
 
-    const currentPrice = await fetchHyperliquidMidFromPair(cfg.pair);
+    const currentPrice = await fetchHyperliquidMidFromPair(instance.pair);
 
     const ordersRaw = await models.TradeOrder.findAll({
         where: { trade_instance_id: tradeInstanceId },

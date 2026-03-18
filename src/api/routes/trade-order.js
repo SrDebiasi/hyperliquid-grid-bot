@@ -53,6 +53,23 @@ export async function tradeOrderRoutes(app, { models }) {
         return row;
     });
 
+    // PATCH /api/trade-order/bulk-clear-orders
+    // Clears buy_order and sell_order for a list of trade order ids in a single query.
+    app.patch('/trade-order/bulk-clear-orders', async (request, reply) => {
+        const ids = Array.isArray(request.body?.ids) ? request.body.ids : [];
+        if (ids.length === 0) return reply.code(400).send({ error: 'No ids provided' });
+
+        const numericIds = ids.map(Number).filter(id => Number.isFinite(id) && id > 0);
+        if (!numericIds.length) return reply.code(400).send({ error: 'No valid ids provided' });
+
+        const [updated] = await TradeOrder.update(
+            { buy_order: null, sell_order: null },
+            { where: { id: numericIds } }
+        );
+
+        return { updated };
+    });
+
     app.delete('/trade-order/bulk', async (request, reply) => {
         const body = request.body ?? {};
         const idsRaw = Array.isArray(body.ids) ? body.ids : [];
@@ -148,12 +165,12 @@ export async function tradeOrderRoutes(app, { models }) {
 
         const instanceRow = await models.TradeInstance.findByPk(instanceId);
         if (!instanceRow) return reply.code(404).send({ error: 'instance not found' });
-        const cfg = instanceRow.toJSON();
+        const instance = instanceRow.toJSON();
 
-        const marginPct = Number(cfg.margin_percent);
-        const targetPct = Number(cfg.target_percent);
-        const decQty    = Number(cfg.decimal_quantity ?? 0);
-        const decPrice  = Number(cfg.decimal_price ?? 0);
+        const marginPct = Number(instance.margin_percent);
+        const targetPct = Number(instance.target_percent);
+        const decQty    = Number(instance.decimal_quantity ?? 0);
+        const decPrice  = Number(instance.decimal_price ?? 0);
 
         const ordersRaw = await TradeOrder.findAll({
             where: { trade_instance_id: instanceId },

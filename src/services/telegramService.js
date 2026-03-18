@@ -19,7 +19,7 @@ const isTelegramEnabled = () => !!(_instanceCfg?.telegram_bot_token && _instance
 
 import {
   getExchange,
-  retrieveInstance,
+  retrieveInstances,
   retrieveOrders,
   retrieveTradeProfit,
   retrieveTradeCycles,
@@ -167,20 +167,20 @@ async function getAggregatedStatusSnapshot() {
   const instanceId = getInstanceId();
 
   // config
-  let cfg = await retrieveInstance({ id: instanceId });
-  cfg = cfg?.[0];
-  if (!cfg?.pair) throw new Error('Missing pair in config');
+  let instance = await retrieveInstances({ id: instanceId });
+  instance = instance?.[0];
+  if (!instance?.pair) throw new Error('Missing pair in config');
 
   // price
   const exchangePrices = await getExchange().getPrices();
   const currentPrice = toNumberSafe(
-      exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')],
+      exchangePrices[instance.pair] ?? exchangePrices[instance.pair.replace('/', '')],
   );
 
   // orders
   const orders =
       (await retrieveOrders({
-        pair: cfg.pair,
+        pair: instance.pair,
         trade_instance_id: instanceId,
       })) || [];
 
@@ -203,8 +203,8 @@ async function getAggregatedStatusSnapshot() {
   }
 
   // position in total grid range
-  const rangeMin = toNumberSafe(cfg.execution_price_min);
-  const rangeMax = toNumberSafe(cfg.execution_price_max);
+  const rangeMin = toNumberSafe(instance.execution_price_min);
+  const rangeMax = toNumberSafe(instance.execution_price_max);
 
   let gridPositionPct = null;
   if (rangeMax > rangeMin) {
@@ -241,27 +241,27 @@ async function getAggregatedStatusSnapshot() {
   const pnlEstimateMonthPct = pctOrZero(estMonth, exposure.totalExposureUsd);
 
   // last operation date — prefer live in-memory state, fall back to most recent profit row
-  const lastOpAt = getLastOperation(cfg.pair)
+  const lastOpAt = getLastOperation(instance.pair)
     ?? allTimeRows?.[0]?.date_transaction_utc
     ?? allTimeRows?.[0]?.date_transaction
     ?? null;
 
   return {
     isRunning: true,
-    symbol: cfg.pair,
+    symbol: instance.pair,
     rangeMin,
     rangeMax,
     currentPrice,
     gridPositionPct,
     waitingCycles,
-    rebuyActive: cfg.rebuy_profit,
-    rebuyPercent: cfg.rebuy_percent,
+    rebuyActive: instance.rebuy_profit,
+    rebuyPercent: instance.rebuy_percent,
     expectedRange,
     buyPct,
     sellPct,
     lastOpAt,
-    totalReboughtValueUsd: toNumberSafe(cfg.rebought_value),
-    totalReboughtCoin: toNumberSafe(cfg.rebought_coin),
+    totalReboughtValueUsd: toNumberSafe(instance.rebought_value),
+    totalReboughtCoin: toNumberSafe(instance.rebought_coin),
     profitTodayUsd: today.total,
     profitTodayCount: today.count,
     profitMonthUsd: month.total,
@@ -438,17 +438,17 @@ async function getPnlForPeriod(periodFn) {
   const period = periodFn();
 
   // config (symbol)
-  let cfg = await retrieveInstance({ id: instanceId });
-  cfg = cfg?.[0];
-  if (!cfg?.pair) throw new Error('Missing pair in config');
+  let instance = await retrieveInstances({ id: instanceId });
+  instance = instance?.[0];
+  if (!instance?.pair) throw new Error('Missing pair in config');
 
   // price (current)
   const exchangePrices = await getExchange().getPrices();
-  const currentPrice = toNumberSafe(exchangePrices[cfg.pair] ?? exchangePrices[cfg.pair.replace('/', '')]);
+  const currentPrice = toNumberSafe(exchangePrices[instance.pair] ?? exchangePrices[instance.pair.replace('/', '')]);
 
   // orders + exposure (now includes avgEntryPrice)
   const orders = (await retrieveOrders({
-    pair: cfg.pair,
+    pair: instance.pair,
     trade_instance_id: instanceId,
   })) || [];
 
@@ -477,7 +477,7 @@ async function getPnlForPeriod(periodFn) {
   const entryBasedPct = pctOrZero(entryBasedUsd, entryEquityUsd);
 
   return {
-    symbol: cfg.pair,
+    symbol: instance.pair,
     currentPrice,
     exposure,
     period,
@@ -793,17 +793,17 @@ function buildAvgMessage({ symbol, allTime, month }) {
 async function getCurrentSymbol() {
   const instanceId = getInstanceId();
 
-  let cfg = await retrieveInstance({ id: instanceId });
-  cfg = cfg?.[0];
-  if (!cfg?.pair) throw new Error('Missing pair in config');
-  return cfg.pair;
+  let instance = await retrieveInstances({ id: instanceId });
+  instance = instance?.[0];
+  if (!instance?.pair) throw new Error('Missing pair in config');
+  return instance.pair;
 }
 
 async function getCurrentExposure() {
-  let cfg = await retrieveInstance({ id: getInstanceId() });
-  cfg = cfg?.[0];
-  if (!cfg?.pair) throw new Error('Missing pair in config');
-  const pair = cfg.pair;
+  let instance = await retrieveInstances({ id: getInstanceId() });
+  instance = instance?.[0];
+  if (!instance?.pair) throw new Error('Missing pair in config');
+  const pair = instance.pair;
   // price
   const exchangePrices = await getExchange().getPrices();
   const currentPrice = toNumberSafe(
@@ -1151,8 +1151,8 @@ function createTelegramBot({ polling = true } = {}) {
 
       try {
         const instanceId = getInstanceId();
-        let cfg = await retrieveInstance({ id: instanceId });
-        cfg = cfg?.[0];
+        let instance = await retrieveInstances({ id: instanceId });
+        instance = instance?.[0];
 
         const [profitRows, cycleRows] = await Promise.all([
           retrieveTradeProfit({ trade_instance_id: instanceId }),
@@ -1174,7 +1174,7 @@ function createTelegramBot({ polling = true } = {}) {
           avgPerDay = totalProfit / days;
         }
 
-        const message = buildAlltimeMessage({ symbol: cfg?.pair ?? 'N/A', totalProfit, trades, cycles, since, avgPerDay });
+        const message = buildAlltimeMessage({ symbol: instance?.pair ?? 'N/A', totalProfit, trades, cycles, since, avgPerDay });
         bot.sendMessage(msg.chat.id, message, { parse_mode: 'MarkdownV2' });
       } catch (err) {
         bot.sendMessage(msg.chat.id, eM(`Failed to get /alltime: ${err.message || err}`), { parse_mode: 'MarkdownV2' });
@@ -1186,8 +1186,8 @@ function createTelegramBot({ polling = true } = {}) {
 
       try {
         const instanceId = getInstanceId();
-        let cfg = await retrieveInstance({ id: instanceId });
-        cfg = cfg?.[0];
+        let instance = await retrieveInstances({ id: instanceId });
+        instance = instance?.[0];
 
         const dayPeriod   = periodDay();
         const weekPeriod  = periodWeek();
@@ -1212,7 +1212,7 @@ function createTelegramBot({ polling = true } = {}) {
         const daysElapsed = Math.max(1, Number(mtdPeriod?.meta?.dayOfMonth || 1));
 
         const message = buildCyclesMessage({
-          symbol: cfg?.pair ?? 'N/A',
+          symbol: instance?.pair ?? 'N/A',
           day:   { cycles: dayCycles,   trades: dayTrades,   efficiency: dayCycles   > 0 ? (dayTrades   / dayCycles)   * 100 : null },
           week:  { cycles: weekCycles,  trades: weekTrades,  efficiency: weekCycles  > 0 ? (weekTrades  / weekCycles)  * 100 : null },
           month: { cycles: monthCycles, trades: monthTrades, efficiency: monthCycles > 0 ? (monthTrades / monthCycles) * 100 : null, avgCyclesPerDay: monthCycles / daysElapsed },
@@ -1229,8 +1229,8 @@ function createTelegramBot({ polling = true } = {}) {
 
       try {
         const instanceId = getInstanceId();
-        let cfg = await retrieveInstance({ id: instanceId });
-        cfg = cfg?.[0];
+        let instance = await retrieveInstances({ id: instanceId });
+        instance = instance?.[0];
 
         const mtdPeriod   = periodMonthToDate();
         const monthPeriod = periodMonth();
@@ -1261,7 +1261,7 @@ function createTelegramBot({ polling = true } = {}) {
         const daysElapsedMtd = Math.max(1, Number(mtdPeriod?.meta?.dayOfMonth || 1));
 
         const message = buildAvgMessage({
-          symbol: cfg?.pair ?? 'N/A',
+          symbol: instance?.pair ?? 'N/A',
           allTime: {
             avgPerTrade:      allTimeTrades > 0 ? allTimeTotal / allTimeTrades : 0,
             avgTradesPerDay:  allTimeTrades / allTimeDays,

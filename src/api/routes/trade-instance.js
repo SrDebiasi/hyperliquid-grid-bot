@@ -257,10 +257,10 @@ export async function tradeInstanceRoutes(app, { models }) {
     const row = await TradeInstance.findByPk(id);
     if (!row) return reply.code(404).send({ error: 'id not found' });
 
-    const cfg = row.toJSON();
+    const instance = row.toJSON();
     const runtimeInputs = extractGridRuntimeInputs(request.query ?? {});
 
-    const result = await buildGrid(cfg, { save: false, runtimeInputs });
+    const result = await buildGrid(instance, { save: false, runtimeInputs });
     if (result.error) return reply.code(400).send({ error: result.error });
 
     return result;
@@ -276,10 +276,10 @@ export async function tradeInstanceRoutes(app, { models }) {
     const row = await TradeInstance.findByPk(id);
     if (!row) return reply.code(404).send({ error: 'id not found' });
 
-    const cfg = row.toJSON();
+    const instance = row.toJSON();
     const runtimeInputs = extractGridRuntimeInputs(request.body ?? {});
 
-    const result = await buildGrid(cfg, {
+    const result = await buildGrid(instance, {
       save: true,
       runtimeInputs,
       saveTradeOrder: async (o) => TradeOrder.create(o),

@@ -3,10 +3,11 @@
 import {
   setApi,
   getExchange,
-  retrieveInstance,
+  retrieveInstances,
   initExchange,
   retrieveOrders,
   updateTradeOrder,
+  bulkClearOrders,
   updateTradeInstance,
   addProfit,
   addCycle,
@@ -21,10 +22,10 @@ import { notifyTelegram, createTelegramBot, setTelegramInstanceConfig } from '..
 import { ORDER_STATUS_NOT_OPEN , ORDER_STATUS_FILLED} from '../exchange/HyperliquidAdapter.js';
 import { FEE_RATE_MAKER_PER_SIDE } from "./fees.js";
 
-function applyInstanceConfig(cfg) {
-  if (!cfg) return;
-  setBotInstanceConfig(cfg);
-  setTelegramInstanceConfig(cfg);
+function applyInstanceConfig(instance) {
+  if (!instance) return;
+  setBotInstanceConfig(instance);
+  setTelegramInstanceConfig(instance);
 }
 
 let wallet = null;
@@ -32,7 +33,7 @@ let enable = true;
 let checking = {};
 let timesExecuted = 0;
 let prices = {};
-let data = [];
+let instances = [];
 let rangePrices = {};
 
 const QUOTE_ASSET = process.env.QUOTE_ASSET || 'USDC';
@@ -113,7 +114,7 @@ function round(n, dp = 8) {
  * This is a fire-and-forget entry point: it triggers `runCoins(coinIndex)` and ensures
  * exceptions are handled so they don't crash the process.
  *
- * @param {number} coinIndex - Index of the market configuration inside `data`.
+ * @param {number} coinIndex - Index of the market configuration inside `instances`.
  * @returns {void}
  */
 function startMarket(coinIndex) {
@@ -130,7 +131,7 @@ function startMarket(coinIndex) {
  * This is used to control how often `startMarket()` runs per coin, allowing faster
  * retries after fills and slower polling during idle periods.
  *
- * @param {number} coinIndex - Index of the market configuration inside `data`.
+ * @param {number} coinIndex - Index of the market configuration inside `instances`.
  * @param {number} ms - Delay in milliseconds before starting the market again.
  * @returns {void}
  */
@@ -244,15 +245,15 @@ function calculateFirstProfit(order) {
  * @returns {Promise<void>}
  */
 async function cancelReserveQuoteOrder(coinIndex) {
-  const cfg = data[coinIndex];
-  if (!cfg?.reserve_quote_order_id) return;
+  const instance = instances[coinIndex];
+  if (!instance?.reserve_quote_order_id) return;
 
-  consoleLog(`${timesExecuted}) Cancelling reserve quote order ${cfg.reserve_quote_order_id}`);
+  consoleLog(`${timesExecuted}) Cancelling reserve quote order ${instance.reserve_quote_order_id}`);
 
   try {
     await getExchange().cancelOrder({
-      orderId: cfg.reserve_quote_order_id,
-      symbol: cfg.pair,
+      orderId: instance.reserve_quote_order_id,
+      symbol: instance.pair,
     });
   } catch (e) {
     const details = e?.message ?? String(e);
@@ -261,12 +262,12 @@ async function cancelReserveQuoteOrder(coinIndex) {
 
   try {
     await updateTradeInstance({
-      id: cfg.id,
+      id: instance.id,
       reserve_quote_order_id: '',
     });
 
     // Keep local cache consistent with the database
-    cfg.reserve_quote_order_id = null;
+    instance.reserve_quote_order_id = null;
   } catch (e) {
     const details = e?.message ?? String(e);
     console.log(`Error clearing reserve quote order in DB: ${details}`);
@@ -282,15 +283,15 @@ async function cancelReserveQuoteOrder(coinIndex) {
  * @returns {Promise<void>}
  */
 async function cancelReserveBaseOrder(coinIndex) {
-  const cfg = data[coinIndex];
-  if (!cfg?.reserve_base_order_id) return;
+  const instance = instances[coinIndex];
+  if (!instance?.reserve_base_order_id) return;
 
-  consoleLog(`${timesExecuted}) Cancelling reserve base order ${cfg.reserve_base_order_id}`);
+  consoleLog(`${timesExecuted}) Cancelling reserve base order ${instance.reserve_base_order_id}`);
 
   try {
     await getExchange().cancelOrder({
-      orderId: cfg.reserve_base_order_id,
-      symbol: cfg.pair,
+      orderId: instance.reserve_base_order_id,
+      symbol: instance.pair,
     });
   } catch (e) {
     const details = e?.message ?? String(e);
@@ -299,12 +300,12 @@ async function cancelReserveBaseOrder(coinIndex) {
 
   try {
     await updateTradeInstance({
-      id: cfg.id,
+      id: instance.id,
       reserve_base_order_id: '',
     });
 
     // Keep local cache consistent with the database
-    cfg.reserve_base_order_id = null;
+    instance.reserve_base_order_id = null;
   } catch (e) {
     const details = e?.message ?? String(e);
     console.log(`${timesExecuted}) Error clearing reserve base order in DB: ${details}`);
@@ -318,15 +319,15 @@ function getQuoteBalance() {
 // Hyperliquid uses "U"-prefixed spot symbols for some assets (e.g., BTC -> UBTC).
 // We map the most common ones explicitly (BTC/ETH/SOL), otherwise we fallback to `U${symbol}`.
 // If nothing matches, we also try the raw symbol as-is.
-function getBaseBalance(cfg) {
-  const a = String(cfg?.name ?? '').trim().toUpperCase();
+function getBaseBalance(instance) {
+  const a = String(instance?.name ?? '').trim().toUpperCase();
   if (!a) return null;
 
   const b = (a === 'BTC' ? 'UBTC' : a === 'ETH' ? 'UETH' : a === 'SOL' ? 'USOL' : `U${a}`);
   return wallet?.find(o => o.asset === b) ?? wallet?.find(o => o.asset === a) ?? null;
 }
 
-async function detectReserveOrdersByExtremes(cfg) {
+async function detectReserveOrdersByExtremes(instance) {
   // 1) Exchange open orders first
   const open = await getExchange().getOpenOrders({});
 
@@ -357,8 +358,8 @@ async function detectReserveOrdersByExtremes(cfg) {
 
   const openIds = new Set(list.map(o => o.orderId));
 
-  const reserveBaseId = cfg.reserve_base_order_id ? Number(cfg.reserve_base_order_id) : null;
-  const reserveQuoteId = cfg.reserve_quote_order_id ? Number(cfg.reserve_quote_order_id) : null;
+  const reserveBaseId = instance.reserve_base_order_id ? Number(instance.reserve_base_order_id) : null;
+  const reserveQuoteId = instance.reserve_quote_order_id ? Number(instance.reserve_quote_order_id) : null;
 
   // 2) If the saved reserve IDs exist in open orders, skip verification for that side
   const baseIdIsPresent = reserveBaseId != null && openIds.has(reserveBaseId);
@@ -371,8 +372,8 @@ async function detectReserveOrdersByExtremes(cfg) {
 
   // 3) Need DB orders to get baseline qty (only if we need to verify at least one side)
   const dbOrders = await retrieveOrders({
-    pair: cfg.pair,
-    trade_instance_id: cfg.id,
+    pair: instance.pair,
+    trade_instance_id: instance.id,
   });
 
   const maxDbQty = Math.max(0, ...dbOrders.map(o => Number(o.quantity) || 0));
@@ -388,9 +389,9 @@ async function detectReserveOrdersByExtremes(cfg) {
     const highestIsReserve = highest.qty > maxDbQty;
 
     if (highestIsReserve && reserveBaseId != null && highest.orderId !== reserveBaseId) {
-      cancels.push({ orderId: highest.orderId, symbol: cfg.pair });
+      cancels.push({ orderId: highest.orderId, symbol: instance.pair });
       updates.reserve_base_order_id = null;
-      cfg.reserve_base_order_id = null;
+      instance.reserve_base_order_id = null;
     }
   }
 
@@ -399,22 +400,22 @@ async function detectReserveOrdersByExtremes(cfg) {
     const lowestIsReserve = lowest.qty > maxDbQty;
 
     if (lowestIsReserve && reserveQuoteId != null && lowest.orderId !== reserveQuoteId) {
-      cancels.push({ orderId: lowest.orderId, symbol: cfg.pair });
+      cancels.push({ orderId: lowest.orderId, symbol: instance.pair });
       updates.reserve_quote_order_id = null;
-      cfg.reserve_quote_order_id = null;
+      instance.reserve_quote_order_id = null;
     }
   }
 
   // 6) Apply cancels + DB updates
   if (cancels.length) {
-    consoleLog(`Reserve mismatch ${cfg.pair}. Cancelling ${cancels.length} candidate(s).`, 'yellow');
+    consoleLog(`Reserve mismatch ${instance.pair}. Cancelling ${cancels.length} candidate(s).`, 'yellow');
     await getExchange().cancelOrders({ cancels });
   }
 
   if (Object.keys(updates).length) {
     await updateTradeInstance({
-      id: cfg.id,
-      pair: cfg.pair,
+      id: instance.id,
+      pair: instance.pair,
       ...updates,
     });
   }
@@ -431,8 +432,8 @@ async function detectReserveOrdersByExtremes(cfg) {
   };
 }
 
-async function dedupeOpenOrdersForPair(cfg) {
-  let dbOrders = await retrieveOrders({ pair: cfg.pair, trade_instance_id: cfg.trade_instance_id })
+async function dedupeOpenOrdersForPair(instance) {
+  let dbOrders = await retrieveOrders({ pair: instance.pair, trade_instance_id: instance.id })
   // 1) expected ids from DB
   const expected = new Set(
       dbOrders.flatMap(o => [o.buy_order, o.sell_order]).filter(Boolean).map(Number)
@@ -440,15 +441,15 @@ async function dedupeOpenOrdersForPair(cfg) {
 
   // 2) exchange open orders
   const open = await getExchange().getOpenOrders({}); // your adapter method
-  // TODO: filter by cfg.pair if we are going to run in more than one pair
-  // const openForPair = open.filter(o => o.pair === cfg.pair);
+  // TODO: filter by instance.pair if we are going to run in more than one pair
+  // const openForPair = open.filter(o => o.pair === instance.pair);
   const openForPair = open;
 
   // 3) group by side+price
   const groups = new Map(); // key -> list
   for (const o of openForPair) {
     const side = o.side; // BUY/SELL already normalized
-    const priceKey = Number(o.price).toFixed(cfg.decimal_price);
+    const priceKey = Number(o.price).toFixed(instance.decimal_price);
     const key = `${side}:${priceKey}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(o);
@@ -474,7 +475,7 @@ async function dedupeOpenOrdersForPair(cfg) {
       if (keepId != null && id === keepId) continue;
 
       // cancel everything else
-      cancels.push({ orderId: id, symbol: cfg.pair }); // your adapter cancel expects symbol pair
+      cancels.push({ orderId: id, symbol: instance.pair }); // your adapter cancel expects symbol pair
       dupes.push({ key, keepId, cancelId: id });
     }
   }
@@ -501,34 +502,34 @@ async function dedupeOpenOrdersForPair(cfg) {
 async function createReserveOrders(coinIndex, currentPrice) {
   await balanceCheck();
 
-  const cfg = data[coinIndex];
+  const instance = instances[coinIndex];
 
   if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
-    consoleLog(`Invalid last price for ${cfg.pair}: ${currentPrice}`, 'red');
+    consoleLog(`Invalid last price for ${instance.pair}: ${currentPrice}`, 'red');
     return;
   }
 
-  const quoteOffsetPct = Number(cfg.reserve_quote_offset_percent ?? DEFAULT_RESERVE_QUOTE_OFFSET_PERCENT);
-  const baseOffsetPct  = Number(cfg.reserve_base_offset_percent ?? DEFAULT_RESERVE_BASE_OFFSET_PERCENT);
+  const quoteOffsetPct = Number(instance.reserve_quote_offset_percent ?? DEFAULT_RESERVE_QUOTE_OFFSET_PERCENT);
+  const baseOffsetPct  = Number(instance.reserve_base_offset_percent ?? DEFAULT_RESERVE_BASE_OFFSET_PERCENT);
 
   if (!Number.isFinite(quoteOffsetPct) || quoteOffsetPct <= 0) {
-    consoleLog(`Invalid reserve_quote_offset_percent: ${cfg.reserve_quote_offset_percent}`, 'red');
+    consoleLog(`Invalid reserve_quote_offset_percent: ${instance.reserve_quote_offset_percent}`, 'red');
     return;
   }
   if (!Number.isFinite(baseOffsetPct) || baseOffsetPct <= 0) {
-    consoleLog(`Invalid reserve_base_offset_percent: ${cfg.reserve_base_offset_percent}`, 'red');
+    consoleLog(`Invalid reserve_base_offset_percent: ${instance.reserve_base_offset_percent}`, 'red');
     return;
   }
 
   // Prices far from market so they likely won't fill
   const reserveBuyPrice = truncate(
       currentPrice * (1 - quoteOffsetPct / 100),
-      cfg.decimal_price
+      instance.decimal_price
   );
 
   const reserveSellPrice = truncate(
       currentPrice * (1 + baseOffsetPct / 100),
-      cfg.decimal_price
+      instance.decimal_price
   );
 
   if (!Number.isFinite(reserveBuyPrice) || reserveBuyPrice <= 0) {
@@ -555,11 +556,11 @@ async function createReserveOrders(coinIndex, currentPrice) {
     const spendableQuote = freeQuote - BLOCK_USD_BUFFER;
 
     if (spendableQuote > 0) {
-      const buyQty = truncate(spendableQuote / reserveBuyPrice, cfg.decimal_quantity);
+      const buyQty = truncate(spendableQuote / reserveBuyPrice, instance.decimal_quantity);
 
       if (Number.isFinite(buyQty) && buyQty > 0) {
         consoleLog(
-            `${timesExecuted}) Reserve QUOTE: BUY ${cfg.pair} @ ${reserveBuyPrice} qty=${buyQty} (locks ~${spendableQuote.toFixed(2)} ${QUOTE_ASSET})`
+            `${timesExecuted}) Reserve QUOTE: BUY ${instance.pair} @ ${reserveBuyPrice} qty=${buyQty} (locks ~${spendableQuote.toFixed(2)} ${QUOTE_ASSET})`
         );
 
         try {
@@ -567,13 +568,13 @@ async function createReserveOrders(coinIndex, currentPrice) {
             side: 'BUY',
             quantity: buyQty,
             price: reserveBuyPrice,
-            symbol: cfg.pair,
+            symbol: instance.pair,
           });
 
           const id = o?.orderId;
           if (id) {
-            await updateTradeInstance({ id: cfg.id, reserve_quote_order_id: id });
-            cfg.reserve_quote_order_id = id;
+            await updateTradeInstance({ id: instance.id, reserve_quote_order_id: id });
+            instance.reserve_quote_order_id = id;
             consoleLog(`${timesExecuted}) Updated reserve_quote_order_id to ${id}`);
           }
         } catch (e) {
@@ -587,17 +588,17 @@ async function createReserveOrders(coinIndex, currentPrice) {
   }
 
   // ---- BASE RESERVE (locks base by placing a SELL LIMIT) ----
-  const base = getBaseBalance(cfg);
+  const base = getBaseBalance(instance);
   if (base) {
     const freeBase = Number(base.free);
     const sellableBase = freeBase - BLOCK_BASE_BUFFER;
 
     if (sellableBase > 0) {
-      const sellQty = truncate(sellableBase, cfg.decimal_quantity);
+      const sellQty = truncate(sellableBase, instance.decimal_quantity);
 
       if (Number.isFinite(sellQty) && sellQty > 0) {
         consoleLog(
-            `${timesExecuted}) Reserve BASE: SELL ${cfg.pair} @ ${reserveSellPrice} qty=${sellQty} (locks ~${sellQty} base units)`
+            `${timesExecuted}) Reserve BASE: SELL ${instance.pair} @ ${reserveSellPrice} qty=${sellQty} (locks ~${sellQty} base units)`
         );
 
         try {
@@ -605,13 +606,13 @@ async function createReserveOrders(coinIndex, currentPrice) {
             side: 'SELL',
             quantity: sellQty,
             price: reserveSellPrice,
-            symbol: cfg.pair,
+            symbol: instance.pair,
           });
 
           const id = o?.orderId;
           if (id) {
-            await updateTradeInstance({ id: cfg.id, reserve_base_order_id: id });
-            cfg.reserve_base_order_id = id;
+            await updateTradeInstance({ id: instance.id, reserve_base_order_id: id });
+            instance.reserve_base_order_id = id;
             consoleLog(`${timesExecuted}) Updated reserve_base_order_id to ${id}`);
           }
         } catch (e) {
@@ -753,11 +754,13 @@ async function getBalance(params = {}) {
  * @param {Array<object>} orders - All grid rows from DB.
  * @param {number} currentPrice - Latest market price.
  * @param {object} coinData - Market configuration (may include execution limits).
- * @param {number} [limit=90] - Maximum BUY and SELL rows to keep near price.
+ * @param {number} [limit=100] - Maximum BUY and SELL rows to return for active trading.
  * @param {boolean} [cleanup=true] - Whether to cancel out-of-range orders.
+ * @param {number} [cleanupLimit=limit] - Wider window used to decide which orders to cancel.
+ *   Orders outside this range are cancelled; orders between limit and cleanupLimit are left alone.
  * @returns {Promise<Array<object>>} Filtered and sorted grid rows.
  */
-async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 100, cleanup = true) {
+async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 100, cleanup = true, cleanupLimit = limit) {
   const above = [];
   const below = [];
 
@@ -779,11 +782,14 @@ async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 10
   above.sort((a, b) => a.sell_price - b.sell_price);
 
   const selected = [...below.slice(0, limit), ...above.slice(0, limit)];
-  const selectedIds = new Set(selected.map(o => o.id));
 
   if (cleanup) {
+    // Cleanup uses the wider cleanupLimit window — only cancel orders outside it
+    const cleanupSelected = [...below.slice(0, cleanupLimit), ...above.slice(0, cleanupLimit)];
+    const cleanupSelectedIds = new Set(cleanupSelected.map(o => o.id));
+
     // 1) collect out-of-range orders that have orderIds
-    const toCleanup = orders.filter(o => !selectedIds.has(o.id) && (o.buy_order || o.sell_order));
+    const toCleanup = orders.filter(o => !cleanupSelectedIds.has(o.id) && (o.buy_order || o.sell_order));
 
     // 2) build list of all orderIds to query once
     const orderIds = toCleanup.flatMap(o => [o.buy_order, o.sell_order]).filter(Boolean);
@@ -806,7 +812,7 @@ async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 10
 
       if (o.buy_order) {
         const st = statuses.get(Number(o.buy_order))?.status;
-        if (st !== ORDER_STATUS_FILLED ) {
+        if (st !== ORDER_STATUS_FILLED) {
           cancels.push({ orderId: o.buy_order, symbol: coinData.pair });
         }
         cleared = true;
@@ -833,13 +839,10 @@ async function filterAndCleanupOrders(orders, currentPrice, coinData, limit = 10
       }
     }
 
-    // 5) clear DB for those rows (parallel)
-    // TODO optimize further with a single SQL UPDATE ... WHERE id IN (...)
-    await Promise.allSettled(
-        toDbClear.map(o =>
-            updateTradeOrder({ id: o.id, buy_order: null, sell_order: null })
-        )
-    );
+    // 5) clear DB for those rows in a single query
+    if (toDbClear.length) {
+      await bulkClearOrders(toDbClear.map(o => o.id));
+    }
   }
 
   // de-dupe selected
@@ -868,59 +871,49 @@ function getIntEnv(name, fallback, { min = 1, max = 100000 } = {}) {
 
 // Keep a larger window when cleanup is enabled (so we cancel fewer "useful" rows by mistake)
 const ORDERS_WINDOW_DEFAULT = getIntEnv('GRID_ORDERS_WINDOW_DEFAULT', 70, { min: 10, max: 1000 });
-const ORDERS_WINDOW_CLEANUP  = getIntEnv('GRID_ORDERS_WINDOW_CLEANUP', 100, { min: 10, max: 2000 });
+const ORDERS_WINDOW_CLEANUP  = getIntEnv('GRID_ORDERS_WINDOW_CLEANUP', 130, { min: 10, max: 2000 });
 
 /**
- * Loads grid orders from the database and filters them around the current price.
+ * Loads grid orders from the database, cancels orders outside ORDERS_WINDOW_CLEANUP,
+ * and returns the closer ORDERS_WINDOW_DEFAULT window for active trading.
  *
- * Cleanup (canceling / pruning) is disabled by default to avoid excessive exchange/API calls
- * and request-credit throttling. Cleanup is only allowed when we are close to Hyperliquid's
- * open-order limit: if the DB has more than MAX_OPEN_ORDERS and the exchange also reports
- * at least SAFE_OPEN_THRESHOLD open orders.
+ * Cleanup always runs: orders outside ORDERS_WINDOW_CLEANUP (130) are cancelled
+ * on the exchange and cleared in DB. Only ORDERS_WINDOW_DEFAULT (70) is returned
+ * for active trading. Orders between the two windows are left alone.
+ *
+ * A warning is emitted (log + Telegram) if the exchange open order count
+ * reaches SAFE_OPEN_THRESHOLD (900).
  *
  * @param {object} params
  * @param {string} params.pair
  * @param {number|string} params.tradeInstanceId
  * @param {number} params.currentPrice
- * @param {object} params.cfg
+ * @param {object} params.instance
  * @param {number} params.timesExecuted
  * @returns {Promise<Array<object>>} Filtered list of orders around the current price.
  */
-async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, timesExecuted }) {
+async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, instance, timesExecuted }) {
   const orders = await retrieveOrders({ pair, trade_instance_id: tradeInstanceId });
+
   consoleLog(`${timesExecuted}) Loaded ${orders.length} total orders from DB`);
-
-  const limit = ORDERS_WINDOW_DEFAULT;
-
-  // Cleanup guards (avoid cancel/create spam)
-  const MAX_OPEN_ORDERS = 1000;       // official default cap
-  const SAFE_OPEN_THRESHOLD = 900;    // only cleanup if we're close-ish
-
-  let shouldCleanup = false;
-
-  // Only even consider cleanup if DB indicates we're beyond the cap.
-  // (DB can drift, so we confirm with exchange open orders before canceling anything.)
-  if (orders.length > MAX_OPEN_ORDERS) {
-    try {
-      const open = await getExchange().getOpenOrders({});
-      const openCount = Array.isArray(open) ? open.length : 0;
-
-      // If exchange also has a lot of open orders, cleanup is allowed.
-      // If exchange is already < threshold, don't cleanup (DB likely has stale records).
-      shouldCleanup = openCount >= SAFE_OPEN_THRESHOLD;
-
-      consoleLog(
-          `${timesExecuted}) Cleanup check: db=${orders.length} open=${openCount} -> shouldCleanup=${shouldCleanup}`
-      );
-    } catch (e) {
-      // If we can't confirm, do NOT cleanup. Safer to avoid accidental spam cancels.
-      consoleLog(`${timesExecuted}) Cleanup check failed, skipping cleanup: ${String(e?.message || e)}`, 'yellow');
-      shouldCleanup = false;
-    }
-  }
-
-  const filtered = await filterAndCleanupOrders(orders, currentPrice, cfg, limit, shouldCleanup);
+  const filtered = await filterAndCleanupOrders(
+    orders, currentPrice, instance, ORDERS_WINDOW_DEFAULT, true, ORDERS_WINDOW_CLEANUP
+  );
   consoleLog(`${timesExecuted}) Filtered to ${filtered.length} orders around price`);
+
+  // Warn if approaching the exchange open-order limit
+  const SAFE_OPEN_THRESHOLD = 900;
+  try {
+    const open = await getExchange().getOpenOrders({});
+    const openCount = Array.isArray(open) ? open.length : 0;
+    if (openCount >= SAFE_OPEN_THRESHOLD) {
+      const msg = `Warning: ${openCount} open orders on exchange (limit ~1000). Consider reducing the grid.`;
+      consoleLog(`${timesExecuted}) ${msg}`, 'yellow');
+      void notifyTelegram(msg);
+    }
+  } catch (e) {
+    consoleLog(`${timesExecuted}) Open order count check failed: ${String(e?.message || e)}`, 'yellow');
+  }
 
   return filtered;
 }
@@ -941,13 +934,13 @@ async function loadAndFilterOrders({ pair, tradeInstanceId, currentPrice, cfg, t
  * - Logic is intentionally sequential per order to avoid rate-limit spikes.
  * - Some DB writes are fire-and-forget to keep the loop responsive.
  *
- * @param {number} coinIndex - Index of the market configuration inside `data`.
+ * @param {number} coinIndex - Index of the market configuration inside `instances`.
  * @returns {Promise<void>}
  */
 const runCoins = async function(coinIndex) {
   // Lock acquired BEFORE any await — prevents concurrent executions even when
   // called simultaneously from multiple WS callbacks or timers. Previously the
-  // lock was acquired after `await retrieveInstance`, leaving a race window where
+  // lock was acquired after `await retrieveInstances`, leaving a race window where
   // two calls could both read checking[coinIndex] === false before either set it.
   if (checking[coinIndex]) { return; }
   checking[coinIndex] = true;
@@ -955,17 +948,17 @@ const runCoins = async function(coinIndex) {
   let timeToExecute = 20000;
   let pair = 'unknown';
   try {
-    data = await retrieveInstance({ id: getInstanceId() }).catch((ex) => console.log(ex));
+    instances = await retrieveInstances({ id: getInstanceId() }).catch((ex) => console.log(ex));
 
-    const cfg = data[coinIndex];
-    if (!cfg) {
+    const instance = instances[coinIndex];
+    if (!instance) {
       timeToExecute = 60000;
       return;
     }
-    pair = cfg.pair;
-    const tradeInstanceId = cfg.id;
-    const dp = cfg.decimal_price;
-    const dq = cfg.decimal_quantity;
+    pair = instance.pair;
+    const tradeInstanceId = instance.id;
+    const dp = instance.decimal_price;
+    const dq = instance.decimal_quantity;
 
     if (!enable) {
       runWithTime(coinIndex, 5000);
@@ -980,14 +973,15 @@ const runCoins = async function(coinIndex) {
 
     consoleLog(`${timesExecuted}) Current price: ${Number(currentPrice).toFixed(dp)}`);
 
-    await dedupeOpenOrdersForPair(cfg)
-    await detectReserveOrdersByExtremes(cfg)
+    await dedupeOpenOrdersForPair(instance)
+    // Functionality disabled for now
+    // await detectReserveOrdersByExtremes(instance)
 
     const orders = await loadAndFilterOrders({
       pair,
       tradeInstanceId,
       currentPrice,
-      cfg,
+      instance,
       timesExecuted,
     });
 
@@ -1000,7 +994,7 @@ const runCoins = async function(coinIndex) {
     const statuses = await getExchange().getOrdersStatusMap({ orderIds });
 
     for (let order of orders) {
-      await sleep(100);
+      await sleep(50);
       order = await retrieveOrders({ id: order.id });
 
       // Place the initial order for this grid row if none exists.
@@ -1096,12 +1090,12 @@ const runCoins = async function(coinIndex) {
 
             addProfit({
               trade_instance_id: tradeInstanceId,
-              name: cfg.name,
+              name: instance.name,
               pair: order.pair,
               profit: 'SELL',
               value: profitReal,
               fee: calculateFeesForCycle(order),
-              target_percent: cfg.target_percent,
+              target_percent: instance.target_percent,
               price_intermediate: order.buy_price,
               price_final: order.sell_price,
             });
@@ -1111,7 +1105,7 @@ const runCoins = async function(coinIndex) {
             void notifyTelegram(sellMsg);
             addCycle({
               trade_instance_id: tradeInstanceId,
-              name: cfg.name,
+              name: instance.name,
               pair: order.pair,
               side: 'SELL',
               price: order.sell_price,
@@ -1172,12 +1166,12 @@ const runCoins = async function(coinIndex) {
 
             addProfit({
               trade_instance_id: tradeInstanceId,
-              name: cfg.name,
+              name: instance.name,
               pair: order.pair,
               profit: 'BUY',
               value: profitReal,
               fee: calculateFeesForCycle(order),
-              target_percent: cfg.target_percent,
+              target_percent: instance.target_percent,
               price_intermediate: order.buy_price,
               price_final: order.sell_price,
             });
@@ -1191,7 +1185,7 @@ const runCoins = async function(coinIndex) {
             void notifyTelegram(buyMsg);
             addCycle({
               trade_instance_id: tradeInstanceId,
-              name: cfg.name,
+              name: instance.name,
               pair: order.pair,
               side: 'BUY',
               price: order.buy_price,
@@ -1209,7 +1203,7 @@ const runCoins = async function(coinIndex) {
     // Since we have some limits in HL to place orders and this keep creating/canceling, I'll comment this for now
     // await createReserveOrders(coinIndex, currentPrice)
 
-    const { minPrice, maxPrice } = computeRange(pair, orders, cfg);
+    const { minPrice, maxPrice } = computeRange(pair, orders, instance);
     consoleLog(`${timesExecuted}) New price check between ${minPrice} and ${maxPrice}`);
     if (orderFilled) {
       consoleLog(`${timesExecuted}) Order filled fast call called`);
@@ -1250,10 +1244,10 @@ function clearMissingOrder({ order, side, tradeOrderId, notify = false }) {
  *
  * @param {string} pair
  * @param {Array<object>} orders
- * @param {{ entry_price: number, exit_price: number }} cfg
+ * @param {{ entry_price: number, exit_price: number }} instance
  * @returns {{ minPrice: number|null, maxPrice: number|null }}
  */
-function computeRange(pair, orders, cfg) {
+function computeRange(pair, orders, instance) {
   let maxPrice = null; // Lowest sell_price with an active sell_order
   let minPrice = null; // Highest buy_price with an active buy_order
 
@@ -1269,8 +1263,8 @@ function computeRange(pair, orders, cfg) {
     }
   }
 
-  const execMin = Number(cfg?.execution_price_min);
-  const execMax = Number(cfg?.execution_price_max);
+  const execMin = Number(instance?.execution_price_min);
+  const execMax = Number(instance?.execution_price_max);
 
   const result = {
     minPrice: minPrice ?? (Number.isFinite(execMin) ? execMin : null),
@@ -1385,9 +1379,9 @@ const socketPrices = () => {
   }
 
   const allowedPairs = new Set(
-      data.map((o) => getExchange().normalizeSymbolForPrice(o.pair))
+      instances.map((o) => getExchange().normalizeSymbolForPrice(o.pair))
   );
-  const allPairs = Array.from(new Set(data.map((o) => o.pair)));
+  const allPairs = Array.from(new Set(instances.map((o) => o.pair)));
 
   consoleLog(`Socket listening on ${allPairs.length} markets`, 'green');
 
@@ -1460,7 +1454,7 @@ const socketPrices = () => {
  * Accumulates realized profit into a "rebuy wallet" and optionally executes a market rebuy.
  *
  * How it works:
- * - If `cfg.rebuy_profit` is enabled, profit from completed cycles is added to `cfg.rebuy_value`.
+ * - If `instance.rebuy_profit` is enabled, profit from completed cycles is added to `instance.rebuy_value`.
  * - When `rebuy_value` reaches the threshold (`amountToBuy`), the bot buys a fixed amount
  *   of the base asset at market and tracks the totals in:
  *   - `rebuy_value` (remaining quote reserved for future rebuys)
@@ -1468,50 +1462,50 @@ const socketPrices = () => {
  *   - `rebought_coin` (total base asset acquired via rebuys)
  *
  * Notes:
- * - Updates DB and then syncs the in-memory `cfg` object.
+ * - Updates DB and then syncs the in-memory `instance` object.
  * - Uses a fixed quote amount per rebuy.
  *
- * @param {number} coinIndex - Index of the market configuration inside `data`.
+ * @param {number} coinIndex - Index of the market configuration inside `instances`.
  * @param {number|string} profitValue - Realized profit amount in quote currency for the cycle.
  * @returns {Promise<void>}
  */
 async function handleRebuyFromProfit(coinIndex, profitValue) {
   try {
-    const cfg = data[coinIndex];
+    const instance = instances[coinIndex];
 
     // Normalize types for safe arithmetic
-    cfg.rebuy_profit = !!cfg.rebuy_profit;
-    cfg.rebuy_value = toNum(cfg.rebuy_value, 0);
-    cfg.rebought_value = toNum(cfg.rebought_value, 0);
-    cfg.rebought_coin = toNum(cfg.rebought_coin, 0);
+    instance.rebuy_profit = !!instance.rebuy_profit;
+    instance.rebuy_value = toNum(instance.rebuy_value, 0);
+    instance.rebought_value = toNum(instance.rebought_value, 0);
+    instance.rebought_coin = toNum(instance.rebought_coin, 0);
 
-    if (!cfg.rebuy_profit) return;
-    const rebuyPercent = Math.max(0, Math.min(100, toNum(cfg.rebuy_percent, 0)));
+    if (!instance.rebuy_profit) return;
+    const rebuyPercent = Math.max(0, Math.min(100, toNum(instance.rebuy_percent, 0)));
     const rebuyShare = rebuyPercent / 100;
 
     const profit = toNum(profitValue, 0);
     const rebuyProfitPortion = round(profit * rebuyShare, 8);
 
     // Add only the configured percent of profit to the rebuy wallet
-    const newRebuyValue = round(cfg.rebuy_value + rebuyProfitPortion, 8);
-    await updateTradeInstance({ id: cfg.id, rebuy_value: newRebuyValue });
-    cfg.rebuy_value = newRebuyValue;
+    const newRebuyValue = round(instance.rebuy_value + rebuyProfitPortion, 8);
+    await updateTradeInstance({ id: instance.id, rebuy_value: newRebuyValue });
+    instance.rebuy_value = newRebuyValue;
 
     const amountToBuyQuote = 15; // quote currency per rebuy (e.g., USDC/USDT)
-    if (cfg.rebuy_value + 1e-9 < amountToBuyQuote) return;
+    if (instance.rebuy_value + 1e-9 < amountToBuyQuote) return;
 
     // Get latest prices so we can convert quote -> base quantity
-    await updatePrices([cfg.pair]);
+    await updatePrices([instance.pair]);
 
-    const priceKey = String(cfg.pair).replace(/[\/\-_]/g, '');
+    const priceKey = String(instance.pair).replace(/[\/\-_]/g, '');
     const currentPrice = toNum(prices?.[priceKey], 0);
     if (!currentPrice || currentPrice <= 0) {
-      consoleLog(`Rebuy aborted: invalid currentPrice for ${cfg.pair} (key=${priceKey})`);
+      consoleLog(`Rebuy aborted: invalid currentPrice for ${instance.pair} (key=${priceKey})`);
       return;
     }
 
-    const qtyDecimals = Number.isFinite(Number(cfg.decimal_quantity))
-        ? Number(cfg.decimal_quantity)
+    const qtyDecimals = Number.isFinite(Number(instance.decimal_quantity))
+        ? Number(instance.decimal_quantity)
         : 8;
 
     // Convert the rebuy quote amount into base qty using current price
@@ -1523,26 +1517,26 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
 
     // Force fill using IOC price with 0.5% slippage buffer
     const slippage = 0.005; // 0.5%
-    const iocPrice = Number((currentPrice * (1 + slippage)).toFixed(cfg.decimal_price));
+    const iocPrice = Number((currentPrice * (1 + slippage)).toFixed(instance.decimal_price));
 
     // Update local + DB bookkeeping immediately (fire-and-forget approach)
     // We assume: spent = amountToBuyQuote, bought = qtyToBuy
-    const updatedRebuyValue = round(cfg.rebuy_value - amountToBuyQuote, 8);
-    const updatedReboughtValue = round(cfg.rebought_value + amountToBuyQuote, 8);
-    const updatedReboughtCoin = round(cfg.rebought_coin + qtyToBuy, 8);
+    const updatedRebuyValue = round(instance.rebuy_value - amountToBuyQuote, 8);
+    const updatedReboughtValue = round(instance.rebought_value + amountToBuyQuote, 8);
+    const updatedReboughtCoin = round(instance.rebought_coin + qtyToBuy, 8);
 
     await updateTradeInstance({
-      id: cfg.id,
+      id: instance.id,
       rebuy_value: updatedRebuyValue,
       rebought_value: updatedReboughtValue,
       rebought_coin: updatedReboughtCoin,
     });
 
-    cfg.rebuy_value = updatedRebuyValue;
-    cfg.rebought_value = updatedReboughtValue;
-    cfg.rebought_coin = updatedReboughtCoin;
+    instance.rebuy_value = updatedRebuyValue;
+    instance.rebought_value = updatedReboughtValue;
+    instance.rebought_coin = updatedReboughtCoin;
 
-    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${cfg.name} at ${iocPrice}`;
+    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${instance.name} at ${iocPrice}`;
     consoleLog(rebuyMsg);
     void notifyTelegram(rebuyMsg);
 
@@ -1550,7 +1544,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     // If it errors, we revert the bookkeeping.
     try {
       await getExchange().placeOrder({
-        symbol: cfg.pair,
+        symbol: instance.pair,
         side: 'BUY',
         type: 'MARKET',      // your adapter maps this to LIMIT + Ioc
         quantity: qtyToBuy,  // base qty
@@ -1559,20 +1553,20 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
       });
     } catch (err) {
       // Revert accounting on failure
-      const revertedRebuyValue = round(cfg.rebuy_value + amountToBuyQuote, 8);
-      const revertedReboughtValue = round(cfg.rebought_value - amountToBuyQuote, 8);
-      const revertedReboughtCoin = round(cfg.rebought_coin - qtyToBuy, 8);
+      const revertedRebuyValue = round(instance.rebuy_value + amountToBuyQuote, 8);
+      const revertedReboughtValue = round(instance.rebought_value - amountToBuyQuote, 8);
+      const revertedReboughtCoin = round(instance.rebought_coin - qtyToBuy, 8);
 
       await updateTradeInstance({
-        id: cfg.id,
+        id: instance.id,
         rebuy_value: revertedRebuyValue,
         rebought_value: revertedReboughtValue,
         rebought_coin: revertedReboughtCoin,
       });
 
-      cfg.rebuy_value = revertedRebuyValue;
-      cfg.rebought_value = revertedReboughtValue;
-      cfg.rebought_coin = revertedReboughtCoin;
+      instance.rebuy_value = revertedRebuyValue;
+      instance.rebought_value = revertedReboughtValue;
+      instance.rebought_coin = revertedReboughtCoin;
 
       consoleLog(`Rebuy failed (reverted): ${err?.message ?? String(err)}`);
     }
@@ -1591,7 +1585,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
  *
  * Side effects:
  * - Calls `setApi()` and `setInstanceId(i)`.
- * - Updates module-level `data` and `prices`.
+ * - Updates module-level `instances` and `prices`.
  * - Exits the process if the instance id or instance secrets cannot be loaded.
  *
  * @param {string} pair - Trading pair to load (e.g., 'BTCUSDT').
@@ -1608,7 +1602,7 @@ const loadInstance = async function(pair, instance) {
   }
 
   // Apply per-instance DB settings to process.env before services start
-  const rawEarly = await retrieveInstance({ id: getInstanceId() }).catch(() => null);
+  const rawEarly = await retrieveInstances({ id: getInstanceId() }).catch(() => null);
   applyInstanceConfig(rawEarly?.[0] ?? null);
 
   // Load API credentials for the given instance
@@ -1621,12 +1615,12 @@ const loadInstance = async function(pair, instance) {
   // Allow the exchange client to finish initialization
   await sleep(1000);
 
-  data = await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
+  instances = await retrieveInstances({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
 
-  data = data.filter((o) => o.pair == pair);
+  instances = instances.filter((o) => o.pair == pair);
 
   try {
     const exchangePrices = await getExchange().getPrices();
@@ -1637,7 +1631,7 @@ const loadInstance = async function(pair, instance) {
     console.log(`Error loading initial prices: ${details}`);
   }
 
-  return data;
+  return instances;
 };
 
 function parseSaveFlag(save) {
@@ -1653,14 +1647,14 @@ function parseSaveFlag(save) {
  * @returns {Promise<void>}
  */
 async function startCoinsStaggered() {
-  if (!data?.length) return;
+  if (!instances?.length) return;
 
   addMessage('Bot grid initiated.');
   socketPrices();
   await sleep(1000)
 
-  for (let idx = 0; idx < data.length; idx++) {
-    const coin = data[idx];
+  for (let idx = 0; idx < instances.length; idx++) {
+    const coin = instances[idx];
     pairToIndex[getExchange().normalizeSymbolForPrice(coin.pair)] = idx;
     if (checking[idx] == null) checking[idx] = false;
 
@@ -1672,7 +1666,7 @@ async function startCoinsStaggered() {
     await sleep(500);
   }
 
-  consoleLog(`Running in ${data.length} markets`);
+  consoleLog(`Running in ${instances.length} markets`);
 }
 
 /**
@@ -1699,7 +1693,7 @@ const start = async function(instance) {
   }
 
   // Load instance early so DB values override process.env before any service starts
-  const rawEarly = await retrieveInstance({ id: getInstanceId() }).catch(() => null);
+  const rawEarly = await retrieveInstances({ id: getInstanceId() }).catch(() => null);
   applyInstanceConfig(rawEarly?.[0] ?? null);
 
   createTelegramBot({ polling: true });
@@ -1713,14 +1707,14 @@ const start = async function(instance) {
   });
   void notifyTelegram('Bot grid initiated.');
 
-  data = await retrieveInstance({ id: getInstanceId() }).catch((ex) => {
+  instances = await retrieveInstances({ id: getInstanceId() }).catch((ex) => {
     console.log(ex);
     return [];
   });
 
-  consoleLog(`${data.length} coin(s) loaded.`);
+  consoleLog(`${instances.length} coin(s) loaded.`);
 
-  await updatePrices(data.map(o=>o.pair));
+  await updatePrices(instances.map(o=>o.pair));
 
   await startCoinsStaggered();
 };
