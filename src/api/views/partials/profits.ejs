@@ -215,12 +215,12 @@
                 <!-- Right: all-time chart -->
                 <div class="col-12 col-lg-6 d-flex flex-column">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="fw-semibold">Daily profit <span class="text-muted fw-normal small">(all-time)</span></div>
+                        <div class="fw-semibold" id="allTimeChartTitle">Overtime profit <span class="text-muted fw-normal small">(all-time)</span></div>
                         <div class="d-flex align-items-center gap-2">
                             <div class="text-muted small"><%= allTimeDays.length %> days</div>
                             <div class="btn-group btn-group-sm" role="group" id="allTimeChartToggle">
-                                <button type="button" class="btn btn-outline-secondary active" data-chart-mode="daily">Daily</button>
-                                <button type="button" class="btn btn-outline-secondary" data-chart-mode="overtime">Overtime</button>
+                                <button type="button" class="btn btn-outline-secondary" data-chart-mode="daily">Daily</button>
+                                <button type="button" class="btn btn-outline-secondary active" data-chart-mode="overtime">Overtime</button>
                             </div>
                         </div>
                     </div>
@@ -249,7 +249,7 @@
                 const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
                 const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
 
-                function makeGrad(values) {
+                function makeGrad() {
                     const ctx = canvas.getContext('2d');
                     const grad = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
                     grad.addColorStop(0, 'rgba(25,135,84,0.25)');
@@ -257,12 +257,21 @@
                     return grad;
                 }
 
+                const titleLabels = {
+                    daily:    'Daily profit <span class="text-muted fw-normal small">(all-time)</span>',
+                    overtime: 'Overtime profit <span class="text-muted fw-normal small">(all-time)</span>',
+                };
+
+                const STORAGE_KEY = 'allTimeChartMode';
+                const savedMode = localStorage.getItem(STORAGE_KEY) || 'overtime';
+                const initData = savedMode === 'overtime' ? overtimeValues : dailyValues;
+
                 canvas._chartInstance = new Chart(canvas, {
                     type: 'line',
                     data: {
                         labels,
                         datasets: [{
-                            data: dailyValues,
+                            data: initData,
                             borderColor: '#198754',
                             borderWidth: 2,
                             tension: 0.4,
@@ -272,7 +281,7 @@
                             pointHoverBorderColor: '#fff',
                             pointHoverBorderWidth: 2,
                             fill: true,
-                            backgroundColor: makeGrad(dailyValues),
+                            backgroundColor: makeGrad(),
                         }]
                     },
                     options: {
@@ -311,21 +320,30 @@
 
                 canvas.style.animation = 'revealChart 2s cubic-bezier(0.16,1,0.3,1) forwards';
 
-                // Toggle handler
+                // Apply saved mode to buttons + title on init
                 const toggleGroup = document.getElementById('allTimeChartToggle');
+                const titleEl = document.getElementById('allTimeChartTitle');
+                function applyMode(mode) {
+                    toggleGroup.querySelectorAll('button').forEach(b =>
+                        b.classList.toggle('active', b.dataset.chartMode === mode)
+                    );
+                    if (titleEl) titleEl.innerHTML = titleLabels[mode] || titleLabels.overtime;
+                    const chart = canvas._chartInstance;
+                    if (!chart) return;
+                    chart.data.datasets[0].data = mode === 'overtime' ? overtimeValues : dailyValues;
+                    chart.data.datasets[0].backgroundColor = makeGrad();
+                    chart.update('none');
+                }
+
+                applyMode(savedMode);
+
                 if (toggleGroup) {
                     toggleGroup.addEventListener('click', function (e) {
                         const btn = e.target.closest('[data-chart-mode]');
                         if (!btn) return;
                         const mode = btn.dataset.chartMode;
-                        toggleGroup.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-                        btn.classList.add('active');
-
-                        const chart = canvas._chartInstance;
-                        if (!chart) return;
-                        chart.data.datasets[0].data = mode === 'overtime' ? overtimeValues : dailyValues;
-                        chart.data.datasets[0].backgroundColor = makeGrad(chart.data.datasets[0].data);
-                        chart.update('none');
+                        localStorage.setItem(STORAGE_KEY, mode);
+                        applyMode(mode);
                     });
                 }
             }, 50);
