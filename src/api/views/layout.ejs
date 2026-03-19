@@ -5,164 +5,382 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title><%= title %></title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <!-- Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+    <!-- CDN libs -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <script src="https://unpkg.com/lightweight-charts@5.1.0/dist/lightweight-charts.standalone.production.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <link rel="icon" type="image/png" href="/favicon.png?v=3">
-    <link rel="shortcut icon" href="/favicon.png?v=3">
 
-    <style>
-        html { scroll-behavior: smooth; }
-        html, body { background-color: var(--bs-body-bg) !important; }
+    <!-- Bootstrap JS only (modals + tooltips) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Tailwind v4 browser CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <style type="text/tailwindcss">
+        @custom-variant dark (&:is([data-bs-theme="dark"] *));
+
+        /* ── Theme: Hyperliquid ─────────────────────────────────────────────
+         *  Inspired by app.hyperliquid.xyz — dark blue-black panels,
+         *  electric green primary (#0ecb81 ≈ oklch 0.74 0.17 158),
+         *  vivid red for destructive, cool steel text.
+         *  Backup of the old theme: src/api/public/css/theme-classic.css
+         * ──────────────────────────────────────────────────────────────── */
+
+        /* ── Light mode (cool white — HL is dark-first) ─────────────────── */
+        :root {
+            --background:             oklch(0.9700 0.0080 245.0);
+            --foreground:             oklch(0.1200 0.0160 248.0);
+            --card:                   oklch(0.9900 0.0040 240.0);
+            --card-foreground:        oklch(0.1200 0.0160 248.0);
+            --primary:                oklch(0.7400 0.1700 158.0);
+            --primary-foreground:     oklch(0.0900 0.0120 248.0);
+            --muted:                  oklch(0.9200 0.0100 245.0);
+            --muted-foreground:       oklch(0.4800 0.0200 248.0);
+            --accent:                 oklch(0.9200 0.0100 245.0);
+            --accent-foreground:      oklch(0.1200 0.0160 248.0);
+            --destructive:            oklch(0.6000 0.2200 22.0);
+            --destructive-foreground: oklch(0.9900 0.0040 240.0);
+            --border:                 oklch(0.8700 0.0120 245.0);
+            --input:                  oklch(0.9900 0.0040 240.0);
+            --ring:                   oklch(0.7400 0.1700 158.0);
+            --chart-1:                oklch(0.7400 0.1700 158.0);
+            --chart-2:                oklch(0.6000 0.2200 22.0);
+            --chart-3:                oklch(0.6500 0.1400 230.0);
+            --chart-4:                oklch(0.7800 0.1500 95.0);
+            --chart-5:                oklch(0.7200 0.1600 195.0);
+            --sidebar:                oklch(0.1100 0.0140 248.0);
+            --sidebar-foreground:     oklch(0.9300 0.0100 245.0);
+            --sidebar-primary:        oklch(0.7400 0.1700 158.0);
+            --sidebar-primary-fg:     oklch(0.0900 0.0120 248.0);
+            --sidebar-border:         oklch(0.1900 0.0160 248.0);
+            --radius:    0.5rem;
+            --radius-sm: 0.25rem;
+            --radius-md: 0.375rem;
+            --radius-lg: 0.5rem;
+            --radius-xl: 0.75rem;
+            --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.15);
+            --shadow:    0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+            --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.2), 0 2px 4px -2px hsl(0 0% 0% / 0.2);
+            --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.2), 0 4px 6px -4px hsl(0 0% 0% / 0.2);
+        }
+
+        /* ── Dark mode (true Hyperliquid feel) ──────────────────────────── */
+        /* Sampled from app.hyperliquid.xyz: bg≈#0f1117 card≈#141720 border≈#1e2230 green≈#1aad8f */
+        [data-bs-theme="dark"] {
+            --background:             oklch(0.1350 0.0140 248.0);
+            --foreground:             oklch(0.9200 0.0080 245.0);
+            --card:                   oklch(0.1750 0.0140 248.0);
+            --card-foreground:        oklch(0.9200 0.0080 245.0);
+            --primary:                oklch(0.7200 0.1600 165.0);
+            --primary-foreground:     oklch(0.0900 0.0120 248.0);
+            --muted:                  oklch(0.2200 0.0160 248.0);
+            --muted-foreground:       oklch(0.5600 0.0200 245.0);
+            --accent:                 oklch(0.2200 0.0160 248.0);
+            --accent-foreground:      oklch(0.9200 0.0080 245.0);
+            --destructive:            oklch(0.6000 0.2200 22.0);
+            --destructive-foreground: oklch(0.9900 0.0040 240.0);
+            --border:                 oklch(0.2550 0.0180 248.0);
+            --input:                  oklch(0.1750 0.0140 248.0);
+            --ring:                   oklch(0.7200 0.1600 165.0);
+            --chart-1:                oklch(0.7200 0.1600 165.0);
+            --chart-2:                oklch(0.6000 0.2200 22.0);
+            --chart-3:                oklch(0.6500 0.1400 230.0);
+            --chart-4:                oklch(0.7800 0.1500 95.0);
+            --chart-5:                oklch(0.7200 0.1600 195.0);
+            --sidebar:                oklch(0.1000 0.0130 248.0);
+            --sidebar-foreground:     oklch(0.9200 0.0080 245.0);
+            --sidebar-primary:        oklch(0.7200 0.1600 165.0);
+            --sidebar-primary-fg:     oklch(0.0900 0.0120 248.0);
+            --sidebar-border:         oklch(0.1900 0.0150 248.0);
+        }
+
+        @theme inline {
+            --color-background:             var(--background);
+            --color-foreground:             var(--foreground);
+            --color-card:                   var(--card);
+            --color-card-foreground:        var(--card-foreground);
+            --color-primary:                var(--primary);
+            --color-primary-foreground:     var(--primary-foreground);
+            --color-muted:                  var(--muted);
+            --color-muted-foreground:       var(--muted-foreground);
+            --color-accent:                 var(--accent);
+            --color-accent-foreground:      var(--accent-foreground);
+            --color-destructive:            var(--destructive);
+            --color-destructive-foreground: var(--destructive-foreground);
+            --color-border:                 var(--border);
+            --color-input:                  var(--input);
+            --color-ring:                   var(--ring);
+            --color-chart-1:                var(--chart-1);
+            --color-chart-2:                var(--chart-2);
+            --color-chart-3:                var(--chart-3);
+            --color-chart-4:                var(--chart-4);
+            --color-chart-5:                var(--chart-5);
+            --color-sidebar:                var(--sidebar);
+            --color-sidebar-foreground:     var(--sidebar-foreground);
+            --color-sidebar-primary:        var(--sidebar-primary);
+            --color-sidebar-border:         var(--sidebar-border);
+            --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
+            --font-mono: "Roboto Mono", ui-monospace, monospace;
+            --radius-sm: var(--radius-sm);
+            --radius-md: var(--radius-md);
+            --radius-lg: var(--radius-lg);
+            --radius-xl: var(--radius-xl);
+            --shadow-sm: var(--shadow-sm);
+            --shadow:    var(--shadow);
+            --shadow-md: var(--shadow-md);
+            --shadow-lg: var(--shadow-lg);
+        }
+
+        @layer base {
+            html { scroll-behavior: smooth; }
+            body { background-color: var(--background); color: var(--foreground); font-family: var(--font-sans); }
+            *, *::before, *::after { box-sizing: border-box; }
+        }
+
+        @layer components {
+
+            /* ── Buttons ─────────────────────────────────────────── */
+            .btn {
+                display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+                padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500; line-height: 1.25rem;
+                border-radius: var(--radius-sm); border: 1px solid transparent;
+                cursor: pointer; text-decoration: none; white-space: nowrap;
+                transition: opacity 0.15s, background-color 0.15s, border-color 0.15s, color 0.15s;
+                user-select: none; outline: none;
+            }
+            .btn:disabled { opacity: 0.5; pointer-events: none; }
+            .btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+            .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; border-radius: var(--radius-sm); }
+            .btn-primary  { background: var(--primary);     color: var(--primary-foreground);     border-color: var(--primary); }
+            .btn-primary:hover  { opacity: 0.9; }
+            .btn-success  { background: var(--primary);     color: var(--primary-foreground);     border-color: var(--primary); }
+            .btn-success:hover  { opacity: 0.9; }
+            .btn-danger   { background: var(--destructive); color: var(--destructive-foreground); border-color: var(--destructive); }
+            .btn-danger:hover   { opacity: 0.9; }
+            .btn-outline-secondary { background: transparent; color: var(--foreground);    border-color: var(--border); }
+            .btn-outline-secondary:hover { background: var(--accent); color: var(--accent-foreground); }
+            .btn-outline-primary  { background: transparent; color: var(--primary);    border-color: var(--primary); }
+            .btn-outline-primary:hover  { background: var(--primary); color: var(--primary-foreground); }
+            .btn-outline-success  { background: transparent; color: var(--primary);    border-color: var(--primary); }
+            .btn-outline-success:hover  { background: var(--primary); color: var(--primary-foreground); }
+            .btn-outline-danger   { background: transparent; color: var(--destructive); border-color: var(--destructive); }
+            .btn-outline-danger:hover   { background: var(--destructive); color: var(--destructive-foreground); }
+
+            /* Sidebar button overrides */
+            .app-sidebar .btn-outline-secondary { border-color: oklch(from var(--sidebar-foreground) l c h / 0.2); color: var(--sidebar-foreground); }
+            .app-sidebar .btn-outline-secondary:hover { background: oklch(from var(--sidebar-foreground) l c h / 0.1); border-color: oklch(from var(--sidebar-foreground) l c h / 0.35); }
+            .app-sidebar .btn-outline-success { border-color: oklch(from var(--sidebar-primary) l c h / 0.6); color: var(--sidebar-primary); }
+            .app-sidebar .btn-outline-success:hover { background: var(--sidebar-primary); color: var(--sidebar-primary-fg); }
+
+            /* ── Sidebar ─────────────────────────────────────────── */
+            .sidebar-link {
+                display: flex; align-items: center; gap: 0.55rem;
+                padding: 0.42rem 0.75rem; margin: 1px 0.5rem;
+                border-radius: var(--radius-sm); font-size: 0.875rem;
+                color: oklch(from var(--sidebar-foreground) l c h / 0.65);
+                text-decoration: none; transition: background 0.12s, color 0.12s;
+            }
+            .sidebar-link:hover { background: oklch(from var(--sidebar-foreground) l c h / 0.08); color: var(--sidebar-foreground); }
+            .sidebar-link.active { background: var(--sidebar-primary); color: var(--sidebar-primary-fg); font-weight: 600; }
+            .sidebar-link .bi { font-size: 1rem; width: 1.1rem; text-align: center; flex-shrink: 0; }
+
+            .bot-running-dot {
+                width: 8px; height: 8px; border-radius: 50%;
+                background: var(--primary); flex-shrink: 0;
+                animation: bot-pulse 2s ease-in-out infinite;
+            }
+
+            /* ── Cards ───────────────────────────────────────────── */
+            .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+            .card-body { padding: 1.25rem; }
+
+            /* ── Forms ───────────────────────────────────────────── */
+            .form-control {
+                display: block; width: 100%; padding: 0.375rem 0.75rem;
+                font-size: 0.875rem; line-height: 1.5; font-family: inherit;
+                color: var(--foreground); background: var(--input);
+                border: 1px solid var(--border); border-radius: var(--radius-sm);
+                transition: border-color 0.15s, box-shadow 0.15s; outline: none;
+            }
+            .form-control::placeholder { color: var(--muted-foreground); opacity: 1; }
+            .form-control:focus { border-color: var(--ring); box-shadow: 0 0 0 2px oklch(from var(--ring) l c h / 0.2); }
+            .form-control:disabled { opacity: 0.6; cursor: not-allowed; }
+            .form-control-sm { padding: 0.25rem 0.5rem; font-size: 0.8125rem; }
+            .form-label { display: block; font-size: 0.875rem; font-weight: 500; color: var(--foreground); margin-bottom: 0.25rem; }
+            .form-select {
+                display: block; width: 100%; padding: 0.375rem 2.25rem 0.375rem 0.75rem;
+                font-size: 0.875rem; line-height: 1.5; font-family: inherit;
+                color: var(--foreground); background: var(--input);
+                border: 1px solid var(--border); border-radius: var(--radius-sm);
+                appearance: none; outline: none;
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23888' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+                background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px;
+            }
+            .form-select:focus { border-color: var(--ring); box-shadow: 0 0 0 2px oklch(from var(--ring) l c h / 0.2); }
+            .form-select-sm { padding: 0.25rem 2rem 0.25rem 0.5rem; font-size: 0.8125rem; }
+            .input-group { display: flex; }
+            .input-group .form-control:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+            .input-group .form-control:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0; }
+            .input-group-text {
+                display: inline-flex; align-items: center; padding: 0.375rem 0.75rem;
+                font-size: 0.875rem; color: var(--muted-foreground); background: var(--muted);
+                border: 1px solid var(--border);
+            }
+            .input-group-text:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+            .input-group-text:last-child  { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: 0; }
+            .form-range { width: 100%; cursor: pointer; accent-color: var(--primary); }
+            .form-check { display: flex; align-items: flex-start; gap: 0.5rem; }
+            .form-check-input { width: 1rem; height: 1rem; margin-top: 0.125rem; accent-color: var(--primary); cursor: pointer; }
+            .form-check-label { font-size: 0.875rem; color: var(--foreground); cursor: pointer; }
+            .form-switch .form-check-input { width: 2rem; height: 1rem; }
+
+            /* Dark toggle */
+            #dark-toggle-input {
+                appearance: none; width: 1.8em; height: 0.9em; background: oklch(0.7 0 0);
+                border-radius: 1em; cursor: pointer; position: relative; transition: background 0.2s; vertical-align: middle;
+            }
+            #dark-toggle-input::after {
+                content: ''; position: absolute; width: 0.7em; height: 0.7em;
+                background: white; border-radius: 50%; top: 0.1em; left: 0.1em; transition: left 0.2s;
+            }
+            #dark-toggle-input:checked { background: var(--muted-foreground); }
+            #dark-toggle-input:checked::after { left: calc(100% - 0.8em); }
+
+            /* ── Badges ──────────────────────────────────────────── */
+            .badge { display: inline-flex; align-items: center; padding: 0.15rem 0.5rem; font-size: 0.72rem; font-weight: 500; border-radius: 9999px; }
+            .text-bg-success  { background: var(--primary);    color: var(--primary-foreground); }
+            .text-bg-secondary { background: var(--muted);     color: var(--muted-foreground); }
+            .text-bg-primary  { background: var(--chart-1);    color: #fff; }
+
+            /* ── Alerts ──────────────────────────────────────────── */
+            .alert { display: flex; align-items: center; gap: 0.5rem; padding: 0.625rem 0.875rem; border-radius: var(--radius-md); border: 1px solid; font-size: 0.875rem; }
+            .alert-warning  { border-color: oklch(0.75 0.15 85 / 0.4); background: oklch(0.97 0.03 85); color: oklch(0.35 0.08 75); }
+            .alert-success  { border-color: oklch(from var(--primary) l c h / 0.3); background: oklch(from var(--primary) l c h / 0.08); color: var(--foreground); }
+            .alert-danger   { border-color: oklch(from var(--destructive) l c h / 0.3); background: oklch(from var(--destructive) l c h / 0.08); color: var(--destructive); }
+            [data-bs-theme="dark"] .alert-warning { border-color: oklch(0.75 0.15 85 / 0.2); background: oklch(0.75 0.15 85 / 0.08); color: oklch(0.85 0.1 85); }
+
+            /* ── Tables ──────────────────────────────────────────── */
+            .table { width: 100%; border-collapse: collapse; }
+            .table-responsive { overflow-x: auto; }
+            .table-sm td, .table-sm th { padding: 0.25rem 0.4rem; }
+
+            /* ── Progress ────────────────────────────────────────── */
+            .progress { position: relative; height: 8px; width: 100%; overflow: hidden; border-radius: 9999px; background: var(--muted); }
+            .progress-bar { height: 100%; border-radius: 9999px; transition: width 0.3s; }
+            .bg-success { background: var(--primary) !important; }
+            .bg-danger  { background: var(--destructive) !important; }
+
+            /* ── Text helpers ────────────────────────────────────── */
+            .text-success { color: var(--primary) !important; }
+            .text-danger  { color: var(--destructive) !important; }
+            .text-muted   { color: var(--muted-foreground) !important; }
+            .text-body    { color: var(--foreground) !important; }
+            .font-monospace { font-family: var(--font-mono) !important; }
+            .text-break { overflow-wrap: break-word; word-break: break-all; }
+            .bg-body-secondary { background: var(--muted) !important; }
+
+            /* ── Bootstrap JS modal shim ─────────────────────────── */
+            .modal { display: none; position: fixed; inset: 0; z-index: 1055; overflow-x: hidden; overflow-y: auto; outline: 0; }
+            .modal.show { display: block; }
+            .modal.fade { transition: opacity 0.15s linear; opacity: 0; }
+            .modal.fade.show { opacity: 1; }
+            .modal-backdrop { position: fixed; inset: 0; z-index: 1050; background: #000; opacity: 0; transition: opacity 0.15s linear; }
+            .modal-backdrop.show { opacity: 0.5; }
+            body.modal-open { overflow: hidden; }
+            .modal-dialog { position: relative; width: auto; margin: 1.75rem auto; max-width: 500px; pointer-events: none; }
+            @media (min-width: 576px) { .modal-dialog { margin: 1.75rem auto; } }
+            .modal-dialog-centered { display: flex; align-items: center; min-height: calc(100% - 3.5rem); }
+            .modal.fade .modal-dialog { transition: transform 0.3s ease-out; transform: translateY(-50px); }
+            .modal.show .modal-dialog { transform: none; }
+            .modal-lg { max-width: 800px; }
+            .modal-xl { max-width: 1140px; }
+            .modal-dialog-scrollable { height: calc(100% - 3.5rem); }
+            .modal-dialog-scrollable .modal-content { max-height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+            .modal-dialog-scrollable .modal-body { overflow-y: auto; flex: 1 1 auto; }
+            .modal-content {
+                position: relative; display: flex; flex-direction: column; width: 100%; pointer-events: auto;
+                background: var(--card); border: 1px solid var(--border);
+                border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+            }
+            .modal-header {
+                display: flex; align-items: center; justify-content: space-between;
+                padding: 0.875rem 1rem; border-bottom: 1px solid var(--border);
+                border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            }
+            .modal-title { font-size: 1rem; font-weight: 600; color: var(--foreground); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+            .modal-body { padding: 1rem; color: var(--foreground); }
+            .modal-footer {
+                display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;
+                padding: 0.75rem 1rem; border-top: 1px solid var(--border);
+                border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+            }
+            .btn-close {
+                display: inline-flex; align-items: center; justify-content: center;
+                width: 1.5rem; height: 1.5rem; padding: 0; flex-shrink: 0;
+                background: transparent url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23888'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e") center/0.875rem no-repeat;
+                border: 0; border-radius: var(--radius-sm); opacity: 0.6; cursor: pointer; transition: opacity 0.15s;
+            }
+            .btn-close:hover { opacity: 1; }
+
+            /* ── Bootstrap tooltips ──────────────────────────────── */
+            .tooltip { position: absolute; z-index: 1080; display: block; font-size: 0.75rem; word-wrap: break-word; opacity: 0; }
+            .tooltip.show { opacity: 0.95; }
+            .tooltip-inner { max-width: 200px; padding: 0.25rem 0.6rem; text-align: center; color: #fff; background: oklch(0.18 0.01 225); border-radius: var(--radius-sm); }
+            .tooltip-arrow { position: absolute; display: block; width: 0.8rem; height: 0.4rem; }
+            .tooltip-arrow::before { position: absolute; content: ""; border-color: transparent; border-style: solid; }
+            .bs-tooltip-auto[data-popper-placement^=top] .tooltip-arrow, .bs-tooltip-top .tooltip-arrow { bottom: 0; }
+            .bs-tooltip-auto[data-popper-placement^=top] .tooltip-arrow::before, .bs-tooltip-top .tooltip-arrow::before { top: -1px; border-width: 0.4rem 0.4rem 0; border-top-color: oklch(0.18 0.01 225); }
+            .bs-tooltip-auto[data-popper-placement^=right] .tooltip-arrow, .bs-tooltip-end .tooltip-arrow { left: 0; width: 0.4rem; height: 0.8rem; }
+            .bs-tooltip-auto[data-popper-placement^=right] .tooltip-arrow::before, .bs-tooltip-end .tooltip-arrow::before { right: -1px; border-width: 0.4rem 0.4rem 0.4rem 0; border-right-color: oklch(0.18 0.01 225); }
+        }
 
         @keyframes bot-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.25; }
         }
-        .bot-running-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #28a745;
-            animation: bot-pulse 2s ease-in-out infinite;
-            flex-shrink: 0;
+        @keyframes revealChart {
+            from { clip-path: inset(0 100% 0 0); opacity: 0; }
+            to   { clip-path: inset(0 0%   0 0); opacity: 1; }
         }
-
-        .app-sidebar {
-            width: 210px;
-            flex-shrink: 0;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-            overflow-y: auto;
-        }
-
-        .sidebar-link {
-            display: flex;
-            align-items: center;
-            gap: 0.55rem;
-            padding: 0.42rem 0.75rem;
-            margin: 1px 0.5rem;
-            border-radius: 6px;
-            color: #495057;
-            text-decoration: none;
-            font-size: 0.875rem;
-            transition: background 0.12s, color 0.12s;
-        }
-
-        .sidebar-link:hover {
-            background: #f1f3f5;
-            color: #212529;
-        }
-
-        .sidebar-link.active {
-            background: #e7f1ff;
-            color: #0d6efd;
-            font-weight: 600;
-        }
-
-        .sidebar-link .bi {
-            font-size: 1rem;
-            width: 1.1rem;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        @media (max-width: 767px) {
-            .app-sidebar { display: none !important; }
-        }
-
-        /* Dark mode — sidebar */
-        [data-bs-theme="dark"] .app-sidebar {
-            background-color: var(--bs-body-bg) !important;
-            border-color: var(--bs-border-color) !important;
-        }
-        [data-bs-theme="dark"] .sidebar-link {
-            color: var(--bs-body-color);
-        }
-        [data-bs-theme="dark"] .sidebar-link:hover {
-            background: var(--bs-secondary-bg);
-            color: var(--bs-body-color);
-        }
-        [data-bs-theme="dark"] .sidebar-link.active {
-            background: rgba(13, 110, 253, 0.15);
-            color: #6ea8fe;
-        }
-        [data-bs-theme="dark"] .app-sidebar .border-top,
-        [data-bs-theme="dark"] .app-sidebar .border-bottom {
-            border-color: var(--bs-border-color) !important;
-        }
-
-        /* Dark mode — outline-secondary buttons: make them visibly active, not muted */
-        [data-bs-theme="dark"] .btn-outline-secondary {
-            color: rgba(255,255,255,0.75);
-            border-color: rgba(255,255,255,0.3);
-        }
-        [data-bs-theme="dark"] .btn-outline-secondary:hover {
-            color: #fff;
-            background-color: rgba(255,255,255,0.1);
-            border-color: rgba(255,255,255,0.55);
-        }
-
-        /* Dark mode — switch: use neutral gray instead of blue */
-        [data-bs-theme="dark"] #dark-toggle-input:checked {
-            background-color: #6c757d;
-            border-color: #6c757d;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
-        }
-
-        #dark-toggle {
-            position: fixed;
-            top: 0.1rem;
-            right: 0.75rem;
-            z-index: 1050;
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-            opacity: 0.5;
-            transition: opacity 0.15s;
-        }
-        #dark-toggle:hover { opacity: 1; }
-        #dark-toggle i { font-size: 0.65rem; color: var(--bs-body-color); }
     </style>
 
+    <!-- Apply saved theme before render to prevent flash -->
     <script>
-        // Apply saved theme before page renders to avoid flash
         (function() {
             const t = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-bs-theme', t);
         })();
     </script>
-
     <script>
-        function copyText(text) {
-            navigator.clipboard.writeText(text);
-        }
+        function copyText(text) { navigator.clipboard.writeText(text); }
     </script>
+
+    <link rel="icon" type="image/png" href="/favicon.png?v=3">
+    <link rel="shortcut icon" href="/favicon.png?v=3">
 </head>
 
-<body class="bg-body">
-<div class="d-flex" style="min-height: 100vh;">
+<body>
+<div class="flex min-h-screen">
 
     <!-- Sidebar -->
-    <aside class="app-sidebar bg-body border-end d-flex flex-column">
+    <aside class="app-sidebar w-[210px] shrink-0 sticky top-0 h-screen overflow-y-auto flex flex-col" style="background:var(--sidebar); border-right:1px solid var(--sidebar-border);">
 
         <!-- Brand -->
-        <div class="px-3 pt-3 pb-2 border-bottom">
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="fw-bold" style="font-size: 0.95rem;">Grid Bot</div>
+        <div class="px-3 pt-3 pb-2" style="border-bottom:1px solid var(--sidebar-border);">
+            <div class="flex items-center justify-between">
+                <div class="font-bold" style="font-size:0.95rem; color:var(--sidebar-foreground);">Grid Bot</div>
                 <% if (botStatus && botStatus.isRunning) { %>
                     <div class="bot-running-dot" title="Bot is running"></div>
                 <% } %>
             </div>
-            <div class="text-muted" style="font-size: 0.7rem;">Hyperliquid</div>
+            <div style="font-size:0.7rem; color:oklch(from var(--sidebar-foreground) l c h / 0.45);">Hyperliquid</div>
         </div>
 
         <!-- Nav -->
-        <nav class="flex-grow-1 py-2">
+        <nav class="flex-1 py-2">
             <a href="#section-account" class="sidebar-link" data-section="section-account">
                 <i class="bi bi-person-circle"></i> Account
             </a>
@@ -180,60 +398,112 @@
             </a>
         </nav>
 
-        <!-- Bottom: donate + clock -->
-        <div class="border-top px-3 py-3">
-            <button
-                    class="btn btn-outline-secondary btn-sm w-100 mb-2"
-                    type="button"
-                    data-bs-toggle="modal"
-                    data-bs-target="#secretsModal"
-            >
+        <!-- Bottom actions + clock -->
+        <div class="px-3 py-3 flex flex-col gap-2" style="border-top:1px solid var(--sidebar-border);">
+            <button class="btn btn-outline-secondary btn-sm w-full" type="button"
+                    data-bs-toggle="modal" data-bs-target="#secretsModal">
                 <i class="bi bi-key"></i> Set secrets
             </button>
-            <button
-                    class="btn btn-outline-secondary btn-sm w-100 mb-2"
-                    type="button"
-                    data-bs-toggle="modal"
-                    data-bs-target="#variablesModal"
-            >
+            <button class="btn btn-outline-secondary btn-sm w-full" type="button"
+                    data-bs-toggle="modal" data-bs-target="#variablesModal">
                 <i class="bi bi-sliders"></i> Configuration
             </button>
-            <button
-                    class="btn btn-outline-success btn-sm w-100 mb-2"
-                    type="button"
-                    data-bs-toggle="modal"
-                    data-bs-target="#donateModal"
-            >
+            <button class="btn btn-outline-success btn-sm w-full" type="button"
+                    data-bs-toggle="modal" data-bs-target="#donateModal">
                 Donate
             </button>
-
-            <div class="text-muted" id="sidebar-clock" style="font-size: 0.7rem;"></div>
+            <div id="sidebar-clock" style="font-size:0.7rem; color:oklch(from var(--sidebar-foreground) l c h / 0.4);"></div>
         </div>
     </aside>
 
     <!-- Main content -->
-    <main class="flex-grow-1 p-4" style="min-width: 0;">
+    <main class="flex-1 p-4 min-w-0 mt-[2px]">
         <%- include(page, { instance, config, botStatus, orders, profitSummary, portfolioOverview, rebuy, envSecretsConfigured, envWalletAddress, envPrivateKey, envTelegramBotToken, envTelegramChatId, envHealthchecksPingUrl, envHealthchecksPingIntervalMs, envBotTz, envHyperliquidTestnet }) %>
     </main>
 
 </div>
 
+<!-- Dark mode toggle -->
+<div id="dark-toggle" title="Toggle dark mode" style="position:fixed; top:0.1rem; right:0.75rem; z-index:1050; display:flex; align-items:center; gap:0.3rem; opacity:0.5; transition:opacity 0.15s;">
+    <i class="bi bi-sun-fill" style="font-size:0.65rem; color:var(--foreground);"></i>
+    <input type="checkbox" id="dark-toggle-input">
+    <i class="bi bi-moon-fill" style="font-size:0.65rem; color:var(--foreground);"></i>
+</div>
+
+<!-- Donate modal -->
+<div class="modal fade" id="donateModal" tabindex="-1" aria-labelledby="donateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="donateModalLabel">Donate</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-muted mb-3">Send crypto to support BotGrid.</p>
+
+                <div class="mb-3">
+                    <div class="font-semibold mb-1">Bitcoin (BTC)</div>
+                    <div class="font-monospace text-sm text-break">bc1qz54alkzd3vtr9zgk3l76mqneecelvxsvtc9w27</div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+                            onclick="copyText('bc1qz54alkzd3vtr9zgk3l76mqneecelvxsvtc9w27')">
+                        Copy BTC address
+                    </button>
+                </div>
+
+                <div class="mb-3">
+                    <div class="font-semibold mb-1">EVM (0x)</div>
+                    <div class="font-monospace text-sm text-break">0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207</div>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="copyText('0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207')">
+                            Copy EVM address
+                        </button>
+                        <a class="btn btn-outline-success btn-sm"
+                           href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@1"
+                           target="_blank" rel="noopener noreferrer">MetaMask (ETH)</a>
+                        <a class="btn btn-outline-success btn-sm"
+                           href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@42161"
+                           target="_blank" rel="noopener noreferrer">MetaMask (ARB)</a>
+                        <a class="btn btn-outline-success btn-sm"
+                           href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@8453"
+                           target="_blank" rel="noopener noreferrer">MetaMask (BASE)</a>
+                    </div>
+                    <p class="text-muted text-xs mt-2">Tip: pick the same network you're sending on (ETH / ARB / BASE).</p>
+                </div>
+
+                <div>
+                    <div class="font-semibold mb-1">Solana (SOL)</div>
+                    <div class="font-monospace text-sm text-break">BejrknxAdRp3KscAwpRUHVHG3sKUah6eSyPmFTJpwo1s</div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
+                            onclick="copyText('BejrknxAdRp3KscAwpRUHVHG3sKUah6eSyPmFTJpwo1s')">
+                        Copy SOL address
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    // Dark mode toggle
     document.addEventListener('DOMContentLoaded', () => {
         const darkInput = document.getElementById('dark-toggle-input');
 
         function applyTheme(theme) {
             document.documentElement.setAttribute('data-bs-theme', theme);
             localStorage.setItem('theme', theme);
-            darkInput.checked = theme === 'dark';
+            if (darkInput) darkInput.checked = (theme === 'dark');
         }
 
         applyTheme(localStorage.getItem('theme') || 'light');
 
-        darkInput.addEventListener('change', () => {
-            applyTheme(darkInput.checked ? 'dark' : 'light');
-        });
+        if (darkInput) {
+            darkInput.addEventListener('change', () => {
+                applyTheme(darkInput.checked ? 'dark' : 'light');
+            });
+        }
+
+        document.getElementById('dark-toggle').addEventListener('mouseenter', function() { this.style.opacity = '1'; });
+        document.getElementById('dark-toggle').addEventListener('mouseleave', function() { this.style.opacity = '0.5'; });
     });
 
     // Live clock
@@ -244,7 +514,7 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    // Scroll-spy via IntersectionObserver
+    // Scroll-spy
     const sectionIds = ['section-account', 'section-config', 'section-profits', 'section-orders', 'section-market'];
 
     function setActiveNav(id) {
@@ -264,7 +534,6 @@
         if (el) observer.observe(el);
     });
 
-    // Click → smooth scroll + instant active
     document.querySelectorAll('.sidebar-link').forEach(link => {
         link.addEventListener('click', e => {
             e.preventDefault();
@@ -283,78 +552,11 @@
             el._bsTooltip = new bootstrap.Tooltip(el);
         });
     }
-
     document.addEventListener('DOMContentLoaded', () => initTooltips());
     document.body.addEventListener('htmx:afterSwap', (e) => { initTooltips(e.target); });
     document.body.addEventListener('shown.bs.modal', (e) => { initTooltips(e.target); });
 </script>
 <script src="/js/grid-ui.js"></script>
 <script src="/js/trade-order.js"></script>
-
-<!-- Dark mode toggle -->
-<div id="dark-toggle" title="Toggle dark mode">
-    <i class="bi bi-sun-fill"></i>
-    <div class="form-check form-switch mb-0">
-        <input class="form-check-input" type="checkbox" id="dark-toggle-input" style="cursor:pointer; width:1.8em; height:0.9em;">
-    </div>
-    <i class="bi bi-moon-fill"></i>
-</div>
-
-<!-- Donate modal -->
-<div class="modal fade" id="donateModal" tabindex="-1" aria-labelledby="donateModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="donateModalLabel">Donate</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="small text-muted mb-3">Send crypto to support BotGrid.</div>
-
-                <!-- BTC -->
-                <div class="mb-3">
-                    <div class="fw-semibold">Bitcoin (BTC)</div>
-                    <div class="font-monospace small text-break">bc1qz54alkzd3vtr9zgk3l76mqneecelvxsvtc9w27</div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
-                            onclick="copyText('bc1qz54alkzd3vtr9zgk3l76mqneecelvxsvtc9w27')">
-                        Copy BTC address
-                    </button>
-                </div>
-
-                <!-- EVM -->
-                <div class="mb-3">
-                    <div class="fw-semibold">EVM (0x)</div>
-                    <div class="font-monospace small text-break">0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207</div>
-                    <div class="d-flex flex-wrap gap-2 mt-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                                onclick="copyText('0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207')">
-                            Copy EVM address
-                        </button>
-                        <a class="btn btn-outline-success btn-sm"
-                           href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@1"
-                           target="_blank" rel="noopener noreferrer">MetaMask (ETH)</a>
-                        <a class="btn btn-outline-success btn-sm"
-                           href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@42161"
-                           target="_blank" rel="noopener noreferrer">MetaMask (ARB)</a>
-                        <a class="btn btn-outline-success btn-sm"
-                           href="https://metamask.app.link/send/0x28A5577ff62F56A2Ea1Ed96c78c0015a88a66207@8453"
-                           target="_blank" rel="noopener noreferrer">MetaMask (BASE)</a>
-                    </div>
-                    <div class="text-muted small mt-2">Tip: pick the same network you're sending on (ETH / ARB / BASE).</div>
-                </div>
-
-                <!-- Solana -->
-                <div>
-                    <div class="fw-semibold">Solana (SOL)</div>
-                    <div class="font-monospace small text-break">BejrknxAdRp3KscAwpRUHVHG3sKUah6eSyPmFTJpwo1s</div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm mt-2"
-                            onclick="copyText('BejrknxAdRp3KscAwpRUHVHG3sKUah6eSyPmFTJpwo1s')">
-                        Copy SOL address
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 </body>
 </html>

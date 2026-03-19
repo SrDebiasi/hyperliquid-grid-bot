@@ -25,16 +25,34 @@ if (!window.__marketSingletonLoaded) {
 
             if (chart && series) return true;
 
+            // LightweightCharts does not support oklch() colors, so we convert
+            // CSS custom properties to rgb() via Canvas2D (which handles oklch natively).
             const isDark = document.documentElement.getAttribute("data-bs-theme") === "dark";
+            function resolveColor(varName, fallback) {
+                try {
+                    const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+                    if (!raw) return fallback;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvas.height = 1;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = raw;
+                    ctx.fillRect(0, 0, 1, 1);
+                    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                    return `rgb(${r}, ${g}, ${b})`;
+                } catch (_) { return fallback; }
+            }
+            const bgColor   = resolveColor('--card',             isDark ? '#181d26' : '#fcfcfe');
+            const textColor = resolveColor('--muted-foreground', isDark ? '#6a7585' : '#5a6475');
+            const borderClr = resolveColor('--border',           isDark ? '#262e3e' : '#d8dce8');
 
             chart = LC.createChart(container, {
                 height: 340,
                 layout: {
-                    background: { color: isDark ? "#212529" : "#ffffff" },
-                    textColor: isDark ? "#adb5bd" : "#495057",
+                    background: { color: bgColor },
+                    textColor,
                 },
                 rightPriceScale: { borderVisible: false },
-                timeScale: { borderVisible: false, borderColor: isDark ? "#373b3e" : "#e9ecef" },
+                timeScale: { borderVisible: false, borderColor: borderClr },
                 grid: { vertLines: { visible: false }, horzLines: { visible: false } },
             });
 

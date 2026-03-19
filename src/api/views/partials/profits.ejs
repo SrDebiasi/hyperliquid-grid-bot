@@ -3,17 +3,6 @@
     from { clip-path: inset(0 100% 0 0); opacity: 0; }
     to   { clip-path: inset(0 0%   0 0); opacity: 1; }
 }
-.mtd-row { padding: 2px 4px; border-radius: 4px; transition: background 0.1s; }
-.mtd-row:hover { background: var(--bs-secondary-bg); }
-.mtd-row.zero { opacity: 0.38; }
-.progress { border-radius: 6px !important; }
-.progress-bar { border-radius: 6px !important; }
-.profit-card { border-left: 3px solid #dee2e6; }
-.profit-card-success { border-left-color: #198754 !important; }
-.profit-card-danger  { border-left-color: #dc3545 !important; }
-.profit-card-neutral { border-left-color: #adb5bd !important; }
-.period-card { transition: box-shadow 0.15s; }
-.period-card:hover { box-shadow: 0 0 0 1px var(--bs-border-color); }
 </style>
 
 <% if (profitSummary) { %>
@@ -25,6 +14,12 @@
                 }
                 function pct(v) { return n(v, 0).toFixed(2); }
                 function fmtUsd(x) { return '$' + n(Number(x), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+                function badge(val, isUp) {
+                    const color = isUp ? 'var(--primary)' : 'var(--destructive)';
+                    const icon  = isUp ? 'bi-arrow-up-right' : 'bi-arrow-down-right';
+                    const sign  = isUp ? '+' : '';
+                    return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:9999px;font-size:0.72rem;font-weight:600;background:color-mix(in oklch,${color} 14%,transparent);color:${color};"><i class="bi ${icon}" style="font-size:0.68rem;"></i>${sign}${val}</span>`;
+                }
                 function fmtDate(str) {
                     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
                     const p = String(str).split('-');
@@ -42,15 +37,15 @@
             %>
 
             <!-- Header -->
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <h2 class="h5 mb-0">Profits</h2>
+            <div class="flex justify-between items-start mb-3">
+                <h2 class="text-xl font-semibold mb-0">Profits</h2>
                 <% if (rebuy) { %>
-                    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <div class="flex items-center gap-2 flex-wrap justify-end">
                         <span class="badge <%= rebuy.active ? 'text-bg-success' : 'text-bg-secondary' %>">
                             Rebuy <%= rebuy.active ? 'Active' : 'Off' %>
                         </span>
-                        <span class="text-muted small">
-                            <%= Number(rebuy.reboughtCoin||0).toFixed(5) %> <%= rebuy.name %>
+                        <span class="text-muted text-sm">
+                            <%= Number(rebuy.reboughtCoin||0).toFixed(5) %> <%= rebuy.asset %>
                             · paid <%= fmtUsd(rebuy.reboughtValueUsd) %> → worth <%= fmtUsd(rebuy.currentValueUsd) %>
                             · avg <%= fmtUsd(rebuy.avgPriceUsd) %> · price <%= fmtUsd(rebuy.currentPrice) %>
                         </span>
@@ -60,48 +55,49 @@
 
             <!-- Portfolio cards -->
             <% if (portfolioOverview) { %>
-                <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
-                            <div class="text-muted small mb-1">Entry value</div>
-                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.valueAtEntry) %></div>
-                            <div class="text-muted small">avg <%= portfolioOverview.symbol %> <%= fmtUsd(portfolioOverview.avgEntryPrice) %></div>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-4">
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid var(--muted-foreground);">
+                        <div class="text-muted text-sm mb-1">Entry value</div>
+                        <div class="text-xl font-semibold mb-1"><%= fmtUsd(portfolioOverview.valueAtEntry) %></div>
+                        <div class="text-muted text-sm">avg <%= portfolioOverview.symbol %> <%= fmtUsd(portfolioOverview.avgEntryPrice) %></div>
                     </div>
 
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <% const currentDelta = portfolioOverview.valueAtCurrent - portfolioOverview.valueAtEntry; %>
-                        <div class="border rounded p-3 h-100 profit-card <%= currentDelta >= 0 ? 'profit-card-success' : 'profit-card-danger' %>">
-                            <div class="text-muted small mb-1">Current value</div>
-                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.valueAtCurrent) %></div>
-                            <div class="text-muted small"><%= portfolioOverview.symbol %> today <%= fmtUsd(portfolioOverview.currentPrice) %></div>
+                    <%
+                        const currentDelta = portfolioOverview.valueAtCurrent - portfolioOverview.valueAtEntry;
+                        const currentIsPos = currentDelta >= 0;
+                        const currentBorderColor = currentIsPos ? 'var(--primary)' : 'var(--destructive)';
+                        const currentDeltaPct = portfolioOverview.valueAtEntry > 0 ? (currentDelta / portfolioOverview.valueAtEntry * 100) : 0;
+                    %>
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid <%= currentBorderColor %>;">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="text-muted text-sm">Current value</div>
+                            <%- badge(pct(currentDeltaPct) + '%', currentIsPos) %>
                         </div>
+                        <div class="text-xl font-semibold mb-1"><%= fmtUsd(portfolioOverview.valueAtCurrent) %></div>
+                        <div class="text-muted text-sm"><%= portfolioOverview.symbol %> today <%= fmtUsd(portfolioOverview.currentPrice) %></div>
                     </div>
 
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <div class="border rounded p-3 h-100 profit-card profit-card-success">
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <div class="text-muted small">Realized profit</div>
-                                <div class="small fw-semibold text-success">+<%= pct(t.allTime.pnlPercent) %>%</div>
-                            </div>
-                            <div class="fs-5 fw-semibold text-success"><%= fmtUsd(portfolioOverview.realizedProfit) %></div>
-                            <div class="text-muted small"><%= n(t.allTime.trades, 0).toLocaleString() %> trades</div>
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid var(--primary);">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="text-muted text-sm">Realized profit</div>
+                            <%- badge(pct(t.allTime.pnlPercent) + '%', true) %>
                         </div>
+                        <div class="text-xl font-semibold text-success mb-1"><%= fmtUsd(portfolioOverview.realizedProfit) %></div>
+                        <div class="text-muted text-sm"><%= n(t.allTime.trades, 0).toLocaleString() %> trades</div>
                     </div>
 
-                    <div class="col-12 col-md-6 col-xl-3">
-                        <% const isPos = portfolioOverview.portfolioDeltaPercent >= 0; %>
-                        <div class="border rounded p-3 h-100 profit-card <%= isPos ? 'profit-card-success' : 'profit-card-danger' %>">
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <div class="text-muted small">Portfolio today</div>
-                                <div class="small fw-semibold <%= isPos ? 'text-success' : 'text-danger' %>">
-                                    <%= isPos ? '+' : '' %><%= pct(portfolioOverview.portfolioDeltaPercent) %>%
-                                </div>
-                            </div>
-                            <div class="fs-5 fw-semibold"><%= fmtUsd(portfolioOverview.currentPortfolio) %></div>
-                            <div class="small <%= isPos ? 'text-success' : 'text-danger' %>">
-                                <%= portfolioOverview.portfolioDeltaUsd >= 0 ? '+' : '' %><%= fmtUsd(portfolioOverview.portfolioDeltaUsd) %> vs entry
-                            </div>
+                    <%
+                        const isPos = portfolioOverview.portfolioDeltaPercent >= 0;
+                        const portfolioBorderColor = isPos ? 'var(--primary)' : 'var(--destructive)';
+                    %>
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid <%= portfolioBorderColor %>;">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="text-muted text-sm">Portfolio</div>
+                            <%- badge(pct(portfolioOverview.portfolioDeltaPercent) + '%', isPos) %>
+                        </div>
+                        <div class="text-xl font-semibold mb-1"><%= fmtUsd(portfolioOverview.currentPortfolio) %></div>
+                        <div class="text-sm <%= isPos ? 'text-success' : 'text-danger' %>">
+                            <%= portfolioOverview.portfolioDeltaUsd >= 0 ? '+' : '' %><%= fmtUsd(portfolioOverview.portfolioDeltaUsd) %> vs entry
                         </div>
                     </div>
                 </div>
@@ -137,7 +133,7 @@
             %>
 
             <!-- Period widgets -->
-            <div class="row g-3">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <% [
                     { label: 'Today', data: t.today },
                     { label: 'Week',  data: t.week,  estimate: estWeek },
@@ -147,26 +143,23 @@
                     const isPos  = n(data.totalUsd, 0) > 0;
                     const isNeg  = n(data.totalUsd, 0) < 0;
                     const hasPct = n(data.pnlPercent, 0) !== 0;
+                    const periodBorderColor = isPos ? 'var(--primary)' : isNeg ? 'var(--destructive)' : 'var(--muted-foreground)';
                 %>
-                <div class="col-12 col-md-4 col-xl">
-                    <div class="border rounded p-3 h-100 period-card profit-card <%= isPos ? 'profit-card-success' : isNeg ? 'profit-card-danger' : 'profit-card-neutral' %>">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-muted small"><%= label %></div>
-                            <% if (hasPct) { %>
-                                <div class="small fw-semibold <%= isPos ? 'text-success' : 'text-danger' %>">
-                                    <%= isPos ? '+' : '' %><%= pct(data.pnlPercent) %>%
-                                </div>
-                            <% } %>
-                        </div>
-                        <div class="fs-5 fw-semibold <%= isPos ? 'text-success' : isNeg ? 'text-danger' : '' %>">
-                            <%= fmtUsd(data.totalUsd) %>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-end">
-                            <div class="text-muted small"><%= n(data.trades,0) %> trades · <%= n(data.cycles,0) %> cycles</div>
-                            <% if (estimate != null) { %>
-                                <div class="text-muted small">est. <%= fmtUsd(estimate) %></div>
-                            <% } %>
-                        </div>
+                <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid <%= periodBorderColor %>; transition: box-shadow 0.15s;">
+                    <div class="flex justify-between items-start mb-1">
+                        <div class="text-muted text-sm"><%= label %></div>
+                        <% if (hasPct) { %>
+                            <%- badge(pct(data.pnlPercent) + '%', isPos) %>
+                        <% } %>
+                    </div>
+                    <div class="text-xl font-semibold mb-1 <%= isPos ? 'text-success' : isNeg ? 'text-danger' : '' %>">
+                        <%= fmtUsd(data.totalUsd) %>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <div class="text-muted text-sm"><%= n(data.trades,0) %> trades · <%= n(data.cycles,0) %> cycles</div>
+                        <% if (estimate != null) { %>
+                            <div class="text-muted text-sm">est. <%= fmtUsd(estimate) %></div>
+                        <% } %>
                     </div>
                 </div>
                 <% }) %>
@@ -174,53 +167,55 @@
 
             <hr class="my-4" />
 
-            <div class="row g-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
                 <!-- Left: MTD bar list -->
-                <div class="col-12 col-lg-6">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="fw-semibold">Daily profit <span class="text-muted fw-normal small">(MTD)</span></div>
-                        <div class="text-muted small">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="font-semibold">Daily profit <span class="text-muted font-normal text-sm">(MTD)</span></div>
+                        <div class="text-muted text-sm">
                             <%= fmtUsd(daily.totalUsd) %> · <%= n(daily.trades,0) %> trades · <%= n(daily.cycles,0) %> cycles
                         </div>
                     </div>
 
-                    <div class="vstack gap-0">
+                    <div class="flex flex-col gap-0">
                         <% days.forEach(d => {
                             const v      = Number(d.totalUsd || 0);
                             const pctBar = Math.round((Math.abs(v) / maxAbs) * 100);
                             const isNeg  = v < 0;
                             const isZero = v === 0;
                         %>
-                        <div class="d-flex align-items-center gap-0 small mtd-row <%= isZero ? 'zero' : '' %>">
-                            <div style="width:52px" class="text-muted"><%= fmtDate(d.date) %></div>
+                        <div class="flex items-center gap-0 text-sm" style="padding: 2px 4px; border-radius: 4px; transition: background 0.1s;<%= isZero ? ' opacity: 0.38;' : '' %>" onmouseover="this.style.background='var(--muted)'" onmouseout="this.style.background=''">
+                            <div style="width:52px; margin-right:3px;" class="text-muted whitespace-nowrap"><%= fmtDate(d.date) %></div>
 
-                            <div class="progress flex-grow-1" style="height:8px; background:var(--bs-secondary-bg);">
+                            <div class="progress grow" style="height:8px; background:var(--muted);">
                                 <div class="progress-bar <%= isNeg ? 'bg-danger' : 'bg-success' %>"
                                      role="progressbar"
                                      style="width:<%= pctBar %>%">
                                 </div>
                             </div>
 
-                            <div style="width:90px" class="text-end fw-semibold <%= isNeg ? 'text-danger' : isZero ? 'text-muted' : 'text-success' %>">
+                            <div style="width:90px" class="text-right font-semibold <%= isNeg ? 'text-danger' : isZero ? 'text-muted' : 'text-success' %>">
                                 <%= fmtUsd(v) %>
                             </div>
-                            <div style="width:70px" class="text-end text-muted"><%= n(d.trades,0) %></div>
-                            <div style="width:70px" class="text-end text-muted"><%= n(d.cycles,0) %></div>
+                            <div style="width:70px" class="text-right text-muted"><%= n(d.trades,0) %></div>
+                            <div style="width:70px" class="text-right text-muted"><%= n(d.cycles,0) %></div>
                         </div>
                         <% }) %>
                     </div>
                 </div>
 
                 <!-- Right: all-time chart -->
-                <div class="col-12 col-lg-6 d-flex flex-column">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="fw-semibold" id="allTimeChartTitle">Overtime profit <span class="text-muted fw-normal small">(all-time)</span></div>
-                        <div class="d-flex align-items-center gap-2">
-                            <div class="text-muted small"><%= allTimeDays.length %> days</div>
-                            <div class="btn-group btn-group-sm" role="group" id="allTimeChartToggle">
-                                <button type="button" class="btn btn-outline-secondary" data-chart-mode="daily">Daily</button>
-                                <button type="button" class="btn btn-outline-secondary active" data-chart-mode="overtime">Overtime</button>
+                <div class="flex flex-col">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="font-semibold" id="allTimeChartTitle">Overtime profit <span class="text-muted font-normal text-sm">(all-time)</span></div>
+                        <div class="flex items-center gap-3">
+                            <div class="text-muted text-sm"><%= allTimeDays.length %> days</div>
+                            <div id="allTimeChartToggle" style="display:inline-flex; gap:4px; background:var(--muted); border-radius:9999px; padding:3px;">
+                                <button type="button" data-chart-mode="daily"
+                                    style="border:none; border-radius:9999px; padding:3px 14px; font-size:0.8rem; font-weight:500; cursor:pointer; transition:all 0.15s; background:transparent; color:var(--muted-foreground);">Daily</button>
+                                <button type="button" data-chart-mode="overtime"
+                                    style="border:none; border-radius:9999px; padding:3px 14px; font-size:0.8rem; font-weight:500; cursor:pointer; transition:all 0.15s; background:var(--card); color:var(--foreground); box-shadow:var(--shadow-sm);">Overtime</button>
                             </div>
                         </div>
                     </div>
@@ -246,20 +241,23 @@
                 let running = 0;
                 for (const v of dailyValues) { running += v; overtimeValues.push(running); }
 
-                const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
-                const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
+                const cs = getComputedStyle(document.documentElement);
+                const primaryColor  = cs.getPropertyValue('--primary').trim();
+                const mutedFgColor  = cs.getPropertyValue('--muted-foreground').trim();
+                const borderColor   = cs.getPropertyValue('--border').trim();
+                const cardBgColor   = cs.getPropertyValue('--card').trim();
 
                 function makeGrad() {
                     const ctx = canvas.getContext('2d');
                     const grad = ctx.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight || 300);
-                    grad.addColorStop(0, 'rgba(25,135,84,0.25)');
-                    grad.addColorStop(1, 'rgba(25,135,84,0)');
+                    grad.addColorStop(0, 'oklch(0.6174 0.1381 160.7161 / 0.25)');
+                    grad.addColorStop(1, 'oklch(0.6174 0.1381 160.7161 / 0)');
                     return grad;
                 }
 
                 const titleLabels = {
-                    daily:    'Daily profit <span class="text-muted fw-normal small">(all-time)</span>',
-                    overtime: 'Overtime profit <span class="text-muted fw-normal small">(all-time)</span>',
+                    daily:    'Daily profit <span class="text-muted font-normal text-sm">(all-time)</span>',
+                    overtime: 'Overtime profit <span class="text-muted font-normal text-sm">(all-time)</span>',
                 };
 
                 const STORAGE_KEY = 'allTimeChartMode';
@@ -272,13 +270,13 @@
                         labels,
                         datasets: [{
                             data: initData,
-                            borderColor: '#198754',
+                            borderColor: primaryColor,
                             borderWidth: 2,
                             tension: 0.4,
                             pointRadius: 0,
                             pointHoverRadius: 5,
-                            pointHoverBackgroundColor: '#198754',
-                            pointHoverBorderColor: '#fff',
+                            pointHoverBackgroundColor: primaryColor,
+                            pointHoverBorderColor: cardBgColor,
                             pointHoverBorderWidth: 2,
                             fill: true,
                             backgroundColor: makeGrad(),
@@ -292,9 +290,9 @@
                         plugins: {
                             legend: { display: false },
                             tooltip: {
-                                backgroundColor: '#212529',
-                                titleColor: '#adb5bd',
-                                bodyColor: '#fff',
+                                backgroundColor: cardBgColor,
+                                titleColor: mutedFgColor,
+                                bodyColor: cs.getPropertyValue('--card-foreground').trim(),
                                 padding: 10,
                                 cornerRadius: 6,
                                 callbacks: {
@@ -306,10 +304,10 @@
                         scales: {
                             x: { display: false },
                             y: {
-                                grid: { color: gridColor },
+                                grid: { color: borderColor },
                                 border: { display: false },
                                 ticks: {
-                                    color: '#adb5bd',
+                                    color: mutedFgColor,
                                     font: { size: 11 },
                                     callback: (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }),
                                 },
@@ -324,9 +322,12 @@
                 const toggleGroup = document.getElementById('allTimeChartToggle');
                 const titleEl = document.getElementById('allTimeChartTitle');
                 function applyMode(mode) {
-                    toggleGroup.querySelectorAll('button').forEach(b =>
-                        b.classList.toggle('active', b.dataset.chartMode === mode)
-                    );
+                    toggleGroup.querySelectorAll('button').forEach(b => {
+                        const isActive = b.dataset.chartMode === mode;
+                        b.style.background = isActive ? 'var(--card)' : 'transparent';
+                        b.style.color      = isActive ? 'var(--foreground)' : 'var(--muted-foreground)';
+                        b.style.boxShadow  = isActive ? 'var(--shadow-sm)' : 'none';
+                    });
                     if (titleEl) titleEl.innerHTML = titleLabels[mode] || titleLabels.overtime;
                     const chart = canvas._chartInstance;
                     if (!chart) return;

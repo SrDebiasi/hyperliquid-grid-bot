@@ -325,7 +325,7 @@ function getQuoteBalance() {
 // We map the most common ones explicitly (BTC/ETH/SOL), otherwise we fallback to `U${symbol}`.
 // If nothing matches, we also try the raw symbol as-is.
 function getBaseBalance(instance) {
-  const a = String(instance?.name ?? '').trim().toUpperCase();
+  const a = String(instance?.asset ?? instance?.name ?? '').trim().toUpperCase();
   if (!a) return null;
 
   const b = (a === 'BTC' ? 'UBTC' : a === 'ETH' ? 'UETH' : a === 'SOL' ? 'USOL' : `U${a}`);
@@ -1558,7 +1558,7 @@ async function handleRebuyFromProfit(coinIndex, profitValue) {
     instance.rebought_value = updatedReboughtValue;
     instance.rebought_coin = updatedReboughtCoin;
 
-    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${instance.name} at ${iocPrice}`;
+    let rebuyMsg = `Rebuy profit triggered: $${amountToBuyQuote.toFixed(2)} -> ${qtyToBuy.toFixed(qtyDecimals)} ${instance.asset ?? instance.name} at ${iocPrice}`;
     consoleLog(rebuyMsg);
     void notifyTelegram(rebuyMsg);
 

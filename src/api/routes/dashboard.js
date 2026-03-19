@@ -53,7 +53,7 @@ async function loadDashboardData({ models, instanceId = null }) {
                 currentPrice,
                 currentValueUsd,
                 avgPriceUsd,
-                name: config.name,
+                asset: config.asset ?? config.name,
             };
 
             const getOrderEntryValue = (order) => {
@@ -151,7 +151,7 @@ async function loadDashboardData({ models, instanceId = null }) {
 
 
             portfolioOverview = {
-                symbol: config.name,
+                symbol: config.asset ?? config.name,
                 avgEntryPrice,
                 currentPrice,
                 valueAtEntry,

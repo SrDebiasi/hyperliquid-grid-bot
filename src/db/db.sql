@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS message (
 CREATE TABLE IF NOT EXISTS trade_instance (
   id              integer PRIMARY KEY,
   name            varchar(255),
+  asset           varchar(255),
   wallet_address  varchar(255),
   private_key     varchar(255),
   mail_to         varchar(255),

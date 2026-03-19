@@ -1,23 +1,18 @@
-<div class="d-flex justify-content-between align-items-center mb-2">
-    <div class="fw-semibold">Logs: <%= logs.name %> (last <%= lines %> lines)</div>
-    <div class="text-muted small">out + err</div>
+<div class="flex justify-between items-center mb-2">
+    <div class="font-semibold">Logs: <%= logs.name %> (last <%= lines %> lines)</div>
+    <div class="text-muted text-sm">out + err</div>
 </div>
 
 <% if (logs.err?.length) { %>
     <div class="mb-2">
-        <div class="text-danger fw-semibold small mb-1">stderr</div>
-        <pre class="border rounded p-2 small mb-0 bg-body-secondary"
+        <div class="text-danger font-semibold text-sm mb-1">stderr</div>
+        <pre class="border border-border rounded-md p-2 text-sm mb-0 bg-body-secondary"
              style="max-height: 260px; overflow:auto; white-space: pre-wrap; word-break: break-word;"><%= logs.err.join('\n') %></pre>
     </div>
 <% } %>
 
 <div>
-    <div class="fw-semibold small mb-1">stdout</div>
-    <pre class="border rounded p-2 small mb-0 bg-body-secondary"
+    <div class="font-semibold text-sm mb-1">stdout</div>
+    <pre class="border border-border rounded-md p-2 text-sm mb-0 bg-body-secondary"
          style="max-height: 260px; overflow:auto; white-space: pre-wrap; word-break: break-word;"><%= logs.out.join('\n') %></pre>
 </div>
-
-
-
-
-

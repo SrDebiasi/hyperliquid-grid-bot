@@ -3,33 +3,17 @@
 <% const secretsConfigured = !!instance?.private_key; %>
 <% const secretsReady = secretsConfigured || !!envSecretsConfigured; %>
 
-<style>
-/* Force compact action buttons on normal/desktop so they don't stay full-width */
-@media (min-width: 576px) {
-    .trade-instance .trade-instance-actions {
-        width: 100px !important;
-        max-width: 100px;
-        min-width: 100px;
-    }
-    .trade-instance .trade-instance-actions form,
-    .trade-instance .trade-instance-actions .trade-instance-action-item {
-        width: 100% !important;
-        max-width: 100%;
-    }
-}
-</style>
-
-<div class="trade-instance d-flex flex-column flex-md-row flex-md-wrap align-items-stretch align-items-md-start justify-content-md-between gap-3">
+<div class="flex flex-col md:flex-row flex-wrap items-stretch md:items-start justify-between gap-3">
 
     <!-- Account block: stacks first on mobile -->
-    <div class="trade-instance-account flex-grow-1 flex-md-grow-0 order-1 order-md-1">
-        <div class="d-flex flex-wrap gap-2 align-items-baseline mb-2">
-            <span class="fw-semibold">Account</span>
-            <span class="text-muted me-1">#<%= instance?.id ?? '-' %></span>
+    <div class="grow md:grow-0 order-1">
+        <div class="flex flex-wrap gap-2 items-baseline mb-2">
+            <span class="font-semibold">Account</span>
+            <span class="text-muted mr-1">#<%= instance?.id ?? '-' %></span>
         </div>
 
-        <div class="trade-instance-fields mt-2">
-            <div class="d-flex align-items-center gap-2">
+        <div class="mt-2">
+            <div class="flex items-center gap-2">
                 <span class="text-muted" style="min-width: 4.5rem;">Name</span>
                 <span><%= instance?.name ?? '-' %></span>
                 <% if (hasInstance) { %>
@@ -42,39 +26,39 @@
     </div>
 
     <!-- Bot status -->
-    <div class="trade-instance-status flex-grow-1 flex-md-grow-0 order-2 order-md-2">
-        <div class="d-flex align-items-center gap-2">
-            <span class="fw-semibold">Bot status</span>
+    <div class="grow md:grow-0 order-2">
+        <div class="flex items-center gap-2">
+            <span class="font-semibold">Bot status</span>
             <span class="badge <%= isRunning ? 'text-bg-success' : 'text-bg-secondary' %>">
                 <%= isRunning ? 'Running' : 'Stopped' %>
             </span>
         </div>
-        <p class="text-muted small mt-1 mb-0">
+        <p class="text-muted text-sm mt-1 mb-0">
             Controls the trading process for this instance.
         </p>
     </div>
 
-    <!-- Actions: full-width only on small mobile; compact from sm up -->
-    <div class="trade-instance-actions d-flex flex-column gap-2 order-3 order-md-3 w-100 w-sm-auto align-items-stretch align-items-sm-end">
+    <!-- Actions -->
+    <div class="flex flex-col gap-2 order-3 w-full md:w-auto items-stretch md:items-end" style="min-width: 100px;">
         <% if (hasInstance) { %>
             <% if (isRunning) { %>
-                <form method="POST" action="/dashboard/instances/<%= instance.id %>/stop" class="m-0 w-100 w-sm-auto" style="min-width: 100px;">
-                    <button type="submit" class="btn btn-outline-danger btn-sm w-100 w-sm-auto" style="min-width: 100px;" onclick="return confirm('Stop the bot for this instance?');">
+                <form method="POST" action="/dashboard/instances/<%= instance.id %>/stop" class="m-0" style="min-width: 100px;">
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-full" style="min-width: 100px;" onclick="return confirm('Stop the bot for this instance?');">
                         Stop bot
                     </button>
                 </form>
             <% } else { %>
-                <form method="POST" action="/dashboard/instances/<%= instance.id %>/start" class="m-0 w-100 w-sm-auto" style="min-width: 100px;">
-                    <button type="submit" class="btn btn-success btn-sm w-100 w-sm-auto" style="min-width: 100px;">
+                <form method="POST" action="/dashboard/instances/<%= instance.id %>/start" class="m-0" style="min-width: 100px;">
+                    <button type="submit" class="btn btn-success btn-sm w-full" style="min-width: 100px;">
                         Start bot
                     </button>
                 </form>
             <% } %>
 
-            <div class="trade-instance-action-item w-100 w-sm-auto align-self-sm-end" style="min-width: 100px;">
+            <div style="min-width: 100px;">
                 <button
                     type="button"
-                    class="btn btn-outline-secondary btn-sm w-100"
+                    class="btn btn-outline-secondary btn-sm w-full"
                     style="min-width: 100px;"
                     hx-get="/dashboard/instances/<%= instance.id %>/logs?lines=100"
                     hx-target="#pm2LogsBody"
@@ -96,7 +80,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="pm2LogsBody">
-                    <div class="text-muted small">Loading…</div>
+                    <div class="text-muted text-sm">Loading…</div>
                 </div>
             </div>
         </div>

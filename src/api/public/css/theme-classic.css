@@ -1,0 +1,63 @@
+/*
+ * Theme: Classic (tweakcn warm parchment / dark steel)
+ * Backup of the original theme. To restore, copy the :root and [data-bs-theme="dark"]
+ * blocks back into the <style type="text/tailwindcss"> block in layout.ejs.
+ */
+
+/* ── Light mode ──────────────────────────────────── */
+:root {
+    --background:             oklch(0.9883 0.0029 84.5588);
+    --foreground:             oklch(0.2423 0.0204 223.8689);
+    --card:                   oklch(0.9543 0.0097 72.6608);
+    --card-foreground:        oklch(0.2423 0.0204 223.8689);
+    --primary:                oklch(0.6174 0.1381 160.7161);
+    --primary-foreground:     oklch(0.9543 0.0097 72.6608);
+    --muted:                  oklch(0.8764 0.0134 71.3145);
+    --muted-foreground:       oklch(0.4443 0.0102 225.2604);
+    --accent:                 oklch(0.8764 0.0134 71.3145);
+    --accent-foreground:      oklch(0.2423 0.0204 223.8689);
+    --destructive:            oklch(0.6167 0.1781 17.1880);
+    --destructive-foreground: oklch(0.9543 0.0097 72.6608);
+    --border:                 oklch(0.8558 0.0064 75.4004);
+    --input:                  oklch(0.9543 0.0097 72.6608);
+    --ring:                   oklch(0.6347 0.0292 80.1581);
+    --chart-1:                oklch(0.5481 0.1158 243.6095);
+    --chart-2:                oklch(0.4856 0.0942 172.0094);
+    --chart-3:                oklch(0.6174 0.1381 160.7161);
+    --chart-4:                oklch(0.7637 0.1543 129.6240);
+    --chart-5:                oklch(0.7976 0.1500 64.0455);
+    --sidebar:                oklch(0.2423 0.0204 223.8689);
+    --sidebar-foreground:     oklch(0.9543 0.0097 72.6608);
+    --sidebar-primary:        oklch(0.6174 0.1381 160.7161);
+    --sidebar-primary-fg:     oklch(0.9543 0.0097 72.6608);
+    --sidebar-border:         oklch(0.3763 0.0200 221.5520);
+    --radius:    0.75rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.625rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+}
+
+/* ── Dark mode ───────────────────────────────────── */
+[data-bs-theme="dark"] {
+    --background:             oklch(0.2423 0.0204 223.8689);
+    --foreground:             oklch(0.9543 0.0097 72.6608);
+    --card:                   oklch(0.3263 0.0205 221.7247);
+    --card-foreground:        oklch(0.9543 0.0097 72.6608);
+    --primary:                oklch(0.6174 0.1381 160.7161);
+    --primary-foreground:     oklch(0.2423 0.0204 223.8689);
+    --muted:                  oklch(0.3763 0.0200 221.5520);
+    --muted-foreground:       oklch(0.7200 0.0097 225.0000);
+    --accent:                 oklch(0.3763 0.0200 221.5520);
+    --accent-foreground:      oklch(0.9543 0.0097 72.6608);
+    --destructive:            oklch(0.6167 0.1781 17.1880);
+    --destructive-foreground: oklch(0.9543 0.0097 72.6608);
+    --border:                 oklch(0.3763 0.0200 221.5520);
+    --input:                  oklch(0.3263 0.0205 221.7247);
+    --ring:                   oklch(0.5200 0.0200 221.5520);
+    --sidebar:                oklch(0.3263 0.0205 221.7247);
+    --sidebar-foreground:     oklch(0.9543 0.0097 72.6608);
+    --sidebar-primary:        oklch(0.6174 0.1381 160.7161);
+    --sidebar-primary-fg:     oklch(0.2423 0.0204 223.8689);
+    --sidebar-border:         oklch(0.3763 0.0200 221.5520);
+}

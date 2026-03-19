@@ -140,6 +140,7 @@ export async function tradeInstanceRoutes(app, { models }) {
       'decimal_quantity',
       'decimal_price',
       'name',
+      'asset',
       'rebuy_profit',
       'reserve_quote_offset_percent',
       'reserve_quote_order_id',

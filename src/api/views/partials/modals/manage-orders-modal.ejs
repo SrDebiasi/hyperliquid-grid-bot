@@ -4,7 +4,7 @@
         <div class="modal-content">
 
             <div class="modal-header py-2">
-                <h5 class="modal-title d-flex align-items-center gap-2">
+                <h5 class="modal-title flex items-center gap-2">
                     <i class="bi bi-list-ul text-secondary"></i>
                     Manage Orders
                 </h5>
@@ -14,60 +14,52 @@
             <div class="modal-body">
 
                 <!-- Stats cards -->
-                <div class="row g-3 mb-3">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
 
-                    <div class="col-6 col-md-3">
-                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
-                            <div class="text-muted small mb-1">Current price</div>
-                            <div class="fs-6 fw-semibold" id="moCurrentPrice">-</div>
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid var(--muted-foreground);">
+                        <div class="text-muted text-sm mb-1">Current price</div>
+                        <div class="text-base font-semibold" id="moCurrentPrice">-</div>
+                    </div>
+
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid var(--muted-foreground);">
+                        <div class="text-muted text-sm mb-1">BTC needed</div>
+                        <div class="font-semibold flex items-center gap-2 flex-wrap">
+                            <span id="moBtcNeeded">-</span>
+                            <span id="moBtcDelta" class="text-sm"></span>
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-3">
-                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
-                            <div class="text-muted small mb-1">BTC needed</div>
-                            <div class="fw-semibold d-flex align-items-center gap-2 flex-wrap">
-                                <span id="moBtcNeeded">-</span>
-                                <span id="moBtcDelta" class="small"></span>
-                            </div>
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid var(--muted-foreground);">
+                        <div class="text-muted text-sm mb-1">USD needed</div>
+                        <div class="font-semibold flex items-center gap-2 flex-wrap">
+                            <span id="moUsdNeeded">-</span>
+                            <span id="moUsdDelta" class="text-sm"></span>
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-3">
-                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
-                            <div class="text-muted small mb-1">USD needed</div>
-                            <div class="fw-semibold d-flex align-items-center gap-2 flex-wrap">
-                                <span id="moUsdNeeded">-</span>
-                                <span id="moUsdDelta" class="small"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-6 col-md-3">
-                        <div class="border rounded p-3 h-100 profit-card profit-card-neutral">
-                            <div class="text-muted small mb-1" id="moNetChangeLabel" style="display:none;">Change</div>
-                            <div class="text-muted small mb-1" id="moNetChangeLabelPlaceholder">Net change</div>
-                            <div class="fw-semibold">
-                                <span id="moNetChange" class="small"></span>
-                            </div>
+                    <div class="border border-border rounded-md p-3 h-full" style="border-left: 3px solid var(--muted-foreground);">
+                        <div class="text-muted text-sm mb-1" id="moNetChangeLabel" style="display:none;">Change</div>
+                        <div class="text-muted text-sm mb-1" id="moNetChangeLabelPlaceholder">Net change</div>
+                        <div class="font-semibold">
+                            <span id="moNetChange" class="text-sm"></span>
                         </div>
                     </div>
 
                 </div>
 
                 <!-- Controls bar -->
-                <div class="border-top border-bottom py-2 my-2">
-                    <div class="d-flex flex-wrap gap-3 align-items-center">
+                <div class="border-t border-b py-2 my-2">
+                    <div class="flex flex-wrap gap-3 items-center">
 
                         <!-- Select all -->
                         <div class="form-check mb-0">
                             <input class="form-check-input" type="checkbox" id="moSelectAll" checked>
-                            <label class="form-check-label small" for="moSelectAll">Select all</label>
+                            <label class="form-check-label text-sm" for="moSelectAll">Select all</label>
                         </div>
 
                         <!-- Slider -->
-                        <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width: 180px;">
-                            <span class="small text-muted text-nowrap">Order value (USD)</span>
+                        <div class="flex items-center gap-2 grow" style="min-width: 180px;">
+                            <span class="text-sm text-muted whitespace-nowrap">Order value (USD)</span>
                             <input
                                 type="range"
                                 class="form-range"
@@ -78,19 +70,19 @@
                                 value="100"
                                 style="min-width: 80px;"
                             />
-                            <span class="fw-semibold small text-nowrap" id="moValueSliderLabel">$100</span>
+                            <span class="font-semibold text-sm whitespace-nowrap" id="moValueSliderLabel">$100</span>
                         </div>
 
                         <!-- Action buttons -->
-                        <div class="d-flex gap-2 ms-auto">
+                        <div class="flex gap-2 ml-auto">
                             <button class="btn btn-sm btn-outline-secondary" id="moRollbackBtn" type="button" disabled>
-                                <i class="bi bi-arrow-counterclockwise me-1"></i>Rollback
+                                <i class="bi bi-arrow-counterclockwise mr-1"></i>Rollback
                             </button>
                             <button class="btn btn-sm btn-outline-danger" id="moDeleteBtn" type="button">
-                                <i class="bi bi-trash me-1"></i>Delete
+                                <i class="bi bi-trash mr-1"></i>Delete
                             </button>
                             <button class="btn btn-sm btn-success" id="moSaveBtn" type="button" disabled>
-                                <i class="bi bi-check2 me-1"></i>Save changes
+                                <i class="bi bi-check2 mr-1"></i>Save changes
                             </button>
                         </div>
 
@@ -99,16 +91,16 @@
 
                 <!-- Table -->
                 <div class="table-responsive">
-                    <table class="table table-sm orders-table mb-0">
+                    <table class="table table-sm mb-0" style="font-size: 0.85rem;">
                         <thead>
                         <tr>
-                            <th style="width: 36px;"></th>
-                            <th class="th-buy text-end">Buy price</th>
-                            <th class="th-buy text-end">Buy USD</th>
-                            <th class="th-sell text-end">Sell price</th>
-                            <th class="th-sell text-end">Sell USD</th>
-                            <th class="text-end">Qty</th>
-                            <th class="text-end">Entry price</th>
+                            <th style="width: 36px; font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);"></th>
+                            <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border)">Buy price</th>
+                            <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border)">Buy USD</th>
+                            <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border)">Sell price</th>
+                            <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border)">Sell USD</th>
+                            <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Qty</th>
+                            <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Entry price</th>
                         </tr>
                         </thead>
                         <tbody id="moTbody">
@@ -117,14 +109,14 @@
                     </table>
                 </div>
 
-                <div class="small text-muted mt-2">
-                    <i class="bi bi-info-circle me-1"></i>Slider changes only update the local view until you click "Save changes".
+                <div class="text-sm text-muted mt-2">
+                    <i class="bi bi-info-circle mr-1"></i>Slider changes only update the local view until you click "Save changes".
                 </div>
 
             </div>
 
             <div class="modal-footer py-2">
-                <div class="me-auto small text-muted" id="moStatus"></div>
+                <div class="mr-auto text-sm text-muted" id="moStatus"></div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
             </div>
 
@@ -137,7 +129,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h5 class="modal-title d-flex align-items-center gap-2" id="moExtendModalTitle">
+                <h5 class="modal-title flex items-center gap-2" id="moExtendModalTitle">
                     <i class="bi bi-plus-circle text-primary"></i> Add level
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -145,49 +137,49 @@
             <div class="modal-body">
 
                 <!-- Preview -->
-                <div class="border rounded p-3 mb-3 small">
+                <div class="border border-border rounded-md p-3 mb-3 text-sm">
                     <div class="text-muted mb-2">New order preview</div>
-                    <div class="row g-2 text-center">
-                        <div class="col-4">
-                            <div class="text-muted small">Buy price</div>
-                            <div class="fw-semibold" id="moExtendBuyPrice">—</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-center">
+                        <div>
+                            <div class="text-muted text-sm">Buy price</div>
+                            <div class="font-semibold" id="moExtendBuyPrice">—</div>
                         </div>
-                        <div class="col-4">
-                            <div class="text-muted small">Sell price</div>
-                            <div class="fw-semibold" id="moExtendSellPrice">—</div>
+                        <div>
+                            <div class="text-muted text-sm">Sell price</div>
+                            <div class="font-semibold" id="moExtendSellPrice">—</div>
                         </div>
-                        <div class="col-4">
-                            <div class="text-muted small">Quantity</div>
-                            <div class="fw-semibold" id="moExtendQty">—</div>
+                        <div>
+                            <div class="text-muted text-sm">Quantity</div>
+                            <div class="font-semibold" id="moExtendQty">—</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Config params (read-only) -->
-                <div class="d-flex gap-3 mb-3 small text-muted">
-                    <span><i class="bi bi-bullseye me-1"></i>Target <span class="fw-semibold text-body" id="moExtendTargetPct">—</span></span>
-                    <span><i class="bi bi-arrows-collapse-vertical me-1"></i>Grid distance <span class="fw-semibold text-body" id="moExtendMarginPct">—</span></span>
+                <div class="flex gap-3 mb-3 text-sm text-muted">
+                    <span><i class="bi bi-bullseye mr-1"></i>Target <span class="font-semibold text-body" id="moExtendTargetPct">—</span></span>
+                    <span><i class="bi bi-arrows-collapse-vertical mr-1"></i>Grid distance <span class="font-semibold text-body" id="moExtendMarginPct">—</span></span>
                 </div>
 
                 <!-- Entry price -->
                 <div class="mb-1">
-                    <div class="fw-semibold small mb-2">Entry price</div>
-                    <div class="vstack gap-2">
+                    <div class="font-semibold text-sm mb-2">Entry price</div>
+                    <div class="flex flex-col gap-2">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="moExtendEntryType" id="moExtendEntrySame" value="same" checked>
-                            <label class="form-check-label small" for="moExtendEntrySame">
-                                Same as adjacent order &mdash; <span class="fw-semibold" id="moExtendEntrySameVal">—</span>
+                            <label class="form-check-label text-sm" for="moExtendEntrySame">
+                                Same as adjacent order &mdash; <span class="font-semibold" id="moExtendEntrySameVal">—</span>
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="moExtendEntryType" id="moExtendEntryCurrent" value="current">
-                            <label class="form-check-label small" for="moExtendEntryCurrent">
-                                Current market price &mdash; <span class="fw-semibold" id="moExtendEntryCurrentVal">—</span>
+                            <label class="form-check-label text-sm" for="moExtendEntryCurrent">
+                                Current market price &mdash; <span class="font-semibold" id="moExtendEntryCurrentVal">—</span>
                             </label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="moExtendEntryType" id="moExtendEntryCustom" value="custom">
-                            <label class="form-check-label small" for="moExtendEntryCustom">Custom</label>
+                            <label class="form-check-label text-sm" for="moExtendEntryCustom">Custom</label>
                         </div>
                         <input type="number" class="form-control form-control-sm" id="moExtendEntryCustomInput"
                                placeholder="Enter price…" step="any" disabled>
@@ -198,7 +190,7 @@
             <div class="modal-footer py-2">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-sm btn-primary" id="moExtendConfirmBtn">
-                    <i class="bi bi-plus-circle me-1"></i>Add level
+                    <i class="bi bi-plus-circle mr-1"></i>Add level
                 </button>
             </div>
         </div>
@@ -210,7 +202,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h5 class="modal-title d-flex align-items-center gap-2" id="moConfirmSaveModalLabel">
+                <h5 class="modal-title flex items-center gap-2" id="moConfirmSaveModalLabel">
                     <i class="bi bi-exclamation-triangle text-warning"></i>
                     Confirm save
                 </h5>
@@ -218,8 +210,8 @@
             </div>
 
             <div class="modal-body">
-                <div class="fw-semibold mb-2">This will cancel orders on the exchange</div>
-                <div class="text-muted small">
+                <div class="font-semibold mb-2">This will cancel orders on the exchange</div>
+                <div class="text-muted text-sm">
                     If you proceed, <strong>ALL</strong> affected orders will be cancelled on Hyperliquid (buy and sell).
                     Then your new quantities will be saved.
                 </div>
@@ -238,7 +230,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header py-2">
-                <h5 class="modal-title d-flex align-items-center gap-2" id="moConfirmDeleteModalLabel">
+                <h5 class="modal-title flex items-center gap-2" id="moConfirmDeleteModalLabel">
                     <i class="bi bi-trash text-danger"></i>
                     Delete orders
                 </h5>
@@ -246,8 +238,8 @@
             </div>
 
             <div class="modal-body">
-                <div class="fw-semibold mb-2">This will cancel orders on the exchange</div>
-                <div class="text-muted small">
+                <div class="font-semibold mb-2">This will cancel orders on the exchange</div>
+                <div class="text-muted text-sm">
                     You are about to delete <strong><span id="moDeleteCount">0</span></strong> selected orders from the database.
                     If you proceed, their buy/sell orders will be cancelled on Hyperliquid (best effort) before deletion.
                 </div>

@@ -7,13 +7,13 @@
             </div>
 
             <div class="modal-body">
-                <p class="text-muted small mb-3">
+                <p class="text-muted text-sm mb-3">
                     Set a price range and order size — the bot will place buy/sell orders across that range, spaced by <strong>Distance Grid %</strong>, each targeting a profit of <strong>Target Profit %</strong>.
                 </p>
-                <div class="border rounded p-2 mb-3">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-12 col-md-3">
-                            <label for="simEntryPrice" class="form-label small mb-1">Entry Price</label>
+                <div class="border border-border rounded-md p-2 mb-3">
+                    <div class="grid grid-cols-12 gap-2 items-end">
+                        <div class="col-span-12 md:col-span-3">
+                            <label for="simEntryPrice" class="form-label text-sm mb-1">Entry Price</label>
                             <input
                                     type="number"
                                     class="form-control form-control-sm"
@@ -25,8 +25,8 @@
                             >
                         </div>
 
-                        <div class="col-12 col-md-3">
-                            <label for="simExitPrice" class="form-label small mb-1">Exit Price</label>
+                        <div class="col-span-12 md:col-span-3">
+                            <label for="simExitPrice" class="form-label text-sm mb-1">Exit Price</label>
                             <input
                                     type="number"
                                     class="form-control form-control-sm"
@@ -38,8 +38,8 @@
                             >
                         </div>
 
-                        <div class="col-12 col-md-3">
-                            <label for="simUsdTransaction" class="form-label small mb-1">USD per order</label>
+                        <div class="col-span-12 md:col-span-3">
+                            <label for="simUsdTransaction" class="form-label text-sm mb-1">USD per order</label>
                             <input
                                     type="number"
                                     class="form-control form-control-sm"
@@ -51,8 +51,8 @@
                             >
                         </div>
 
-                        <div class="col-12 col-md-3 d-grid">
-                            <button type="button" class="btn btn-primary btn-sm" id="simRunBtn">
+                        <div class="col-span-12 md:col-span-3">
+                            <button type="button" class="btn btn-primary btn-sm w-full" id="simRunBtn">
                                 Simulate
                             </button>
                         </div>
@@ -63,12 +63,12 @@
                 <div id="simStatus" class="mb-3"></div>
                 <div
                         id="simText"
-                        class="small mb-0"
+                        class="text-sm mb-0"
                         style="min-height: 320px;"
                 ></div>
             </div>
 
-            <div class="modal-footer d-flex justify-content-between">
+            <div class="modal-footer" style="justify-content: space-between;">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                     Close
                 </button>

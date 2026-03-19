@@ -2,10 +2,10 @@
 <style>
 .price-ticker-wrap {
     overflow: hidden;
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border);
     margin: -1rem -1rem 1rem -1rem;
     padding: 0.35rem 1rem;
-    background: var(--bs-secondary-bg);
+    background: var(--muted);
 }
 .price-ticker-track {
     display: flex;
@@ -19,7 +19,7 @@
     100% { transform: translateX(-50%); }
 }
 .ticker-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; white-space: nowrap; }
-.ticker-item .ticker-name { color: var(--bs-secondary-color); }
+.ticker-item .ticker-name { color: var(--muted-foreground); }
 .ticker-item .ticker-price { font-weight: 600; }
 </style>
 
@@ -78,24 +78,24 @@
 })();
 </script>
 
-<div class="d-flex justify-content-between align-items-center mb-2">
+<div class="flex justify-between items-center mb-2">
     <div>
-        <div class="fw-semibold">Market</div>
-        <div class="text-muted small">
+        <div class="font-semibold">Market</div>
+        <div class="text-muted text-sm">
             <span id="mktSymbol">BTCUSDT</span> ·
             <span id="mktInterval">5m</span> ·
             last <span id="mktDays">5</span> days
         </div>
     </div>
 
-    <div class="text-end small">
+    <div class="text-right text-sm">
         <div class="text-muted">Price</div>
-        <div class="fw-semibold" id="mktLastPrice">—</div>
+        <div class="font-semibold" id="mktLastPrice">—</div>
     </div>
 </div>
 
 <div id="mktChart" style="height: 340px;"></div>
 
-<div class="mt-2 small text-muted d-flex gap-3 flex-wrap">
-    <div>Range (<span id="mktRangePctLabel">—</span>%): <span class="fw-semibold" id="mktRange">—</span></div>
+<div class="mt-2 text-sm text-muted flex gap-3 flex-wrap">
+    <div>Range (<span id="mktRangePctLabel">—</span>%): <span class="font-semibold" id="mktRange">—</span></div>
 </div>

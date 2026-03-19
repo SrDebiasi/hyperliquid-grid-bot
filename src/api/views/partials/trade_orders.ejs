@@ -1,21 +1,7 @@
-<style>
-.orders-table th { font-size: 0.75rem; font-weight: 600; color: #6c757d; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--bs-border-color); }
-.orders-table td { font-size: 0.85rem; vertical-align: middle; border-bottom: 1px solid var(--bs-border-color-translucent); }
-.orders-table tbody tr { transition: background 0.1s; }
-.orders-table tbody tr:hover { background: var(--bs-secondary-bg) !important; }
-.orders-table tbody tr.row-buy  { border-left: 3px solid #198754; }
-.orders-table tbody tr.row-sell { border-left: 3px solid #0d6efd; }
-.order-id { font-family: monospace; font-size: 0.78rem; color: #6c757d; cursor: default; }
-.th-buy  { background: #f0faf5; }
-.th-sell { background: #f0f4ff; }
-[data-bs-theme="dark"] .th-buy  { background: transparent; }
-[data-bs-theme="dark"] .th-sell { background: transparent; }
-</style>
-
-<h2 class="h5 mb-3">Orders</h2>
+<h2 class="text-xl font-semibold mb-3">Orders</h2>
 
 <% if (!orders || orders.length === 0) { %>
-    <div class="text-muted small">No orders found.</div>
+    <div class="text-muted text-sm">No orders found.</div>
 <% } else { %>
 
     <%
@@ -67,12 +53,12 @@
     %>
 
     <!-- Legend + toggle -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="d-flex gap-3 small text-muted">
-            <span class="d-flex align-items-center gap-1">
+    <div class="flex justify-between items-center mb-3">
+        <div class="flex gap-3 text-sm text-muted">
+            <span class="flex items-center gap-1">
                 <i class="bi bi-currency-dollar text-success"></i> Profit on next fill
             </span>
-            <span class="d-flex align-items-center gap-1">
+            <span class="flex items-center gap-1">
                 <i class="bi bi-hourglass-split text-warning"></i> Waiting for cycle
             </span>
         </div>
@@ -82,19 +68,19 @@
     </div>
 
     <div class="table-responsive">
-        <table class="table table-sm orders-table mb-0">
+        <table class="table table-sm mb-0" style="font-size: 0.85rem;">
             <thead>
                 <tr>
-                    <th class="text-center"></th>
-                    <th class="th-buy text-end">Buy price</th>
-                    <th class="th-buy text-center">Buy order</th>
-                    <th class="th-buy text-end">Buy USD</th>
-                    <th class="th-sell text-end">Sell price</th>
-                    <th class="th-sell text-center">Sell order</th>
-                    <th class="th-sell text-end">Sell USD</th>
-                    <th class="text-end">Qty</th>
-                    <th class="text-center">Last side</th>
-                    <th class="text-end">Entry price</th>
+                    <th class="text-center" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);"></th>
+                    <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Buy price</th>
+                    <th class="text-center" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Buy order</th>
+                    <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Buy USD</th>
+                    <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Sell price</th>
+                    <th class="text-center" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Sell order</th>
+                    <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Sell USD</th>
+                    <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Qty</th>
+                    <th class="text-center" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Last side</th>
+                    <th class="text-right" style="font-size: 0.75rem; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border);">Entry price</th>
                 </tr>
             </thead>
 
@@ -104,7 +90,7 @@
                 const sellUsd = usdFor(o.quantity, o.sell_price);
                 const isBuy   = o.last_side === 'BUY';
             %>
-            <tr class="<%= isBuy ? 'row-buy' : 'row-sell' %>">
+            <tr style="border-left: 3px solid <%= isBuy ? 'var(--primary)' : 'var(--chart-1)' %>; vertical-align: middle; border-bottom: 1px solid var(--border); transition: background 0.1s;" onmouseover="this.style.background='var(--muted)'" onmouseout="this.style.background=''">
                 <td class="text-center" style="width:36px;">
                     <% if (o.last_operation) { %>
                         <i class="bi bi-currency-dollar text-success" title="Profit on next fill"></i>
@@ -112,44 +98,44 @@
                         <i class="bi bi-hourglass-split text-warning" title="Waiting for cycle"></i>
                     <% } %>
                 </td>
-                <td class="text-end fw-medium"><%= fmtPrice(o.buy_price) %></td>
+                <td class="text-right font-medium"><%= fmtPrice(o.buy_price) %></td>
                 <td class="text-center">
                     <% if (o.buy_order) { %>
-                        <span class="order-id" title="<%= o.buy_order %>"><%= shortId(o.buy_order) %></span>
+                        <span style="font-family: monospace; font-size: 0.78rem; color: var(--muted-foreground); cursor: default;" title="<%= o.buy_order %>"><%= shortId(o.buy_order) %></span>
                     <% } else { %>
                         <span class="text-muted">—</span>
                     <% } %>
                 </td>
-                <td class="text-end text-muted"><%= buyUsd === null ? '—' : fmtUsd(buyUsd) %></td>
+                <td class="text-right text-muted"><%= buyUsd === null ? '—' : fmtUsd(buyUsd) %></td>
 
-                <td class="text-end fw-medium"><%= fmtPrice(o.sell_price) %></td>
+                <td class="text-right font-medium"><%= fmtPrice(o.sell_price) %></td>
                 <td class="text-center">
                     <% if (o.sell_order) { %>
-                        <span class="order-id" title="<%= o.sell_order %>"><%= shortId(o.sell_order) %></span>
+                        <span style="font-family: monospace; font-size: 0.78rem; color: var(--muted-foreground); cursor: default;" title="<%= o.sell_order %>"><%= shortId(o.sell_order) %></span>
                     <% } else { %>
                         <span class="text-muted">—</span>
                     <% } %>
                 </td>
-                <td class="text-end text-muted"><%= sellUsd === null ? '—' : fmtUsd(sellUsd) %></td>
+                <td class="text-right text-muted"><%= sellUsd === null ? '—' : fmtUsd(sellUsd) %></td>
 
-                <td class="text-end text-muted"><%= o.quantity ?? '—' %></td>
+                <td class="text-right text-muted"><%= o.quantity ?? '—' %></td>
                 <td class="text-center">
                     <span class="badge <%= isBuy ? 'text-bg-success' : 'text-bg-primary' %>" style="font-size:0.7rem;">
                         <%= o.last_side ?? '—' %>
                     </span>
                 </td>
-                <td class="text-end text-muted"><%= fmtPrice(o.entry_price) %></td>
+                <td class="text-right text-muted"><%= fmtPrice(o.entry_price) %></td>
             </tr>
             <% }) %>
             </tbody>
 
-            <tbody id="ordersTbodyAll" class="d-none">
+            <tbody id="ordersTbodyAll" class="hidden">
             <% orders.forEach((o) => {
                 const buyUsd  = usdFor(o.quantity, o.buy_price);
                 const sellUsd = usdFor(o.quantity, o.sell_price);
                 const isBuy   = o.last_side === 'BUY';
             %>
-            <tr class="<%= isBuy ? 'row-buy' : 'row-sell' %>">
+            <tr style="border-left: 3px solid <%= isBuy ? 'var(--primary)' : 'var(--chart-1)' %>; vertical-align: middle; border-bottom: 1px solid var(--border); transition: background 0.1s;" onmouseover="this.style.background='var(--muted)'" onmouseout="this.style.background=''">
                 <td class="text-center" style="width:36px;">
                     <% if (o.last_operation) { %>
                         <i class="bi bi-currency-dollar text-success" title="Profit on next fill"></i>
@@ -157,33 +143,33 @@
                         <i class="bi bi-hourglass-split text-warning" title="Waiting for cycle"></i>
                     <% } %>
                 </td>
-                <td class="text-end fw-medium"><%= fmtPrice(o.buy_price) %></td>
+                <td class="text-right font-medium"><%= fmtPrice(o.buy_price) %></td>
                 <td class="text-center">
                     <% if (o.buy_order) { %>
-                        <span class="order-id" title="<%= o.buy_order %>"><%= shortId(o.buy_order) %></span>
+                        <span style="font-family: monospace; font-size: 0.78rem; color: var(--muted-foreground); cursor: default;" title="<%= o.buy_order %>"><%= shortId(o.buy_order) %></span>
                     <% } else { %>
                         <span class="text-muted">—</span>
                     <% } %>
                 </td>
-                <td class="text-end text-muted"><%= buyUsd === null ? '—' : fmtUsd(buyUsd) %></td>
+                <td class="text-right text-muted"><%= buyUsd === null ? '—' : fmtUsd(buyUsd) %></td>
 
-                <td class="text-end fw-medium"><%= fmtPrice(o.sell_price) %></td>
+                <td class="text-right font-medium"><%= fmtPrice(o.sell_price) %></td>
                 <td class="text-center">
                     <% if (o.sell_order) { %>
-                        <span class="order-id" title="<%= o.sell_order %>"><%= shortId(o.sell_order) %></span>
+                        <span style="font-family: monospace; font-size: 0.78rem; color: var(--muted-foreground); cursor: default;" title="<%= o.sell_order %>"><%= shortId(o.sell_order) %></span>
                     <% } else { %>
                         <span class="text-muted">—</span>
                     <% } %>
                 </td>
-                <td class="text-end text-muted"><%= sellUsd === null ? '—' : fmtUsd(sellUsd) %></td>
+                <td class="text-right text-muted"><%= sellUsd === null ? '—' : fmtUsd(sellUsd) %></td>
 
-                <td class="text-end text-muted"><%= o.quantity ?? '—' %></td>
+                <td class="text-right text-muted"><%= o.quantity ?? '—' %></td>
                 <td class="text-center">
                     <span class="badge <%= isBuy ? 'text-bg-success' : 'text-bg-primary' %>" style="font-size:0.7rem;">
                         <%= o.last_side ?? '—' %>
                     </span>
                 </td>
-                <td class="text-end text-muted"><%= fmtPrice(o.entry_price) %></td>
+                <td class="text-right text-muted"><%= fmtPrice(o.entry_price) %></td>
             </tr>
             <% }) %>
             </tbody>
@@ -199,8 +185,8 @@
 
         btn.addEventListener('click', function () {
             const isFiltered = btn.getAttribute('data-state') === 'filtered';
-            tbFiltered.classList.toggle('d-none',  isFiltered);
-            tbAll.classList.toggle('d-none', !isFiltered);
+            tbFiltered.classList.toggle('hidden',  isFiltered);
+            tbAll.classList.toggle('hidden', !isFiltered);
             btn.setAttribute('data-state', isFiltered ? 'all' : 'filtered');
             btn.textContent = isFiltered ? 'Show around price' : 'Show all';
         });
