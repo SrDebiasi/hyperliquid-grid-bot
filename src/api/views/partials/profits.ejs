@@ -185,7 +185,7 @@
                             const isNeg  = v < 0;
                             const isZero = v === 0;
                         %>
-                        <div class="flex items-center gap-0 text-sm" style="padding: 2px 4px; border-radius: 4px; transition: background 0.1s;<%= isZero ? ' opacity: 0.38;' : '' %>" onmouseover="this.style.background='var(--muted)'" onmouseout="this.style.background=''">
+                        <div class="flex items-center gap-0 text-sm" style="padding: 1px 4px; border-radius: 4px; transition: background 0.1s;<%= isZero ? ' opacity: 0.38;' : '' %>" onmouseover="this.style.background='var(--muted)'" onmouseout="this.style.background=''">
                             <div style="width:52px; margin-right:3px;" class="text-muted whitespace-nowrap"><%= fmtDate(d.date) %></div>
 
                             <div class="progress grow" style="height:8px; background:var(--muted);">
