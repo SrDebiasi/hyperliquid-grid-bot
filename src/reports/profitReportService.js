@@ -140,7 +140,7 @@ async function countCyclesForPeriod({ models, tradeInstanceId, from, to }) {
             trade_instance_id: tradeInstanceId,
             date_transaction: {
                 [Op.gte]: `${from} 00:00:00`,
-                [Op.lte]: `${to} 23:59:59`,
+                [Op.lte]: `${to} 23:59:59.999999`,
             },
         },
     });
@@ -197,7 +197,7 @@ async function buildCycleMtdByDay({ models, tradeInstanceId, period }) {
             trade_instance_id: tradeInstanceId,
             date_transaction: {
                 [Op.gte]: `${period.from} 00:00:00`,
-                [Op.lte]: `${period.to} 23:59:59`,
+                [Op.lte]: `${period.to} 23:59:59.999999`,
             },
         },
     });

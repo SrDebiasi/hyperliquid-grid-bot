@@ -27,7 +27,7 @@ export async function tradeCycleRoutes(app, { models }) {
             if (date_end) {
                 const d1 = String(date_end).slice(0, 10);
                 if (!dateRe.test(d1)) return reply.code(400).send({ error: "Invalid date_end format, expected YYYY-MM-DD" });
-                where.date_transaction[Op.lte] = Sequelize.cast(`${d1} 23:59:59`, "timestamp");
+                where.date_transaction[Op.lte] = Sequelize.cast(`${d1} 23:59:59.999999`, "timestamp");
             }
         }
 
