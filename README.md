@@ -9,7 +9,7 @@ Hyperliquid view:
 ![Grid bot](docs/bot.png)
 
 
-Dashboard view:
+Dashboard view http://localhost:3000/dashboard :
 ![Dashboard](docs/dashboard.png)
 
 
