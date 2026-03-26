@@ -1,0 +1,13 @@
+# Force LF line endings for shell scripts and Docker files (prevents CRLF issues on Windows)
+*.sh        text eol=lf
+*.bash      text eol=lf
+Dockerfile  text eol=lf
+docker-compose.yml text eol=lf
+*.cjs       text eol=lf
+*.js        text eol=lf
+*.mjs       text eol=lf
+*.json      text eol=lf
+*.ejs       text eol=lf
+*.sql       text eol=lf
+*.md        text eol=lf
+*.env*      text eol=lf

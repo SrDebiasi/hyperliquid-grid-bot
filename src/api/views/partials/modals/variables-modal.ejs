@@ -25,13 +25,15 @@
                         <div class="mb-3">
                             <label class="form-label flex items-center gap-1">
                                 Bot token
-                                <i class="bi bi-info-circle text-muted"
+                                <i class="bi bi-box-arrow-up-right text-muted"
                                    style="cursor:pointer"
                                    data-bs-toggle="tooltip"
                                    data-bs-placement="right"
-                                   title="Open Telegram, search @BotFather, send /newbot and follow the steps. Copy the token it gives you."></i>
+                                   title="Click to open @BotFather on Telegram"
+                                   onclick="window.open('https://t.me/BotFather','_blank')"></i>
                             </label>
                             <input
+                                id="varBotToken"
                                 name="telegram_bot_token"
                                 class="form-control"
                                 autocomplete="off"
@@ -42,11 +44,12 @@
                         <div class="mb-3">
                             <label class="form-label flex items-center gap-1">
                                 Chat ID
-                                <i class="bi bi-info-circle text-muted"
+                                <i id="varChatIdIcon" class="bi bi-copy text-muted"
                                    style="cursor:pointer"
                                    data-bs-toggle="tooltip"
                                    data-bs-placement="right"
-                                   title="Start your bot in Telegram and send it any message. Then open: https://api.telegram.org/bot&lt;YOUR_TOKEN&gt;/getUpdates — look for &quot;chat&quot;:{&quot;id&quot;: ...} — that number is your Chat ID."></i>
+                                   title="Click to copy the getUpdates link (open it in browser after messaging your bot)"
+                                   onclick="varCopyGetUpdates(this)"></i>
                             </label>
                             <input
                                 name="telegram_chat_id"
@@ -61,13 +64,15 @@
                         <div class="mb-3">
                             <label class="form-label flex items-center gap-1">
                                 Ping URL
-                                <i class="bi bi-info-circle text-muted"
+                                <i class="bi bi-box-arrow-up-right text-muted"
                                    style="cursor:pointer"
                                    data-bs-toggle="tooltip"
                                    data-bs-placement="right"
-                                   title="Create a free check at healthchecks.io — copy the Ping URL (looks like https://hc-ping.com/your-uuid). The bot will ping it periodically; if it stops, you get an alert."></i>
+                                   title="Click to open healthchecks.io"
+                                   onclick="window.open('https://healthchecks.io','_blank')"></i>
                             </label>
                             <input
+                                id="varPingUrl"
                                 name="healthchecks_ping_url"
                                 class="form-control"
                                 autocomplete="off"
@@ -162,7 +167,24 @@
     </div>
 
     <script>
-        document.body.addEventListener('htmx:afterRequest', function (e) {
+        function varCopyIcon(el, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                el.classList.replace('bi-copy', 'bi-check2');
+                el.style.color = 'var(--primary)';
+                setTimeout(() => {
+                    el.classList.replace('bi-check2', 'bi-copy');
+                    el.style.color = '';
+                }, 2000);
+            });
+        }
+
+        function varCopyGetUpdates(el) {
+            const token = document.getElementById('varBotToken')?.value?.trim();
+            if (!token) { alert('Enter your Bot Token first.'); return; }
+            varCopyIcon(el, `https://api.telegram.org/bot${token}/getUpdates`);
+        }
+
+document.body.addEventListener('htmx:afterRequest', function (e) {
             if (!e.target || e.target.id !== 'variablesForm') return;
 
             const result = document.getElementById('variablesResult');
